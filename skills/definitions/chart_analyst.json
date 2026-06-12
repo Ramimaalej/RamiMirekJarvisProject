@@ -1,0 +1,13 @@
+{
+  "name": "chart_analyst",
+  "description": "Analyzes financial charts, identifies patterns, support/resistance levels, and market trends",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "(analyze|read|check).*(chart|graph|market|price)", "weight": 20, "keywords": ["chart analysis", "technical analysis", "trading view", "chart", "support resistance", "market analysis", "trend"]},
+    {"pattern": "(xauusd|eurusd|gbpusd|btc|gold|silver|crypto|forex|stock|equity)", "weight": 15, "keywords": ["trading", "invest", "price action", "candlestick"]},
+    {"pattern": "(support|resistance|trend|pattern).*(level|line|analysis)", "weight": 10, "keywords": ["support", "resistance", "breakout", "indicator"]}
+  ],
+  "instructions": "1) Take a screenshot of the chart using screen_process. 2) Analyze the visual for: trend direction, support/resistance levels, chart patterns (head and shoulders, triangles, flags), candlestick patterns, volume analysis. 3) Provide clear entry/exit suggestions. 4) Note timeframe and key price levels.",
+  "preferred_tools": ["screen_process", "computer_control", "web_search"],
+  "knowledge": "Technical analysis patterns: head and shoulders, double top/bottom, triangles, flags, wedges. Candlestick patterns: doji, hammer, engulfing, morning/evening star. Support/resistance: previous highs/lows, round numbers, moving averages. Indicators: RSI, MACD, Bollinger Bands, Volume."
+}

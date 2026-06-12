@@ -1,0 +1,12 @@
+{
+  "name": "automation_agent",
+  "description": "Automates any computer task: form filling, account creation, data entry, web automation, file organization",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "(create|register|sign up|make|set up).*(account|profile)", "weight": 20, "keywords": ["create account", "register", "sign up", "fill form"]},
+    {"pattern": "automate", "weight": 20, "keywords": ["automate", "automation", "bot", "script"]}
+  ],
+  "instructions": "For account creation/form filling: 1) Use browser_control to navigate to the page. 2) Use screen_process to see the form fields. 3) Use computer_control with screen_find/screen_click to locate and interact with elements. 4) Use random_data from computer_control to generate fake data when needed. 5) Use smart_type for reliable text entry. For automation scripts: use run_python to write and execute automation scripts with pyautogui or selenium. For web scraping: use run_python with requests and BeautifulSoup.",
+  "preferred_tools": ["browser_control", "computer_control", "run_python", "run_command", "screen_process", "file_controller"],
+  "knowledge": "Form automation techniques: CSS selectors, XPath, smart_click/smart_type for Playwright. Data generation: use computer_control random_data for fake names, emails, phones. Screenshot-based element detection with screen_find for elements Playwright can't find. Python automation with pyautogui, playwright, selenium. Web scraping with requests + BeautifulSoup or direct Playwright get_text."
+}

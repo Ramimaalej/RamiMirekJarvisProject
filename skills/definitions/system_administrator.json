@@ -1,0 +1,14 @@
+{
+  "name": "system_administrator",
+  "description": "Manages system: installs packages, configures services, monitors resources, manages processes",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "(install|update|remove|configure).*(package|software|app|tool|library)", "weight": 20, "keywords": ["install", "uninstall", "update package", "configure"]},
+    {"pattern": "(check|monitor|show|view).*(system|memory|cpu|disk|process|resource)", "weight": 15, "keywords": ["system info", "check system", "monitor", "process", "resource"]},
+    {"pattern": "fix|repair|troubleshoot", "weight": 15, "keywords": ["fix", "repair", "troubleshoot", "error", "broken"]},
+    {"pattern": "backup|restore", "weight": 10, "keywords": ["backup", "restore", "snapshot"]}
+  ],
+  "instructions": "Use run_command for all system operations. For package management: use system's native package manager (apt, dnf, pip, npm, brew). For monitoring: use standard Linux tools (top, htop, df, free, uptime). For service management: use systemctl. Always check current state before making changes. Use sudo when needed via run_command. For backups: use tar/rsync via run_command.",
+  "preferred_tools": ["run_command", "run_python", "file_controller", "computer_settings"],
+  "knowledge": "Linux system administration: systemctl, journalctl, dmesg, df, du, free, top, ps, kill, chmod, chown. Package managers: apt, dnf, pip, npm, cargo. Service management: systemctl enable/disable/start/stop/restart. Backup: rsync, tar, dd. Network: nmcli, ip, ss, ping, curl. Logs: journalctl, /var/log."
+}

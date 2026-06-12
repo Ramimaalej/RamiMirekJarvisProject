@@ -1,0 +1,13 @@
+{
+  "name": "web_automator",
+  "description": "Automates web tasks: filling forms, scraping data, monitoring pages, repetitive browser actions",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "(auto|auto)mate.*(web|browser|form|page|site)", "weight": 20, "keywords": ["automate", "web automation", "scrape", "form fill", "extract data", "crawl", "monitor website"]},
+    {"pattern": "(fill|submit|complete).*(form|application|registration|survey)", "weight": 20, "keywords": ["auto fill", "form submission", "register", "sign up", "bot", "fill out"]},
+    {"pattern": "(scrape|extract|collect|grab).*(data|info|content|text|price)", "weight": 15, "keywords": ["scraping", "data extraction", "web scraping", "collect data"]}
+  ],
+  "instructions": "1) Determine target URL and what action is needed. 2) Use browser_control for web interaction (go_to, click, type, fill_form). 3) For data extraction, use browser_control get_text or take screenshots. 4) Save extracted data with file_controller. 5) For repeated tasks, suggest creating a background agent.",
+  "preferred_tools": ["browser_control", "file_controller", "run_command", "run_python", "manage_agents"],
+  "knowledge": "XPATH and CSS selector basics. Form automation patterns: find input fields, fill, submit. Data extraction: text content, attributes, tables. Rate limiting: add delays between actions. Headless vs headed browsing. Cookie/session management. Pagination handling."
+}

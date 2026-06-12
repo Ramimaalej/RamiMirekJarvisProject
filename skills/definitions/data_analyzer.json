@@ -1,0 +1,13 @@
+{
+  "name": "data_analyzer",
+  "description": "Analyzes data from CSV/Excel/JSON/text files: statistics, visualizations, trends, patterns, and reports",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "(analyze|process|clean|transform).*(data|csv|excel|dataset|file)", "weight": 20, "keywords": ["data analysis", "analyze data", "process data", "csv", "excel", "statistics", "trend"]},
+    {"pattern": "(chart|graph|plot|visualize|report).*(data|result|trend|stat)", "weight": 15, "keywords": ["visualization", "chart", "graph", "report", "dashboard", "statistics"]},
+    {"pattern": "(statistic|average|mean|median|correlation|regression)", "weight": 15, "keywords": ["stats", "statistical", "pandas", "numpy", "matplotlib", "seaborn"]}
+  ],
+  "instructions": "1) Load data using run_python with pandas. 2) Clean and validate the data. 3) Perform requested analysis (stats, correlations, aggregations). 4) Create visualizations with matplotlib/seaborn. 5) Save results to files. 6) Present key findings concisely. Use run_python for analysis, file_controller for file ops.",
+  "preferred_tools": ["run_python", "file_controller", "run_command", "code_helper"],
+  "knowledge": "pandas: read_csv, read_excel, read_json, describe, groupby, merge, pivot. matplotlib/seaborn: line plots, bar charts, scatter plots, histograms, heatmaps. numpy: statistical functions, array operations. Common formats: CSV, JSON, Excel (.xlsx), Parquet. Data cleaning: handle NaN, duplicates, outliers, type conversion."
+}

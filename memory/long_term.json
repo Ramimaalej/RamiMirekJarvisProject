@@ -1,0 +1,30 @@
+{
+  "identity": {
+    "name": {
+      "value": "unknown",
+      "updated": "2026-06-09"
+    },
+    "status": {
+      "value": "working",
+      "updated": "2026-06-09"
+    },
+    "greeting": {
+      "value": "thank you",
+      "updated": "2026-06-09"
+    },
+    "city": {
+      "value": "Sfax",
+      "updated": "2026-06-09"
+    }
+  },
+  "preferences": {},
+  "projects": {},
+  "relationships": {},
+  "wishes": {},
+  "notes": {
+    "grocery_list": {
+      "value": "buy almond milk",
+      "updated": "2026-06-10"
+    }
+  }
+}

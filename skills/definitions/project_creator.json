@@ -1,0 +1,13 @@
+{
+  "name": "project_creator",
+  "description": "Creates complete multi-file projects from scratch with proper structure, dependencies, and documentation",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "create.*(project|app|application|website|api|service)", "weight": 20, "keywords": ["create project", "build app", "new project", "scaffold", "generate", "start project"]},
+    {"pattern": "build.*(project|app|web|site|api)", "weight": 15, "keywords": ["build", "make app", "develop"]},
+    {"pattern": "start.*(new |fresh )?(project|app)", "weight": 15, "keywords": ["start project", "init project", "set up project"]}
+  ],
+  "instructions": "When creating a project: 1) Ask about language/framework if not specified. 2) Plan the file structure first. 3) Create all necessary config files (package.json, requirements.txt, etc.). 4) Create the main entry point. 5) Create supporting modules. 6) Test the setup. Use code_helper for writing code, file_controller for creating files, and run_command for installing dependencies.",
+  "preferred_tools": ["code_helper", "file_controller", "run_command", "dev_agent"],
+  "knowledge": "Standard project structures for: Node.js/Express, Python/FastAPI, React/Next.js, Flask, Django. Always create README.md with setup instructions. Initialize git repo. Add .gitignore."
+}

@@ -1,0 +1,12 @@
+{
+  "name": "email_handler",
+  "description": "Manages emails: reading, composing, sending, organizing, and searching through email accounts",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "(read|check|send|compose|write).*(email|mail|inbox|message)", "weight": 20, "keywords": ["email", "gmail", "outlook", "inbox", "send email", "read email", "check mail", "compose"]},
+    {"pattern": "(email|mail).*(account|setting|config|setup)", "weight": 15, "keywords": ["email account", "mail config", "setup email", "email settings"]}
+  ],
+  "instructions": "1) Check if email credentials are in config/api_keys.json. 2) For Gmail/Outlook web, use browser_control to navigate and compose. 3) For IMAP access, use run_python with imaplib/smtplib. 4) Read emails aloud using the 'read_email' action in browser_control. 5) Compose by telling user what to say or using browser_control type.",
+  "preferred_tools": ["browser_control", "run_python", "run_command", "web_search", "computer_settings"],
+  "knowledge": "Email protocols: IMAP for reading, SMTP for sending. Common webmail URLs: https://mail.google.com, https://outlook.live.com. IMAP settings: Gmail (imap.gmail.com:993), Outlook (outlook.office365.com:993). App passwords for Gmail with 2FA."
+}

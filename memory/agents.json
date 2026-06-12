@@ -1,0 +1,35 @@
+[
+  {
+    "agent_id": "d431e7d4",
+    "name": "TestMonitor",
+    "goal": "Check system status every minute",
+    "instructions": "Use run_command to check cpu, memory, disk",
+    "status": "idle",
+    "created": "2026-06-09T23:04:48.590194",
+    "last_active": "2026-06-09T23:04:48.590194",
+    "loop_interval": 0,
+    "context": {}
+  },
+  {
+    "agent_id": "6dc404dc",
+    "name": "TestAgent",
+    "goal": "test goal",
+    "instructions": "",
+    "status": "idle",
+    "created": "2026-06-09T23:06:00.030533",
+    "last_active": "2026-06-09T23:06:00.030533",
+    "loop_interval": 0,
+    "context": {}
+  },
+  {
+    "agent_id": "1a3ff63c",
+    "name": "TestAgent",
+    "goal": "test goal",
+    "instructions": "",
+    "status": "idle",
+    "created": "2026-06-09T23:06:55.383780",
+    "last_active": "2026-06-09T23:06:55.383780",
+    "loop_interval": 0,
+    "context": {}
+  }
+]

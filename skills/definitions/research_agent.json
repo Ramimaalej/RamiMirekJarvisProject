@@ -1,0 +1,13 @@
+{
+  "name": "research_agent",
+  "description": "Deep research on any topic: gathers information from multiple sources, cross-references, and produces comprehensive summaries",
+  "version": "1.0",
+  "triggers": [
+    {"pattern": "research|investigate|look into|find out about", "weight": 20, "keywords": ["research", "investigate", "deep dive", "study"]},
+    {"pattern": "compare|difference between|vs ", "weight": 15, "keywords": ["compare", "difference", "vs", "versus"]},
+    {"pattern": "(summarize|explain|tell me about).*(topic|subject|concept)", "weight": 10, "keywords": ["summarize", "explain", "tell me about"]}
+  ],
+  "instructions": "1) Use web_search with multiple queries to gather comprehensive information. 2) Cross-reference from at least 3 different sources. 3) For complex topics, use agent_task for multi-step research. 4) Save findings to a file if the user wants to keep them. 5) Provide a structured summary with key points, sources, and conclusions.",
+  "preferred_tools": ["web_search", "agent_task", "file_controller", "browser_control"],
+  "knowledge": "Research methodology: use multiple search queries, check recent sources, verify claims against multiple sources. For comparisons: create structured tables. For technical topics: find official documentation, tutorials, and community discussions. Always cite sources when possible."
+}

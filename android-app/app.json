@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "MARK XL",
+    "slug": "mark-xl",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "markxl",
+    "splash": {
+      "backgroundColor": "#0a0a1a"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.markxl.jarvis"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0a0a1a"
+      },
+      "package": "com.markxl.jarvis",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.ASSIST",
+          "category": ["android.intent.category.DEFAULT"]
+        }
+      ],
+      "permissions": [
+        "RECORD_AUDIO",
+        "INTERNET"
+      ]
+    },
+    "plugins": []
+  }
+}
