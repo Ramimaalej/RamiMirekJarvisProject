@@ -181,12 +181,132 @@ def _capture_camera() -> tuple[bytes, str]:
 # ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = (
-    "You are JARVIS, an advanced AI assistant. "
-    "Analyze the provided image with precision and intelligence. "
-    "Be concise and direct — maximum two sentences unless the user's question "
-    "requires more detail. "
-    "Address the user respectfully."
+    "You are JARVIS — a precise, efficient AI assistant. "
+    "Analyze the screen or image with accuracy. "
+    "Describe what you see: the main window, key UI elements (buttons, text fields, "
+    "links), their labels and positions, and any notable content. "
+    "If the user asks a specific question about the screen, answer it directly. "
+    "Be concise — maximum 3 sentences unless the user asks for detail."
 )
+
+# ---------------------------------------------------------------------------
+# UI element extraction (NeuralAgent-inspired)
+# ---------------------------------------------------------------------------
+
+try:
+    import psutil as _psutil
+except ImportError:
+    _psutil = None
+
+try:
+    import pyatspi as _pyatspi
+except ImportError:
+    _pyatspi = None
+
+
+def _get_running_apps() -> list[dict]:
+    if not _psutil:
+        return []
+    system = platform.system()
+    apps = []
+    if system == "Linux":
+        import subprocess
+        try:
+            output = subprocess.check_output(["wmctrl", "-lp"], stderr=subprocess.DEVNULL).decode()
+            active_out = subprocess.check_output(
+                ["xdotool", "getactivewindow", "getwindowpid"], stderr=subprocess.DEVNULL
+            ).decode().strip()
+            active_pid = int(active_out) if active_out.isdigit() else None
+            seen = set()
+            for line in output.splitlines():
+                parts = line.split()
+                if len(parts) >= 5:
+                    pid = int(parts[2])
+                    if pid not in seen:
+                        seen.add(pid)
+                        try:
+                            name = _psutil.Process(pid).name()
+                            apps.append({"pid": pid, "name": name, "focused": pid == active_pid})
+                        except _psutil.NoSuchProcess:
+                            pass
+        except Exception:
+            pass
+    return apps
+
+
+def _extract_ui_elements_linux() -> list[dict]:
+    if not _pyatspi:
+        return []
+    try:
+        desktop = _pyatspi.Registry.getDesktop(0)
+    except Exception:
+        return []
+    elements = []
+    def _recurse(obj, depth=0):
+        try:
+            role = obj.getRoleName()
+            name = obj.name or ""
+        except Exception:
+            return
+        interactive = {"push button", "check box", "combo box", "text", "hyperlink", "menu item",
+                       "toggle button", "spin button", "slider", "list item", "table cell"}
+        if role.lower() in interactive:
+            try:
+                box = _extract_extents(obj)
+            except Exception:
+                box = None
+            elements.append({
+                "type": role.title().replace(" ", ""),
+                "label": name[:80],
+                "bbox": box,
+                "depth": depth,
+            })
+        try:
+            for i in range(obj.childCount):
+                _recurse(obj.getChildAtIndex(i), depth + 1)
+        except Exception:
+            pass
+    _recurse(desktop)
+    return elements
+
+
+def _extract_extents(obj) -> dict | None:
+    try:
+        box = obj.queryComponent().getExtents(0)
+        return {"x": box.x, "y": box.y, "w": box.width, "h": box.height}
+    except Exception:
+        return None
+
+
+def _describe_ui_context() -> str:
+    parts = []
+    apps = _get_running_apps()
+    if apps:
+        focused = [a["name"] for a in apps if a.get("focused")]
+        others = [a["name"] for a in apps if not a.get("focused") and a["name"] not in focused]
+        if focused:
+            parts.append(f"Active window: {focused[0]}")
+        if others:
+            parts.append(f"Open apps: {', '.join(others[:8])}")
+
+    if platform.system() == "Linux":
+        ui_el = _extract_ui_elements_linux()
+        if ui_el:
+            seen = set()
+            lines = []
+            for el in ui_el[:25]:
+                key = f"{el['type']}:{el['label']}"
+                if key not in seen:
+                    seen.add(key)
+                    loc = ""
+                    if el["bbox"]:
+                        loc = f" @({el['bbox']['x']},{el['bbox']['y']})"
+                    lines.append(f"  [{el['type']}] \"{el['label']}\"{loc}")
+            if lines:
+                parts.append("UI elements visible:")
+                parts.extend(lines[:15])
+
+    return "\n".join(parts) if parts else ""
 
 # ---------------------------------------------------------------------------
 # Vision model selection helpers
@@ -196,9 +316,8 @@ _VISION_CAPABLE_MODELS: dict[str, set[str]] = {
     "nvidia_nim": {
         "meta/llama-3.2-11b-vision-instruct",
         "meta/llama-3.2-90b-vision-instruct",
-        "microsoft/phi-3-vision-128k-instruct",
-        "microsoft/phi-3.5-vision-instruct",
-        "nvidia/neva-22b",
+        "meta/llama-4-maverick-17b-128e-instruct",
+        "microsoft/phi-4-multimodal-instruct",
     },
     "openai": {
         "gpt-4o", "gpt-4o-mini", "gpt-4-vision-preview",
@@ -216,7 +335,7 @@ def _is_vision_model(provider: str, model: str) -> bool:
 
 
 _VISION_FALLBACK: dict[str, str] = {
-    "nvidia_nim": "microsoft/phi-3.5-vision-instruct",
+    "nvidia_nim": "meta/llama-3.2-11b-vision-instruct",
     "openai":     "gpt-4o-mini",
     "openrouter": "",
 }
@@ -229,7 +348,7 @@ def _get_vision_fallback(provider: str, current_model: str) -> str:
     return fallback or current_model
 
 
-def _call_vision(image_bytes: bytes, mime: str, user_text: str) -> str:
+def _call_vision(image_bytes: bytes, mime: str, user_text: str, angle: str = "screen") -> str:
     cfg          = _load_config()
     url          = cfg.get("llm_url", "http://localhost:11434").rstrip("/")
     provider     = cfg.get("llm_provider", "ollama").strip().lower().replace(" ", "_").replace("-", "_")
@@ -240,6 +359,12 @@ def _call_vision(image_bytes: bytes, mime: str, user_text: str) -> str:
     if not vision_model or not _is_vision_model(provider, vision_model):
         vision_model = _get_vision_fallback(provider, llm_model)
     is_openai    = provider in ("openai", "nvidia_nim", "openrouter")
+
+    # Enrich prompt with UI context when analysing the screen
+    if angle == "screen" and not cfg.get("llm_provider", "").startswith("ollama"):
+        ui_context = _describe_ui_context()
+        if ui_context:
+            user_text = f"{user_text}\n\nDesktop context:\n{ui_context}"
 
     print(f"[Vision] provider={provider} model={vision_model} url={url} size={len(image_bytes)} bytes")
     b64 = base64.b64encode(image_bytes).decode("ascii")
@@ -337,7 +462,7 @@ def screen_process(
         return msg
 
     # Analyse
-    analysis = _call_vision(image_bytes, mime, user_text)
+    analysis = _call_vision(image_bytes, mime, user_text, angle)
     print(f"[Vision] 💬 {analysis[:120]}")
 
     if player:

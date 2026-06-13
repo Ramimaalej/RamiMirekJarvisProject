@@ -601,6 +601,11 @@ class _BrowserSession:
             "bing":       "https://www.bing.com/search?q=",
             "duckduckgo": "https://duckduckgo.com/?q=",
             "yandex":     "https://yandex.com/search/?text=",
+            "youtube":    "https://www.youtube.com/results?search_query=",
+            "wikipedia":  "https://en.wikipedia.org/w/index.php?search=",
+            "github":     "https://github.com/search?q=",
+            "amazon":     "https://www.amazon.com/s?k=",
+            "reddit":     "https://www.reddit.com/search/?q=",
         }
         base = _engines.get(engine.lower(), _engines["google"])
         return await self.go_to(base + query.replace(" ", "+"))
@@ -880,8 +885,17 @@ def browser_control(
     if action == "search":
         query   = params.get("query", "")
         engine  = params.get("engine", "google").lower().strip()
-        engines = {"google": "https://www.google.com/search?q=", "bing": "https://www.bing.com/search?q=",
-                   "duckduckgo": "https://duckduckgo.com/?q=", "yandex": "https://yandex.com/search/?text="}
+        engines = {
+            "google":     "https://www.google.com/search?q=",
+            "bing":       "https://www.bing.com/search?q=",
+            "duckduckgo": "https://duckduckgo.com/?q=",
+            "yandex":     "https://yandex.com/search/?text=",
+            "youtube":    "https://www.youtube.com/results?search_query=",
+            "wikipedia":  "https://en.wikipedia.org/w/index.php?search=",
+            "github":     "https://github.com/search?q=",
+            "amazon":     "https://www.amazon.com/s?k=",
+            "reddit":     "https://www.reddit.com/search/?q=",
+        }
         url = engines.get(engine, "https://www.google.com/search?q=") + query.replace(" ", "+")
         if _open_native(url):
             _log(player, f"Searched {engine} for '{query}' in default browser")

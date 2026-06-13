@@ -1,0 +1,246 @@
+{
+  "nodes": {
+    "proj-1": {
+      "id": "proj-1",
+      "type": "project",
+      "name": "TaskPro",
+      "properties": {},
+      "created": "2026-06-12T19:25:47.346349"
+    },
+    "p1": {
+      "id": "p1",
+      "type": "project",
+      "name": "App",
+      "properties": {},
+      "created": "2026-06-12T19:25:47.506742"
+    },
+    "r1": {
+      "id": "r1",
+      "type": "repository",
+      "name": "github/app",
+      "properties": {},
+      "created": "2026-06-12T19:25:47.515709"
+    },
+    "proj": {
+      "id": "proj",
+      "type": "project",
+      "name": "MyApp",
+      "properties": {},
+      "created": "2026-06-12T19:25:47.566012"
+    },
+    "repo": {
+      "id": "repo",
+      "type": "repository",
+      "name": "github/myapp",
+      "properties": {},
+      "created": "2026-06-12T19:25:47.574164"
+    },
+    "srv": {
+      "id": "srv",
+      "type": "server",
+      "name": "AWS EC2",
+      "properties": {
+        "ip": "1.2.3.4"
+      },
+      "created": "2026-06-12T19:25:47.582172"
+    },
+    "db": {
+      "id": "db",
+      "type": "database",
+      "name": "PostgreSQL RDS",
+      "properties": {
+        "engine": "postgres"
+      },
+      "created": "2026-06-12T19:25:47.588945"
+    },
+    "cred": {
+      "id": "cred",
+      "type": "credentials",
+      "name": "admin creds",
+      "properties": {
+        "username": "admin"
+      },
+      "created": "2026-06-12T19:25:47.604618"
+    },
+    "src": {
+      "id": "src",
+      "type": "project",
+      "name": "Source",
+      "properties": {},
+      "created": "2026-06-12T19:24:58.177926"
+    },
+    "tgt": {
+      "id": "tgt",
+      "type": "server",
+      "name": "Target",
+      "properties": {},
+      "created": "2026-06-12T19:24:58.179599"
+    },
+    "src_rel": {
+      "id": "src_rel",
+      "type": "project",
+      "name": "SourceRel",
+      "properties": {},
+      "created": "2026-06-12T19:25:47.726040"
+    },
+    "tgt_rel": {
+      "id": "tgt_rel",
+      "type": "server",
+      "name": "TargetRel",
+      "properties": {},
+      "created": "2026-06-12T19:25:47.727502"
+    }
+  },
+  "edges": [
+    {
+      "source": "p1",
+      "target": "r1",
+      "relation": "hosted_at",
+      "created": "2026-06-12T19:22:38.905628"
+    },
+    {
+      "source": "proj",
+      "target": "repo",
+      "relation": "code",
+      "created": "2026-06-12T19:22:38.914435"
+    },
+    {
+      "source": "repo",
+      "target": "srv",
+      "relation": "deployed",
+      "created": "2026-06-12T19:22:38.915033"
+    },
+    {
+      "source": "srv",
+      "target": "db",
+      "relation": "uses",
+      "created": "2026-06-12T19:22:38.915292"
+    },
+    {
+      "source": "db",
+      "target": "cred",
+      "relation": "requires",
+      "created": "2026-06-12T19:22:38.915510"
+    },
+    {
+      "source": "src",
+      "target": "tgt",
+      "relation": "deploys_to",
+      "created": "2026-06-12T19:22:38.927753"
+    },
+    {
+      "source": "p1",
+      "target": "r1",
+      "relation": "hosted_at",
+      "created": "2026-06-12T19:23:37.558563"
+    },
+    {
+      "source": "proj",
+      "target": "repo",
+      "relation": "code",
+      "created": "2026-06-12T19:23:37.590679"
+    },
+    {
+      "source": "repo",
+      "target": "srv",
+      "relation": "deployed",
+      "created": "2026-06-12T19:23:37.593523"
+    },
+    {
+      "source": "srv",
+      "target": "db",
+      "relation": "uses",
+      "created": "2026-06-12T19:23:37.593835"
+    },
+    {
+      "source": "db",
+      "target": "cred",
+      "relation": "requires",
+      "created": "2026-06-12T19:23:37.594191"
+    },
+    {
+      "source": "src",
+      "target": "tgt",
+      "relation": "deploys_to",
+      "created": "2026-06-12T19:23:37.641467"
+    },
+    {
+      "source": "p1",
+      "target": "r1",
+      "relation": "hosted_at",
+      "created": "2026-06-12T19:24:36.965933"
+    },
+    {
+      "source": "proj",
+      "target": "repo",
+      "relation": "code",
+      "created": "2026-06-12T19:24:36.990581"
+    },
+    {
+      "source": "repo",
+      "target": "srv",
+      "relation": "deployed",
+      "created": "2026-06-12T19:24:36.991316"
+    },
+    {
+      "source": "srv",
+      "target": "db",
+      "relation": "uses",
+      "created": "2026-06-12T19:24:37.003813"
+    },
+    {
+      "source": "db",
+      "target": "cred",
+      "relation": "requires",
+      "created": "2026-06-12T19:24:37.004355"
+    },
+    {
+      "source": "src",
+      "target": "tgt",
+      "relation": "deploys_to",
+      "created": "2026-06-12T19:24:37.081514"
+    },
+    {
+      "source": "src",
+      "target": "tgt",
+      "relation": "deploys_to",
+      "created": "2026-06-12T19:24:58.181150"
+    },
+    {
+      "source": "p1",
+      "target": "r1",
+      "relation": "hosted_at",
+      "created": "2026-06-12T19:25:47.523332"
+    },
+    {
+      "source": "proj",
+      "target": "repo",
+      "relation": "code",
+      "created": "2026-06-12T19:25:47.617638"
+    },
+    {
+      "source": "repo",
+      "target": "srv",
+      "relation": "deployed",
+      "created": "2026-06-12T19:25:47.627337"
+    },
+    {
+      "source": "srv",
+      "target": "db",
+      "relation": "uses",
+      "created": "2026-06-12T19:25:47.639284"
+    },
+    {
+      "source": "db",
+      "target": "cred",
+      "relation": "requires",
+      "created": "2026-06-12T19:25:47.664521"
+    },
+    {
+      "source": "src_rel",
+      "target": "tgt_rel",
+      "relation": "deploys_to",
+      "created": "2026-06-12T19:25:47.728330"
+    }
+  ]
+}

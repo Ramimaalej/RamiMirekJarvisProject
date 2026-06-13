@@ -378,11 +378,113 @@ def _handle_trending(parameters: dict, player, speak) -> str:
 
     return result
 
+def _handle_search(parameters: dict, player, speak) -> str:
+    query = parameters.get("query", "").strip()
+    max_results = int(parameters.get("max_results", 8))
+
+    if not query:
+        return "Please provide a search query, sir."
+
+    if player:
+        player.write_log(f"[YouTube] Searching: {query}")
+
+    try:
+        search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp={_YT_VIDEO_FILTER}"
+        r = requests.get(search_url, headers=HEADERS, timeout=10)
+        html = r.text
+
+        video_ids = re.findall(r'"videoId":"([A-Za-z0-9_-]{11})"', html)
+        titles = re.findall(r'"title":{"runs":\[{"text":"([^"]+)"', html)
+        channels = re.findall(r'"ownerText":{"runs":\[{"text":"([^"]+)"', html)
+
+        seen = set()
+        results = []
+        for i, vid in enumerate(video_ids):
+            if vid in seen:
+                continue
+            seen.add(vid)
+            if f'/shorts/{vid}' in html:
+                continue
+            title = titles[len(seen) - 1] if len(seen) <= len(titles) else ""
+            channel = channels[len(seen) - 1] if len(seen) <= len(channels) else ""
+            results.append({
+                "title": title,
+                "video_id": vid,
+                "channel": channel,
+                "url": f"https://www.youtube.com/watch?v={vid}",
+            })
+            if len(results) >= max_results:
+                break
+
+        if not results:
+            return f"No results found for '{query}', sir."
+
+        lines = [f"Search results for '{query}':"]
+        for i, r in enumerate(results, 1):
+            lines.append(f"  {i}. {r['title']} — {r['channel']}")
+        result = "\n".join(lines)
+
+        if speak:
+            top = results[:3]
+            spoken = f"Here are the top results for {query}. " + ". ".join(
+                f"{r['title']} by {r['channel']}" for r in top
+            )
+            speak(spoken)
+
+        return result
+    except Exception as e:
+        return f"Search failed, sir: {e}"
+
+
+def _handle_channel_stats(parameters: dict, player, speak) -> str:
+    channel = parameters.get("channel", "").strip()
+    if not channel:
+        return "Please provide a channel name or URL, sir."
+
+    if player:
+        player.write_log(f"[YouTube] Channel stats: {channel}")
+
+    try:
+        if "youtube.com/" in channel:
+            search_url = channel
+        else:
+            search_url = f"https://www.youtube.com/@{channel.replace(' ', '')}"
+
+        r = requests.get(search_url, headers=HEADERS, timeout=10)
+        html = r.text
+
+        name = channel
+        m = re.search(r'"name":"([^"]+)"', html)
+        if m:
+            name = m.group(1)
+
+        subscriber_count = "?"
+        m = re.search(r'"subscriberCountText":"([^"]+)"', html)
+        if m:
+            subscriber_count = m.group(1)
+
+        video_count = "?"
+        m = re.search(r'"videosCountText":"([^"]+)"', html)
+        if m:
+            video_count = m.group(1)
+
+        result = f"Channel: {name}\nSubscribers: {subscriber_count}\nVideos: {video_count}"
+
+        if speak:
+            speak(f"Channel {name} has {subscriber_count} subscribers and {video_count} videos, sir.")
+
+        return result
+    except Exception as e:
+        return f"Could not fetch channel stats, sir: {e}"
+
+
 _ACTION_MAP = {
-    "play":      _handle_play,
-    "summarize": _handle_summarize,
-    "get_info":  _handle_get_info,
-    "trending":  _handle_trending,
+    "play":          _handle_play,
+    "summarize":     _handle_summarize,
+    "get_info":      _handle_get_info,
+    "trending":      _handle_trending,
+    "search":        _handle_search,
+    "channel_stats": _handle_channel_stats,
 }
 
 
@@ -404,7 +506,7 @@ def youtube_video(
     if handler is None:
         return (
             f"Unknown YouTube action: '{action}'. "
-            "Available: play, summarize, get_info, trending."
+            "Available: play, summarize, get_info, trending, search, channel_stats."
         )
 
     try:

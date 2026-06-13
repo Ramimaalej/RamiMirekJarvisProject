@@ -577,7 +577,7 @@ def _stream_openai(
 def call_llm_stream(
     messages: list,
     tools:    list | None = None,
-    timeout:  int = 120,
+    timeout:  int | None = None,
 ) -> Generator[dict, None, None]:
     """
     Streaming chat request.  Routes to Ollama or OpenAI-compatible backend.
@@ -589,6 +589,8 @@ def call_llm_stream(
     Sentences are split on [.!?] + whitespace so TTS can start immediately.
     Tool calls always appear in the final "done" event.
     """
+    if timeout is None:
+        timeout = _load_config().get("llm_timeout", 300)
     provider = get_llm_provider()
     if _is_openai_compatible(provider):
         yield from _stream_openai(messages, tools, timeout)

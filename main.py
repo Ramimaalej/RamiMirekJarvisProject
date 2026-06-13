@@ -57,7 +57,9 @@ def _bootstrap() -> None:
 _bootstrap()
 # ───────────────────────────────────────────────────────────────────────────
 
+import asyncio
 import json
+import logging
 import queue
 import re
 import sys
@@ -65,6 +67,7 @@ import threading
 import traceback
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import sounddevice as sd
@@ -82,6 +85,9 @@ from actions.file_processor    import file_processor
 from actions.flight_finder     import flight_finder
 from actions.open_app          import open_app
 from actions.weather_report    import weather_action
+from actions.maps              import maps_action
+from actions.stock_prices      import stock_price_action
+from actions.news_reader       import news_action
 from actions.send_message      import send_message
 from actions.reminder          import reminder
 from actions.computer_settings import computer_settings
@@ -97,6 +103,47 @@ from actions.computer_control  import computer_control
 from actions.game_updater      import game_updater
 from actions.get_location      import get_location
 from actions.read_email        import read_email
+from actions.browser_use_agent import run_browser_use_task
+from actions.screen_reader     import get_ui_elements, get_active_window_info
+from actions.face_recognition  import detect_faces, detect_smiles, detect_eyes, analyze_camera_feed
+from actions.wake_word         import start_wake_word, stop_wake_word
+from actions.github_integration import GitHubClient, _get_client as _get_gh_client
+from actions.file_search       import search_files
+from actions.finance_tracker   import FinanceClient, _get_client as _get_finance_client
+from actions.network_discovery import discover_services, get_local_ips
+from actions.voice_calls       import LiveKitClient, _get_client as _get_lk_client
+from actions.monitor_manager   import get_monitors, get_monitor_summary, set_monitor_brightness, get_active_monitor
+from actions.obsidian_vault    import save_note, search_notes, list_notes, create_knowledge_graph, set_vault_path, get_all_tags
+from actions.package_manager   import install_package, uninstall_package, list_installed, update_all, detect_os_package_manager
+from actions.goal_engine       import create_goal, list_goals, get_goal, update_goal_progress, complete_step, delete_goal, get_goal_summary
+from actions.task_graph        import create_task, complete_task, get_available_tasks, get_task_graph_summary, get_critical_path, delete_task, reset_graph
+from actions.security_vault    import HashiVaultClient, store_secret, get_secret, list_secrets, delete_secret
+from actions.context_bus       import get_bus, publish, subscribe, get_context, get_all_context
+from actions.project_scaffold import scaffold_project, list_projects, get_project_status
+from actions.relationship_graph import (
+    add_node, remove_node, add_edge, remove_edge,
+    get_related, resolve_deployment, get_graph_summary,
+)
+from actions.forensics         import file_history, process_history, network_history, what_installed_since, get_forensics_summary
+from actions.remote_control    import remote_control
+from actions.federation        import federation
+from gws_bridge                import (
+    get_unread_emails as gws_get_unread_emails,
+    search_emails as gws_search_emails,
+    read_email as gws_read_email,
+    send_email as gws_send_email,
+    reply_email as gws_reply_email,
+    get_todays_agenda,
+    get_upcoming_events,
+    create_event,
+    delete_event,
+    search_files,
+    upload_file,
+    create_doc,
+    create_meet,
+    is_authenticated as gws_is_authenticated,
+    GwsError,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -236,13 +283,15 @@ TOOL_DECLARATIONS = [
         "name": "youtube_video",
         "description": (
             "Controls YouTube. Use for: playing videos, summarizing a video's content, "
-            "getting video info, or showing trending videos."
+            "getting video info, showing trending videos, searching videos, or getting channel stats."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action": {"type": "STRING", "description": "play | summarize | get_info | trending"},
-                "query":  {"type": "STRING", "description": "Search query for play action"},
+                "action": {"type": "STRING", "description": "play | summarize | get_info | trending | search | channel_stats"},
+                "query":  {"type": "STRING", "description": "Search query for play/search action"},
+                "channel": {"type": "STRING", "description": "Channel name or handle for channel_stats action"},
+                "max_results": {"type": "INTEGER", "description": "Number of results for search (default 8)"},
                 "save":   {"type": "BOOLEAN", "description": "Save summary to Notepad"},
                 "region": {"type": "STRING", "description": "Country code for trending e.g. TR, US"},
                 "url":    {"type": "STRING", "description": "Video URL for get_info action"},
@@ -316,6 +365,27 @@ TOOL_DECLARATIONS = [
                 "clear_first": {"type": "BOOLEAN", "description": "Clear field before typing"},
             },
             "required": ["action"]
+        }
+    },
+    {
+        "name": "browser_use",
+        "description": (
+            "Uses an AI agent to perform complex multi-step browser automation tasks. "
+            "Use this for things like: filling out web forms, scraping data from multiple pages, "
+            "logging into websites, searching for information across sites, "
+            "completing online purchases, booking appointments, or any task that requires "
+            "multiple browser interactions. The agent can see the page, click, type, scroll, "
+            "and navigate. For simple single actions like 'go to a URL' use browser_control instead."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "task":     {"type": "STRING",  "description": "The task to complete in the browser. Be specific about what to do and what information to extract."},
+                "headless": {"type": "BOOLEAN", "description": "Run browser invisibly (default: true). Set to false for debugging."},
+                "max_steps":{"type": "INTEGER", "description": "Maximum number of agent steps (default: 30)."},
+                "timeout":  {"type": "INTEGER", "description": "Overall timeout in seconds (default: 180)."}
+            },
+            "required": ["task"]
         }
     },
     {
@@ -519,6 +589,55 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "maps",
+        "description": (
+            "Geocoding and distance calculation using OpenStreetMap Nominatim. "
+            "Call this to find a place's coordinates, get an address, or calculate distance between two places. "
+            "Examples: where is ISIMS, how far is Sfax from Tunis, what is the distance from Paris to London."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "geocode | distance | coords"},
+                "query":  {"type": "STRING", "description": "Place name to search (for geocode/coords) or 'A to B' string (for distance)"},
+                "origin": {"type": "STRING", "description": "Starting place name (for distance with separate params)"},
+                "destination": {"type": "STRING", "description": "Destination place name (for distance with separate params)"},
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "stock_price",
+        "description": (
+            "Look up current stock prices, change percentages, and company info via Yahoo Finance. "
+            "Call this when the user asks about stock prices, share prices, market data, ticker symbols. "
+            "Examples: what is AAPL stock, TSLA price, how is the market doing."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "symbols": {"type": "STRING", "description": "Stock ticker symbols separated by spaces or commas (e.g. AAPL TSLA MSFT)"},
+            },
+            "required": ["symbols"]
+        }
+    },
+    {
+        "name": "news",
+        "description": (
+            "Fetch latest news headlines by topic using RSS feeds. "
+            "Call this when the user asks for news, headlines, current events. "
+            "Topics: top, world, tech, science, business. Default: top."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "topic": {"type": "STRING", "description": "News topic: top | world | tech | science | business"},
+                "count": {"type": "INTEGER", "description": "Number of headlines to return (default 5)"},
+            },
+            "required": []
+        }
+    },
+    {
         "name": "shutdown_jarvis",
         "description": (
             "Shuts down the assistant completely. "
@@ -628,6 +747,140 @@ TOOL_DECLARATIONS = [
         }
     },
     {
+        "name": "gmail_get_unread",
+        "description": "Retrieves unread emails from Gmail. Returns sender, subject, and date for each.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "limit": {"type": "INTEGER", "description": "Max emails to fetch (default: 10)"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "gmail_search",
+        "description": "Searches Gmail with a query string. Use for finding specific emails.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query": {"type": "STRING", "description": "Gmail search query (e.g. 'from:boss', 'subject:report')"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "gmail_send",
+        "description": "Sends an email via Gmail.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "to":      {"type": "STRING", "description": "Recipient email address"},
+                "subject": {"type": "STRING", "description": "Email subject"},
+                "body":    {"type": "STRING", "description": "Email body text"}
+            },
+            "required": ["to", "subject", "body"]
+        }
+    },
+    {
+        "name": "gmail_reply",
+        "description": "Replies to an existing Gmail message.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "message_id": {"type": "STRING", "description": "Gmail message ID to reply to"},
+                "body":       {"type": "STRING", "description": "Reply body text"}
+            },
+            "required": ["message_id", "body"]
+        }
+    },
+    {
+        "name": "calendar_agenda",
+        "description": "Gets today's agenda or upcoming events from Google Calendar.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "days": {"type": "INTEGER", "description": "Number of days ahead to fetch (default: 1 for today only)"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "calendar_create_event",
+        "description": "Creates a new event on Google Calendar. Optionally adds a Google Meet link.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "title":           {"type": "STRING",  "description": "Event title/name"},
+                "date":            {"type": "STRING",  "description": "Date in YYYY-MM-DD format"},
+                "time":            {"type": "STRING",  "description": "Time in HH:MM format (24h)"},
+                "duration_minutes": {"type": "INTEGER", "description": "How long the event lasts in minutes"},
+                "description":     {"type": "STRING",  "description": "Optional description or notes"},
+                "meet":            {"type": "BOOLEAN", "description": "Add a Google Meet video link (default: false)"}
+            },
+            "required": ["title", "date", "time", "duration_minutes"]
+        }
+    },
+    {
+        "name": "calendar_delete_event",
+        "description": "Deletes a Google Calendar event by its event ID.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "event_id": {"type": "STRING", "description": "The event ID to delete"}
+            },
+            "required": ["event_id"]
+        }
+    },
+    {
+        "name": "drive_search",
+        "description": "Searches Google Drive for files matching a query.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query": {"type": "STRING", "description": "Drive search query (e.g. 'name contains Q1')"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "drive_upload",
+        "description": "Uploads a local file to Google Drive.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "local_path": {"type": "STRING", "description": "Full path to the local file to upload"},
+                "folder_id":  {"type": "STRING", "description": "Optional Drive folder ID to upload into"}
+            },
+            "required": ["local_path"]
+        }
+    },
+    {
+        "name": "drive_create_doc",
+        "description": "Creates a new Google Doc with a title and optional content.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "title":   {"type": "STRING", "description": "Document title"},
+                "content": {"type": "STRING", "description": "Optional text content to add to the document"}
+            },
+            "required": ["title"]
+        }
+    },
+    {
+        "name": "meet_create",
+        "description": "Creates a Google Meet meeting with a calendar event. Use for 'create a Google Meet' / 'schedule a video call'.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "title":           {"type": "STRING",  "description": "Meeting title"},
+                "date":            {"type": "STRING",  "description": "Date in YYYY-MM-DD format"},
+                "time":            {"type": "STRING",  "description": "Time in HH:MM format (24h)"},
+                "duration_minutes": {"type": "INTEGER", "description": "Duration in minutes (default: 60)"}
+            },
+            "required": ["title", "date", "time"]
+        }
+    },
+    {
         "name": "search_memory",
         "description": (
             "Searches Jarvis's semantic (vector) memory for relevant past "
@@ -670,6 +923,295 @@ TOOL_DECLARATIONS = [
                 "value": {"type": "STRING", "description": "Concise value in English"},
             },
             "required": ["category", "key", "value"]
+        }
+    },
+    {
+        "name": "screen_read",
+        "description": "Reads UI elements from the active window using accessibility APIs. Returns buttons, labels, menus, and text visible on screen — no OCR needed. Works on Linux (pyatspi2), Windows (UIAutomation), and macOS (PyObjC).",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "active_window",
+        "description": "Returns the title, app name, and role of the currently focused window.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "detect_faces",
+        "description": "Detects faces in the camera feed using OpenCV Haar cascades. Returns face positions and count. Also detects smiles and eyes if faces are found.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "wake_word",
+        "description": "Starts or stops local wake word detection (OpenWakeWord). When active, JARVIS listens for a wake word before processing speech. Supported models: jarvis, computer, alexa.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING", "description": "start | stop"},
+                "model_name":  {"type": "STRING", "description": "Wake word model: jarvis (default), computer, alexa"},
+                "sensitivity": {"type": "NUMBER", "description": "Detection threshold 0.0–1.0 (default: 0.5). Lower = more sensitive."}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "github",
+        "description": "GitHub API integration. Create/list repos, manage issues and pull requests, view workflows. Requires GITHUB_TOKEN environment variable.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":     {"type": "STRING", "description": "list_repos | create_repo | get_repo | list_issues | create_issue | close_issue | list_prs | get_pr | create_pr | merge_pr | list_workflows | list_runs"},
+                "repo":       {"type": "STRING", "description": "Full repo name (e.g. 'user/repo') for repo/issue/PR operations"},
+                "name":       {"type": "STRING", "description": "Repo name for create_repo, or issue/PR title"},
+                "description":{"type": "STRING", "description": "Repo description for create_repo"},
+                "private":    {"type": "BOOLEAN", "description": "Make repo private (default: false)"},
+                "body":       {"type": "STRING", "description": "Issue/PR body text"},
+                "number":     {"type": "INTEGER", "description": "Issue or PR number"},
+                "head":       {"type": "STRING", "description": "Head branch name for create_pr"},
+                "base":       {"type": "STRING", "description": "Base branch name for create_pr (default: main)"},
+                "state":      {"type": "STRING", "description": "Filter state: open (default), closed, all"},
+                "user":       {"type": "STRING", "description": "GitHub username for listing repos"},
+                "branch":     {"type": "STRING", "description": "Branch name for workflow runs"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "search_files_fast",
+        "description": "Extremely fast file search. Uses Everything SDK on Windows and locate/glob on Linux. Finds files by name in milliseconds.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query":       {"type": "STRING", "description": "Filename or pattern to search for"},
+                "root":        {"type": "STRING", "description": "Root directory (Linux only; default: home dir)"},
+                "max_results": {"type": "INTEGER", "description": "Maximum results (default: 20)"}
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "finance",
+        "description": "Plaid finance dashboard. Track spending, transactions, budgets, and account balances. Requires PLAID_CLIENT_ID, PLAID_SECRET, PLAID_ACCESS_TOKEN environment variables.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":     {"type": "STRING", "description": "accounts | transactions | spending_summary | balances"},
+                "days":       {"type": "INTEGER", "description": "Look back days for spending_summary (default: 30)"},
+                "start_date": {"type": "STRING", "description": "Start date YYYY-MM-DD for transactions"},
+                "end_date":   {"type": "STRING", "description": "End date YYYY-MM-DD for transactions"},
+                "limit":      {"type": "INTEGER", "description": "Max transactions (default: 50)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "network_scan",
+        "description": "Discovers devices and services on the local network via mDNS/Zeroconf. Finds printers, NAS, smart TVs, Chromecasts, and other network services. Also returns local IP addresses.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "discover | local_ips"},
+                "timeout":{"type": "INTEGER", "description": "Discovery timeout in seconds (default: 3)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "voice_call",
+        "description": "Create and manage LiveKit voice/video call rooms. Generate access tokens, create rooms, list active rooms. Requires LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_HOST environment variables.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":    {"type": "STRING", "description": "create_room | list_rooms | generate_token"},
+                "room_name": {"type": "STRING", "description": "Room name for create_room or generate_token"},
+                "identity":  {"type": "STRING", "description": "User identity for token generation (default: jarvis)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "monitors",
+        "description": "Multi-monitor awareness. List all connected monitors with resolutions and positions, get active monitor info, or set brightness.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":    {"type": "STRING", "description": "list | summary | active | brightness"},
+                "monitor":   {"type": "INTEGER", "description": "Monitor index for brightness action"},
+                "brightness":{"type": "NUMBER", "description": "Brightness level 0.0–1.0 (default: 1.0)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "obsidian",
+        "description": "Obsidian vault integration. Save ideas as notes, search existing notes, list notes by folder, create knowledge graph (wiki-link relationships), or set vault path. Set OBSIDIAN_VAULT env var.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":    {"type": "STRING", "description": "save | search | list | graph | tags | set_vault"},
+                "title":     {"type": "STRING", "description": "Note title for save action"},
+                "content":   {"type": "STRING", "description": "Note content for save action"},
+                "query":     {"type": "STRING", "description": "Search query for search action"},
+                "folder":    {"type": "STRING", "description": "Subfolder within JARVIS/ for save/list"},
+                "max_results":{"type": "INTEGER", "description": "Max results (default: 10)"},
+                "vault_path":{"type": "STRING", "description": "Path to Obsidian vault root (for set_vault)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "package_manager",
+        "description": "Install, uninstall, list, or update software packages. Auto-detects OS and uses the appropriate package manager (apt, dnf, pacman, brew, winget, pip, poetry, uv).",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":  {"type": "STRING", "description": "install | uninstall | list | update_all | detect"},
+                "package": {"type": "STRING", "description": "Package name to install/uninstall"},
+                "manager": {"type": "STRING", "description": "Package manager: auto (default), pip, apt, dnf, brew, winget, poetry, uv, pacman"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "goals",
+        "description": "Goal engine — track complex multi-step goals. Create goals with steps, mark steps complete, track progress percentage, list active/completed goals.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING", "description": "create | list | get | progress | complete_step | delete | summary"},
+                "title":       {"type": "STRING", "description": "Goal title for create action"},
+                "description": {"type": "STRING", "description": "Goal description for create action"},
+                "goal_id":     {"type": "STRING", "description": "Goal ID for get/progress/complete_step/delete"},
+                "steps":       {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Step descriptions for create action"},
+                "step_title":  {"type": "STRING", "description": "Step title for complete_step action"},
+                "status":      {"type": "STRING", "description": "Filter: active (default), completed, paused"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "task_graph",
+        "description": "Dependency task graph using NetworkX. Create tasks with dependencies, mark tasks complete, find available (unblocked) tasks, view critical path.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":      {"type": "STRING", "description": "create | complete | available | summary | critical_path | delete | reset"},
+                "task_id":     {"type": "STRING", "description": "Task ID for create/complete/delete"},
+                "description": {"type": "STRING", "description": "Task description for create action"},
+                "depends_on":  {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Task IDs this task depends on"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "vault",
+        "description": "Security layer — store, retrieve, list, or delete secrets. Uses local encrypted JSON file by default. Optionally connects to HashiCorp Vault for professional secret management.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "store | get | list | delete"},
+                "key":    {"type": "STRING", "description": "Secret key/name"},
+                "value":  {"type": "STRING", "description": "Secret value for store action"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "context",
+        "description": "Context bus — view the current system context snapshot. Shows what JARVIS knows about current app, battery, meeting status, git status, and more. Any plugin publishes context in real-time.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "summary | get | search | keys"},
+                "key":    {"type": "STRING", "description": "Context key for get action"},
+                "query":  {"type": "STRING", "description": "Search query for search action"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "scaffold",
+        "description": "Scaffolds a new software project. Creates project folder in workspace, starts opencode sessions as Project Manager, Backend Developer, Frontend Developer, and QA Engineer sequentially. Use for 'start new project', 'create new app', 'scaffold project'.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "project_name": {"type": "STRING", "description": "Name of the project to create"},
+                "description":  {"type": "STRING", "description": "Brief project description"},
+                "tech_stack":   {"type": "STRING", "description": "Technology stack (e.g. python, react, node)"},
+                "roles":        {"type": "ARRAY", "items": {"type": "STRING"}, "description": "Roles to start: project_manager, backend, frontend, tester (default: all four)"}
+            },
+            "required": ["project_name"]
+        }
+    },
+    {
+        "name": "relationship_graph",
+        "description": "Tracks relationships between projects, repositories, servers, databases, and credentials. Link them together and ask where anything is deployed. Supports add/list/resolve/deployment queries.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":     {"type": "STRING", "description": "add_node | remove_node | add_edge | remove_edge | get_related | resolve_deployment | summary"},
+                "node_id":    {"type": "STRING", "description": "Node ID for add_node/remove_node/add_edge"},
+                "node_type":  {"type": "STRING", "description": "Node type: project | repository | server | database | credentials"},
+                "name":       {"type": "STRING", "description": "Node display name"},
+                "target_id":  {"type": "STRING", "description": "Target node ID for add_edge"},
+                "relation":   {"type": "STRING", "description": "Relationship label for edge"},
+                "project":    {"type": "STRING", "description": "Project name for resolve_deployment"},
+                "properties": {"type": "STRING", "description": "JSON string of additional properties"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "forensics",
+        "description": "Computer forensics layer. Check recent file changes, running processes, network connections, and package install history. Example: 'what installed yesterday', 'show me recent processes', 'check network connections'.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "files | processes | network | installed | summary"},
+                "days":   {"type": "INTEGER", "description": "Look back days (default: 1)"},
+                "path":   {"type": "STRING", "description": "Directory path for file search (default: home)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "remote_control",
+        "description": "Start or stop the JARVIS remote control server. Exposes a FastAPI REST API and WebSocket endpoint for controlling JARVIS from phone, tablet, or smartwatch. REST at http://host:port, WebSocket at ws://host:port/ws.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "start | stop | status"},
+                "host":   {"type": "STRING", "description": "Bind address (default: 0.0.0.0)"},
+                "port":   {"type": "INTEGER", "description": "Port number (default: 8765)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "federation",
+        "description": "JARVIS multi-instance federation. Share memory, query memories across instances, register instances, sync data between JARVIS instances (laptop, desktop, home server). All instances share memory via JSON files.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action":   {"type": "STRING", "description": "share | query | register | instances | sync | status"},
+                "key":      {"type": "STRING", "description": "Memory key for share/query"},
+                "value":    {"type": "STRING", "description": "Memory value for share action"},
+                "instance": {"type": "STRING", "description": "Instance name for sync action"},
+                "name":     {"type": "STRING", "description": "Instance name for register action"},
+                "ttl_hours":{"type": "INTEGER", "description": "TTL in hours for shared memory (0 = no expiry)"}
+            },
+            "required": ["action"]
         }
     },
 ]
@@ -757,6 +1299,9 @@ def _is_greeting(text: str) -> bool:
     """Return True if the user's message is a simple greeting with no action intent."""
     t = text.lower().strip().rstrip("!?.,").strip()
     if t in _GREETINGS:
+        return True
+    first_word = t.split()[0] if t.split() else ""
+    if first_word in _GREETINGS:
         return True
 
 
@@ -867,8 +1412,8 @@ def _load_system_prompt() -> str:
     except Exception:
         return (
             "You are JARVIS, Tony Stark's AI assistant. "
-            "Be concise, direct, and always use the provided tools to complete tasks. "
-            "Never simulate or guess results — always call the appropriate tool."
+            "Be concise, direct, and helpful. You support both executing computer tasks via tools "
+            "and engaging in general friendly chat / conversation. Keep responses under 3 sentences."
         )
 
 
@@ -882,7 +1427,7 @@ class _VADBuffer:
     def __init__(
         self,
         sample_rate:    int   = 16_000,
-        silence_sec:    float = 0.7,    # silence after last word → send to STT
+        silence_sec:    float = 0.45,   # silence after last word → send to STT
         speech_thresh:  float = 0.008,  # RMS above this = speech  (0.008 catches voice at 3-4 m; raise if mic picks up too much room noise)
         silence_thresh: float = 0.004,  # RMS below this = silence (half of speech_thresh — hysteresis prevents mid-sentence cuts)
         min_speech_sec: float = 0.3,
@@ -955,6 +1500,18 @@ class JarvisLocal:
 
         self.ui.on_text_command = self._on_text_command
         self._current_language = "en"
+
+        # ── GWS logging ───────────────────────────────────────────────────
+        _gws_log_dir = BASE_DIR / "logs"
+        _gws_log_dir.mkdir(parents=True, exist_ok=True)
+        _gws_log_path = str(_gws_log_dir / "gws.log")
+        _gws_handler = logging.FileHandler(_gws_log_path)
+        _gws_handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+        ))
+        logging.getLogger("gws_bridge").addHandler(_gws_handler)
+        logging.getLogger("gws_bridge").setLevel(logging.DEBUG)
+        logging.getLogger("gws_bridge").propagate = False
 
     # ------------------------------------------------------------------
     # Auto-detect and switch TTS language
@@ -1200,6 +1757,16 @@ class JarvisLocal:
                 r = browser_control(parameters=args, player=self.ui)
                 result = r or "Done."
 
+            elif name == "browser_use":
+                task = args.get("task", "")
+                headless = args.get("headless", True)
+                max_steps = int(args.get("max_steps", 30))
+                timeout = int(args.get("timeout", 180))
+                result = run_browser_use_task(
+                    task=task, headless=headless,
+                    max_steps=max_steps, timeout=timeout,
+                )
+
             elif name == "file_controller":
                 r = file_controller(parameters=args, player=self.ui)
                 result = r or "Done."
@@ -1297,7 +1864,28 @@ class JarvisLocal:
 
             elif name == "get_location":
                 r = get_location(parameters=args, player=self.ui)
+                if r:
+                    import re
+                    m = re.search(r'currently in ([^,]+)', r)
+                    if m:
+                        self.ui.set_location(m.group(1).strip())
+                    else:
+                        parts = r.split(".")
+                        if parts:
+                            self.ui.set_location(parts[0].replace("You are currently in ", ""))
                 result = r or "Location retrieved."
+
+            elif name == "maps":
+                r = maps_action(parameters=args, player=self.ui)
+                result = r or "Done."
+
+            elif name == "stock_price":
+                r = stock_price_action(parameters=args, player=self.ui)
+                result = r or "Done."
+
+            elif name == "news":
+                r = news_action(parameters=args, player=self.ui)
+                result = r or "Done."
 
             elif name == "shutdown_jarvis":
                 self.ui.write_log("SYS: Shutdown requested.")
@@ -1412,6 +2000,697 @@ class JarvisLocal:
                             lines.append(f"  [{r['category']}] {r['text'][:150]}")
                         result = "\n".join(lines)
 
+            # ── Google Workspace tools ──────────────────────────────────────
+            elif name == "gmail_get_unread":
+                limit = int(args.get("limit", 10))
+                emails = _run_async(gws_get_unread_emails(limit=limit))
+                if isinstance(emails, list) and emails:
+                    lines = [f"Unread emails ({len(emails)}):"]
+                    for e in emails:
+                        subject = e.get("subject", e.get("Subject", "(no subject)"))
+                        sender = e.get("from", e.get("From", "?"))
+                        date = e.get("date", e.get("Date", ""))
+                        lines.append(f"  From: {sender} | {subject} | {date}")
+                    result = "\n".join(lines)
+                else:
+                    result = "No unread emails found."
+
+            elif name == "gmail_search":
+                query = args.get("query", "")
+                emails = _run_async(gws_search_emails(query=query))
+                if isinstance(emails, list) and emails:
+                    lines = [f"Gmail search results ({len(emails)}):"]
+                    for e in emails:
+                        subject = e.get("subject", e.get("Subject", "(no subject)"))
+                        sender = e.get("from", e.get("From", "?"))
+                        date = e.get("date", e.get("Date", ""))
+                        lines.append(f"  From: {sender} | {subject} | {date}")
+                    result = "\n".join(lines)
+                else:
+                    result = "No emails found matching that query."
+
+            elif name == "gmail_send":
+                to = args.get("to", "")
+                subject = args.get("subject", "")
+                body = args.get("body", "")
+                _run_async(gws_send_email(to=to, subject=subject, body=body))
+                result = f"Email sent to {to}."
+
+            elif name == "gmail_reply":
+                message_id = args.get("message_id", "")
+                body = args.get("body", "")
+                _run_async(gws_reply_email(message_id=message_id, body=body))
+                result = "Reply sent."
+
+            elif name == "calendar_agenda":
+                days = int(args.get("days", 1))
+                if days == 1:
+                    events = _run_async(get_todays_agenda())
+                else:
+                    events = _run_async(get_upcoming_events(days=days))
+                if isinstance(events, list) and events:
+                    lines = [f"Calendar ({'today' if days == 1 else f'next {days} days'}):"]
+                    for e in events:
+                        summary = e.get("summary", e.get("Summary", "(no title)"))
+                        start = e.get("start", e.get("Start", ""))
+                        end = e.get("end", e.get("End", ""))
+                        meet_link = e.get("hangoutLink", e.get("meet", ""))
+                        extra = ""
+                        lines.append(f"  {summary}  ({start} - {end}){extra}")
+                    result = "\n".join(lines)
+                else:
+                    result = "No upcoming events."
+
+            elif name == "calendar_create_event":
+                title = args.get("title", "")
+                date = args.get("date", "")
+                time = args.get("time", "")
+                duration = int(args.get("duration_minutes", 60))
+                description = args.get("description", "")
+                meet = args.get("meet", False)
+                ev = _run_async(create_event(
+                    title=title, date=date, time=time,
+                    duration_minutes=duration, description=description, meet=meet,
+                ))
+                result = f"Event '{title}' created on {date} at {time}."
+                if meet:
+                    link = ev.get("hangoutLink", ev.get("meet", ""))
+                    if link:
+                        result += f" Meet link: {link}"
+
+            elif name == "calendar_delete_event":
+                event_id = args.get("event_id", "")
+                _run_async(delete_event(event_id=event_id))
+                result = "Event deleted."
+
+            elif name == "drive_search":
+                query = args.get("query", "")
+                files = _run_async(search_files(query=query))
+                if isinstance(files, list) and files:
+                    lines = [f"Drive files ({len(files)}):"]
+                    for f in files:
+                        fname = f.get("name", f.get("Name", "?"))
+                        ftype = f.get("mimeType", "")
+                        modified = f.get("modifiedTime", f.get("Modified", ""))
+                        icon = "📄"
+                        if "folder" in ftype: icon = "📁"
+                        elif "sheet" in ftype: icon = "📊"
+                        elif "doc" in ftype: icon = "📝"
+                        elif "pdf" in ftype: icon = "📕"
+                        lines.append(f"  {icon} {fname}  ({modified})")
+                    result = "\n".join(lines)
+                else:
+                    result = "No files found."
+
+            elif name == "drive_upload":
+                local_path = args.get("local_path", "")
+                folder_id = args.get("folder_id")
+                _run_async(upload_file(local_path=local_path, folder_id=folder_id))
+                result = f"File uploaded to Drive."
+
+            elif name == "drive_create_doc":
+                title = args.get("title", "")
+                content = args.get("content", "")
+                doc = _run_async(create_doc(title=title, content=content))
+                doc_id = doc.get("documentId") or doc.get("id", "")
+                result = f"Document '{title}' created. ID: {doc_id}"
+
+            elif name == "meet_create":
+                title = args.get("title", "")
+                date = args.get("date", "")
+                time = args.get("time", "")
+                duration = int(args.get("duration_minutes", 60))
+                ev = _run_async(create_meet(
+                    title=title, date=date, time=time, duration_minutes=duration,
+                ))
+                result = f"Google Meet '{title}' created for {date} at {time}."
+                link = ev.get("hangoutLink", ev.get("meet", ""))
+                if link:
+                    result += f" Join: {link}"
+
+            # ── New Feature Tools ─────────────────────────────────────────
+            elif name == "screen_read":
+                elems = get_ui_elements()
+                if elems:
+                    lines = [f"Screen elements ({len(elems)}):"]
+                    for e in elems[:30]:
+                        rect = e.get("rect") or {}
+                        pos = f" [{rect.get('x',0)},{rect.get('y',0)}]" if rect else ""
+                        lines.append(f"  {e['role']}: {e['name'][:80]}{pos}")
+                    result = "\n".join(lines)
+                else:
+                    result = "No UI elements found (accessibility API may need permissions)."
+
+            elif name == "active_window":
+                info = get_active_window_info()
+                result = f"Window: {info['title']} | App: {info['app']} | Role: {info['role']}"
+
+            elif name == "detect_faces":
+                r = analyze_camera_feed()
+                if "error" in r:
+                    result = r["error"]
+                else:
+                    people = r.get("people", [])
+                    parts = [f"Detected {r['faces']} face(s):"]
+                    for p in people:
+                        parts.append(f"  Face at ({p['x']},{p['y']}) size {p['width']}x{p['height']}")
+                    if r.get("expressions", {}).get("smiling"):
+                        parts.append("  Smiling: Yes")
+                    if r.get("expressions", {}).get("eyes_detected", 0) > 0:
+                        parts.append(f"  Eyes: {r['expressions']['eyes_detected']}")
+                    result = "\n".join(parts)
+
+            elif name == "wake_word":
+                action = args.get("action", "start")
+                if action == "start":
+                    model = args.get("model_name", "jarvis")
+                    sens = float(args.get("sensitivity", 0.5))
+                    result = start_wake_word(model_name=model, sensitivity=sens)
+                elif action == "stop":
+                    result = stop_wake_word()
+                else:
+                    result = f"Unknown wake word action: {action}"
+
+            elif name == "github":
+                gh = _get_gh_client()
+                action = args.get("action", "")
+                try:
+                    if action == "list_repos":
+                        repos = gh.list_repos(user=args.get("user"))
+                        lines = [f"Repos ({len(repos)}):"]
+                        for r in repos:
+                            lines.append(f"  {r['full_name']} ({r['language']}) {'⭐'+str(r['stars']) if r['stars'] else ''}")
+                        result = "\n".join(lines)
+                    elif action == "create_repo":
+                        r = gh.create_repo(name=args["name"], description=args.get("description", ""), private=args.get("private", False))
+                        result = f"Repo created: {r['url']}"
+                    elif action == "get_repo":
+                        r = gh.get_repo(repo_full_name=args["repo"])
+                        result = f"{r['full_name']}: {r['description']} ({r['language']}, {r['stars']}⭐)" if r else "Repo not found."
+                    elif action == "list_issues":
+                        issues = gh.list_issues(repo_full_name=args["repo"], state=args.get("state", "open"))
+                        lines = [f"Issues ({len(issues)}):"]
+                        for i in issues:
+                            lines.append(f"  #{i['number']} {i['title']} [{i['state']}]")
+                        result = "\n".join(lines)
+                    elif action == "create_issue":
+                        i = gh.create_issue(repo_full_name=args["repo"], title=args["name"], body=args.get("body", ""))
+                        result = f"Issue #{i['number']} created: {i['url']}"
+                    elif action == "close_issue":
+                        i = gh.close_issue(repo_full_name=args["repo"], issue_number=int(args["number"]))
+                        result = f"Issue #{i['number']} closed."
+                    elif action == "list_prs":
+                        prs = gh.list_prs(repo_full_name=args["repo"], state=args.get("state", "open"))
+                        lines = [f"PRs ({len(prs)}):"]
+                        for pr in prs:
+                            lines.append(f"  #{pr['number']} {pr['title']} ({pr['author']})")
+                        result = "\n".join(lines)
+                    elif action == "get_pr":
+                        pr = gh.get_pr(repo_full_name=args["repo"], pr_number=int(args["number"]))
+                        result = f"PR #{pr['number']}: {pr['title']} ({pr['state']}) by {pr['author']} — +{pr['additions']}/-{pr['deletions']} in {pr['changed_files']} files"
+                    elif action == "create_pr":
+                        pr = gh.create_pr(repo_full_name=args["repo"], title=args["name"], head=args["head"], base=args.get("base", "main"), body=args.get("body", ""))
+                        result = f"PR #{pr['number']} created: {pr['url']}"
+                    elif action == "merge_pr":
+                        r = gh.merge_pr(repo_full_name=args["repo"], pr_number=int(args["number"]))
+                        result = f"PR merged: {r['message']}" if r['merged'] else f"Merge failed: {r['message']}"
+                    elif action == "list_workflows":
+                        flows = gh.list_workflows(repo_full_name=args["repo"])
+                        lines = [f"Workflows ({len(flows)}):"]
+                        for f in flows:
+                            lines.append(f"  {f['name']} ({f['state']})")
+                        result = "\n".join(lines)
+                    elif action == "list_runs":
+                        runs = gh.list_workflow_runs(repo_full_name=args["repo"], branch=args.get("branch", ""))
+                        lines = [f"Workflow runs ({len(runs)}):"]
+                        for r in runs:
+                            lines.append(f"  {r['name']}: {r['status']} / {r['conclusion']}")
+                        result = "\n".join(lines)
+                    else:
+                        result = f"Unknown GitHub action: {action}"
+                except ImportError as e:
+                    result = f"PyGithub not installed: {e}"
+                except ValueError as e:
+                    result = str(e)
+                except Exception as e:
+                    result = f"GitHub error: {e}"
+
+            elif name == "search_files_fast":
+                query = args.get("query", "")
+                root = args.get("root")
+                max_results = int(args.get("max_results", 20))
+                files = search_files(query=query, root=root, max_results=max_results)
+                if files:
+                    lines = [f"Found {len(files)} files:"]
+                    for f in files:
+                        size = f.get("size", 0)
+                        size_str = f"{size/1024:.1f}KB" if size > 0 else ""
+                        lines.append(f"  {f['path']} {size_str}")
+                    result = "\n".join(lines)
+                else:
+                    result = "No files found matching that name."
+
+            elif name == "finance":
+                fc = _get_finance_client()
+                action = args.get("action", "")
+                try:
+                    if action == "accounts":
+                        accs = fc.get_accounts()
+                        lines = [f"Accounts ({len(accs)}):"]
+                        for a in accs:
+                            lines.append(f"  {a['name']} ({a['type']}): ${a['balance']:.2f}")
+                        result = "\n".join(lines) if lines[1:] else "No accounts linked."
+                    elif action == "transactions":
+                        txns = fc.get_transactions(
+                            start_date=args.get("start_date", ""),
+                            end_date=args.get("end_date", ""),
+                            limit=int(args.get("limit", 50)),
+                        )
+                        lines = [f"Transactions ({len(txns)}):"]
+                        for t in txns:
+                            lines.append(f"  {t['date']} ${t['amount']:.2f} — {t['name']}")
+                        result = "\n".join(lines) if lines[1:] else "No transactions."
+                    elif action in ("spending_summary", "summary"):
+                        s = fc.get_spending_summary(days=int(args.get("days", 30)))
+                        lines = [f"Spending (last {s['period_days']} days): Total ${s['total']} ({s['count']} txns)"]
+                        for cat, amt in s.get("categories", {}).items():
+                            lines.append(f"  {cat}: ${amt}")
+                        result = "\n".join(lines)
+                    elif action == "balances":
+                        result = getattr(fc, "get_account_balances")()
+                    else:
+                        result = f"Unknown finance action: {action}"
+                except ImportError as e:
+                    result = f"Plaid not installed: {e}"
+                except ValueError as e:
+                    result = str(e)
+                except Exception as e:
+                    result = f"Finance error: {e}"
+
+            elif name == "network_scan":
+                action = args.get("action", "discover")
+                if action == "discover":
+                    timeout = int(args.get("timeout", 3))
+                    devices = discover_services(timeout=timeout)
+                    if devices:
+                        lines = [f"Discovered {len(devices)} devices/services:"]
+                        for d in devices:
+                            addr = d.get("address", "")
+                            name = d.get("name", "").replace("._tcp.local.", "")
+                            svc = d.get("type", "").replace("._tcp.local.", "")
+                            lines.append(f"  {name} ({svc}) @ {addr}")
+                        result = "\n".join(lines)
+                    else:
+                        result = "No devices discovered on network."
+                elif action == "local_ips":
+                    ips = get_local_ips()
+                    result = f"Local IPs: {', '.join(ips)}" if ips else "No local IPs found."
+                else:
+                    result = f"Unknown action: {action}"
+
+            elif name == "voice_call":
+                lk = _get_lk_client()
+                action = args.get("action", "")
+                try:
+                    if action == "create_room":
+                        r = lk.create_room(room_name=args.get("room_name", "jarvis-room"))
+                        result = f"Room '{r['name']}' created (SID: {r['sid']})"
+                    elif action == "list_rooms":
+                        rooms = lk.list_rooms()
+                        if rooms:
+                            lines = [f"Active rooms ({len(rooms)}):"]
+                            for r in rooms:
+                                lines.append(f"  {r['name']} ({r['num_participants']} participants)")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No active rooms."
+                    elif action == "generate_token":
+                        token = lk.generate_token(
+                            identity=args.get("identity", "jarvis"),
+                            room_name=args.get("room_name", "jarvis-room"),
+                        )
+                        result = f"Token: {token}"
+                    else:
+                        result = f"Unknown action: {action}"
+                except ImportError as e:
+                    result = f"LiveKit not installed: {e}"
+                except ValueError as e:
+                    result = str(e)
+                except Exception as e:
+                    result = f"LiveKit error: {e}"
+
+            elif name == "monitors":
+                action = args.get("action", "list")
+                if action == "list":
+                    monitors = get_monitors()
+                    if monitors:
+                        lines = [f"Monitors ({len(monitors)}):"]
+                        for m in monitors:
+                            p = " (Primary)" if m["is_primary"] else ""
+                            lines.append(f"  {m['name']}{p}: {m['width']}x{m['height']} @ ({m['x']},{m['y']})")
+                        result = "\n".join(lines)
+                    else:
+                        result = "No monitor information available."
+                elif action == "summary":
+                    result = get_monitor_summary()
+                elif action == "active":
+                    m = get_active_monitor()
+                    result = f"Active: {m['name']} ({m['width']}x{m['height']})" if m else "No monitor info."
+                elif action == "brightness":
+                    ok = set_monitor_brightness(
+                        monitor_index=int(args.get("monitor", 0)),
+                        brightness=float(args.get("brightness", 1.0)),
+                    )
+                    result = f"Brightness set to {args.get('brightness', '1.0')}" if ok else "Brightness control not supported."
+                else:
+                    result = f"Unknown monitors action: {action}"
+
+            # ── Obsidian Vault ────────────────────────────────────────────
+            elif name == "obsidian":
+                action = args.get("action", "")
+                try:
+                    if action == "save":
+                        r = save_note(
+                            title=args.get("title", "Untitled"),
+                            content=args.get("content", ""),
+                            folder=args.get("folder", ""),
+                        )
+                        result = f"Note saved: {r['path']}"
+                    elif action == "search":
+                        notes = search_notes(
+                            query=args.get("query", ""),
+                            max_results=int(args.get("max_results", 10)),
+                        )
+                        if notes:
+                            lines = [f"Notes ({len(notes)}):"]
+                            for n in notes:
+                                lines.append(f"  {n['title']} ({n['modified'][:10]})")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No matching notes found."
+                    elif action == "list":
+                        notes = list_notes(
+                            folder=args.get("folder", ""),
+                            max_results=int(args.get("max_results", 50)),
+                        )
+                        if notes:
+                            lines = [f"Notes ({len(notes)}):"]
+                            for n in notes:
+                                lines.append(f"  {n['title']} ({n['modified'][:10]})")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No notes found."
+                    elif action == "graph":
+                        g = create_knowledge_graph()
+                        result = f"Knowledge graph: {g['node_count']} notes, {g['edge_count']} wiki-link edges"
+                    elif action == "tags":
+                        tags = get_all_tags()
+                        result = f"Tags ({len(tags)}): {', '.join(tags)}" if tags else "No tags found."
+                    elif action == "set_vault":
+                        result = set_vault_path(args.get("vault_path", ""))
+                    else:
+                        result = f"Unknown obsidian action: {action}"
+                except Exception as e:
+                    result = f"Obsidian error: {e}"
+
+            # ── Package Manager ───────────────────────────────────────────
+            elif name == "package_manager":
+                action = args.get("action", "")
+                pkg = args.get("package", "")
+                mgr = args.get("manager", "auto")
+                try:
+                    if action == "install":
+                        r = install_package(package=pkg, manager=mgr)
+                        result = f"Installed {pkg} via {r['manager']}" if r.get("success") else f"Install failed: {r.get('output', '')}"
+                    elif action == "uninstall":
+                        r = uninstall_package(package=pkg, manager=mgr)
+                        result = f"Uninstalled {pkg}" if r.get("success") else f"Uninstall failed: {r.get('output', '')}"
+                    elif action == "list":
+                        pkgs = list_installed(manager=mgr)
+                        lines = [f"Packages via {mgr} ({len(pkgs)}):"]
+                        for p in pkgs[:50]:
+                            lines.append(f"  {p['name']} {p.get('version', '')}")
+                        result = "\n".join(lines) if pkgs else f"No packages found via {mgr}."
+                    elif action == "update_all":
+                        r = update_all(manager=mgr)
+                        result = "Packages updated." if r.get("success") else f"Update failed: {r.get('output', '')}"
+                    elif action == "detect":
+                        pm = detect_os_package_manager()
+                        result = f"Detected package manager: {pm}"
+                    else:
+                        result = f"Unknown package action: {action}"
+                except Exception as e:
+                    result = f"Package manager error: {e}"
+
+            # ── Goal Engine ───────────────────────────────────────────────
+            elif name == "goals":
+                action = args.get("action", "")
+                try:
+                    if action == "create":
+                        g = create_goal(
+                            title=args.get("title", ""),
+                            description=args.get("description", ""),
+                            steps=args.get("steps", []),
+                        )
+                        step_count = len(g["steps"])
+                        result = f"Goal '{g['title']}' created ({step_count} steps, ID: {g['id']})"
+                    elif action == "list":
+                        goals = list_goals(status=args.get("status", ""))
+                        if goals:
+                            lines = [f"Goals ({len(goals)}):"]
+                            for g in goals:
+                                lines.append(f"  [{g['status']}] {g['title']} ({g['progress']}%)")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No goals found."
+                    elif action == "get":
+                        g = get_goal(goal_id=args.get("goal_id", ""))
+                        if g:
+                            lines = [f"Goal: {g['title']} ({g['progress']}%)"]
+                            for i, s in enumerate(g["steps"]):
+                                mark = "✓" if s["done"] else "○"
+                                lines.append(f"  {mark} {s['title']}")
+                            result = "\n".join(lines)
+                        else:
+                            result = "Goal not found."
+                    elif action == "progress":
+                        g = update_goal_progress(
+                            goal_id=args.get("goal_id", ""),
+                            step_index=int(args["step_index"]) if "step_index" in args else None,
+                            status=args.get("status", ""),
+                        )
+                        result = f"Progress: {g['title']} at {g['progress']}%" if g else "Goal not found."
+                    elif action == "complete_step":
+                        g = complete_step(goal_id=args.get("goal_id", ""), step_title=args.get("step_title", ""))
+                        result = f"Step completed. Progress: {g['progress']}%" if g else "Goal/step not found."
+                    elif action == "delete":
+                        ok = delete_goal(goal_id=args.get("goal_id", ""))
+                        result = "Goal deleted." if ok else "Goal not found."
+                    elif action == "summary":
+                        result = get_goal_summary()
+                    else:
+                        result = f"Unknown goals action: {action}"
+                except Exception as e:
+                    result = f"Goal engine error: {e}"
+
+            # ── Task Graph ────────────────────────────────────────────────
+            elif name == "task_graph":
+                action = args.get("action", "")
+                try:
+                    if action == "create":
+                        t = create_task(
+                            task_id=args.get("task_id", ""),
+                            description=args.get("description", ""),
+                            depends_on=args.get("depends_on", []),
+                        )
+                        result = f"Task '{t['id']}' created (deps: {t.get('dependencies', [])})"
+                    elif action == "complete":
+                        t = complete_task(task_id=args.get("task_id", ""))
+                        result = f"Task '{t['id']}' completed." if t.get("done") else t.get("error", "Failed")
+                    elif action == "available":
+                        tasks = get_available_tasks()
+                        if tasks:
+                            lines = [f"Available tasks ({len(tasks)}):"]
+                            for t in tasks:
+                                lines.append(f"  {t['id']}: {t['description']}")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No available tasks (all done or waiting on dependencies)."
+                    elif action == "summary":
+                        result = get_task_graph_summary()
+                    elif action == "critical_path":
+                        path = get_critical_path()
+                        result = f"Critical path: {' → '.join(path)}" if path else "No tasks in graph."
+                    elif action == "delete":
+                        ok = delete_task(task_id=args.get("task_id", ""))
+                        result = "Task deleted." if ok else "Task not found."
+                    elif action == "reset":
+                        reset_graph()
+                        result = "Task graph reset."
+                    else:
+                        result = f"Unknown task_graph action: {action}"
+                except ImportError:
+                    result = "NetworkX required — pip install networkx"
+                except Exception as e:
+                    result = f"Task graph error: {e}"
+
+            # ── Security Vault ────────────────────────────────────────────
+            elif name == "vault":
+                action = args.get("action", "")
+                key = args.get("key", "")
+                try:
+                    if action == "store":
+                        result = store_secret(key=key, value=args.get("value", ""))
+                    elif action == "get":
+                        val = get_secret(key=key)
+                        result = f"{key}: {val}" if val else f"Secret '{key}' not found."
+                    elif action == "list":
+                        keys = list_secrets()
+                        result = f"Secrets ({len(keys)}): {', '.join(keys)}" if keys else "No secrets stored."
+                    elif action == "delete":
+                        result = delete_secret(key=key)
+                    else:
+                        result = f"Unknown vault action: {action}"
+                except Exception as e:
+                    result = f"Vault error: {e}"
+
+            # ── Context Bus ───────────────────────────────────────────────
+            elif name == "context":
+                action = args.get("action", "summary")
+                try:
+                    if action == "summary":
+                        result = get_bus().get_summary()
+                    elif action == "get":
+                        val = get_context(key=args.get("key", ""))
+                        result = f"{args['key']}: {val}" if val else f"Key '{args.get('key')}' not found."
+                    elif action == "search":
+                        entries = get_bus().search(query=args.get("query", ""))
+                        if entries:
+                            lines = [f"Context history ({len(entries)}):"]
+                            for e in entries:
+                                lines.append(f"  [{e['timestamp'][:19]}] {e['key']}: {e['value']}")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No matching context entries."
+                    elif action == "keys":
+                        ctx = get_all_context()
+                        result = f"Context keys ({len(ctx)}): {', '.join(sorted(ctx.keys()))}" if ctx else "No context data."
+                    else:
+                        result = f"Unknown context action: {action}"
+                except Exception as e:
+                    result = f"Context bus error: {e}"
+
+            # ── Project Scaffold ────────────────────────────────────────────
+            elif name == "scaffold":
+                r = scaffold_project(parameters=args, speak=self.speak, player=self.ui)
+                result = r or "Project scaffolded."
+
+            # ── Relationship Graph ─────────────────────────────────────────
+            elif name == "relationship_graph":
+                action = args.get("action", "")
+                try:
+                    if action == "add_node":
+                        props = {}
+                        if args.get("properties"):
+                            try:
+                                props = json.loads(args["properties"])
+                            except Exception:
+                                props = {"note": args["properties"]}
+                        n = add_node(
+                            node_id=args.get("node_id", args.get("name", "").lower().replace(" ", "_")),
+                            node_type=args.get("node_type", "project"),
+                            name=args.get("name", ""),
+                            properties=props,
+                        )
+                        result = f"Node '{n['name']}' ({n['type']}) created."
+                    elif action == "remove_node":
+                        ok = remove_node(node_id=args.get("node_id", ""))
+                        result = "Node removed." if ok else "Node not found."
+                    elif action == "add_edge":
+                        e = add_edge(
+                            source_id=args.get("node_id", ""),
+                            target_id=args.get("target_id", ""),
+                            relation=args.get("relation", ""),
+                        )
+                        result = f"Edge: {e['source']} → {e['target']} ({e['relation']})"
+                    elif action == "remove_edge":
+                        ok = remove_edge(
+                            source_id=args.get("node_id", ""),
+                            target_id=args.get("target_id", ""),
+                        )
+                        result = "Edge removed." if ok else "Edge not found."
+                    elif action == "get_related":
+                        rels = get_related(node_id=args.get("node_id", ""))
+                        if rels:
+                            lines = [f"Related to '{args['node_id']}':"]
+                            for r in rels:
+                                arrow = "→" if r["direction"] == "outbound" else "←"
+                                lines.append(f"  {arrow} {r['node']['name']} ({r['relation'] or 'related'})")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No related nodes found."
+                    elif action == "resolve_deployment":
+                        result = resolve_deployment(project_name=args.get("project", args.get("name", "")))
+                    elif action == "summary":
+                        result = get_graph_summary()
+                    else:
+                        result = f"Unknown relationship_graph action: {action}"
+                except Exception as e:
+                    result = f"Relationship graph error: {e}"
+
+            # ── Forensics ──────────────────────────────────────────────────
+            elif name == "forensics":
+                action = args.get("action", "summary")
+                days = int(args.get("days", 1))
+                try:
+                    if action == "files":
+                        files = file_history(days=days, path=args.get("path", ""))
+                        if files:
+                            lines = ["Recent file changes:"]
+                            for f in files[:20]:
+                                lines.append(f"  [{f['modified'][:19]}] {f['name']} ({f['path'][:80]})")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No recent file changes."
+                    elif action == "processes":
+                        procs = process_history(days=days)
+                        if procs:
+                            lines = [f"Top processes ({len(procs)}):"]
+                            for p in procs[:20]:
+                                cmd = p.get("command", p.get("name", p.get("pid", "?")))
+                                lines.append(f"  PID {p['pid']}: {cmd}")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No process data."
+                    elif action == "network":
+                        nets = network_history(days=days)
+                        if nets:
+                            lines = [f"Network connections ({len(nets)}):"]
+                            for n in nets[:20]:
+                                peer = n.get("peer", n.get("local", ""))
+                                state = n.get("state", "")
+                                extra = f" [{state}]" if state else ""
+                                lines.append(f"  {peer}{extra}")
+                            result = "\n".join(lines)
+                        else:
+                            result = "No network connections."
+                    elif action == "installed":
+                        result = what_installed_since(days=days)
+                    elif action == "summary":
+                        result = get_forensics_summary(days=days)
+                    else:
+                        result = f"Unknown forensics action: {action}"
+                except Exception as e:
+                    result = f"Forensics error: {e}"
+
+            # ── Remote Control ─────────────────────────────────────────────
+            elif name == "remote_control":
+                result = remote_control(parameters=args, player=self.ui)
+
+            # ── Federation ─────────────────────────────────────────────────
+            elif name == "federation":
+                result = federation(parameters=args, player=self.ui)
+
             else:
                 result = f"Unknown tool: {name}"
 
@@ -1425,6 +2704,20 @@ class JarvisLocal:
 
         print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
         return result
+
+    # ------------------------------------------------------------------
+    # Async helper for Google Workspace tools
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _run_async(coro) -> Any:
+        """Run an async coroutine synchronously. Safe because this runs in a background thread."""
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
 
     # ------------------------------------------------------------------
     # LLM processing loop
@@ -1493,14 +2786,11 @@ class JarvisLocal:
 
             # ── Greeting guard ────────────────────────────────────────────────
             # Small models hallucinate action tool calls for greetings.
-            # Strip any intent-requiring tools AND save_memory if user just said hello.
+            # Strip ALL tool calls if user just said hello — the prompt already
+            # tells the model not to run tools for general chat.
             if final_tool_calls and _round == 0 and _is_greeting(user_text):
-                final_tool_calls = [
-                    tc for tc in final_tool_calls
-                    if tc.get("function", {}).get("name") not in _INTENT_TOOLS
-                    and tc.get("function", {}).get("name") != "save_memory"
-                ]
-                if not final_tool_calls and not final_content:
+                final_tool_calls = []
+                if not final_content:
                     final_content = "Hello! How can I help you?"
 
             # ── No tool calls: pure conversational reply ─────────────────────
@@ -1824,6 +3114,27 @@ class JarvisLocal:
             self.ui.write_log("SYS: JARVIS online.")
             self.ui.set_state("LISTENING")
             self.ui.set_startup_status("● JARVIS online · Voice loading in background…")
+
+            # ── Fetch location in background (cached for later use) ───────
+            def _init_location():
+                try:
+                    from actions.get_location import get_location
+                    r = get_location(player=self.ui, force_refresh=True)
+                    import re
+                    m = re.search(r'currently in ([^,]+)', r)
+                    if m:
+                        self.ui.set_location(m.group(1).strip())
+                except Exception:
+                    pass
+                if self.ui._win._loc_lbl.text() == "LOC  --":
+                    try:
+                        from actions.get_location import _ip_location
+                        ip_data = _ip_location()
+                        if ip_data and ip_data.get("city"):
+                            self.ui.set_location(ip_data["city"])
+                    except Exception:
+                        pass
+            threading.Thread(target=_init_location, daemon=True).start()
 
             threading.Thread(target=self._tts_worker,        daemon=True).start()
             threading.Thread(target=self._text_command_loop,  daemon=True).start()

@@ -502,7 +502,10 @@ _GREETINGS = {
 
 def _is_greeting(text: str) -> bool:
     t = text.lower().strip().rstrip("!?.,").strip()
-    return t in _GREETINGS
+    if t in _GREETINGS:
+        return True
+    first_word = t.split()[0] if t.split() else ""
+    return first_word in _GREETINGS
 
 _SCRIPT_RANGES = {
     "ar": [(0x0600, 0x06FF), (0x0750, 0x077F), (0x08A0, 0x08FF), (0xFB50, 0xFDFF), (0xFE70, 0xFEFF)],
@@ -533,8 +536,8 @@ def _load_system_prompt() -> str:
     except Exception:
         return (
             "You are JARVIS, Tony Stark's AI assistant. "
-            "Be concise, direct, and always use the provided tools to complete tasks. "
-            "Never simulate or guess results — always call the appropriate tool."
+            "Be concise, direct, and helpful. You support both executing computer tasks via tools "
+            "and engaging in general friendly chat / conversation. Keep responses under 3 sentences."
         )
 
 class HeadlessJarvis:
@@ -840,12 +843,8 @@ class HeadlessJarvis:
                 return f"LLM error: {e}"
 
             if final_tool_calls and _round == 0 and _is_greeting(user_text):
-                final_tool_calls = [
-                    tc for tc in final_tool_calls
-                    if tc.get("function", {}).get("name") not in _INTENT_TOOLS
-                    and tc.get("function", {}).get("name") != "save_memory"
-                ]
-                if not final_tool_calls and not final_content:
+                final_tool_calls = []
+                if not final_content:
                     final_content = "Hello! How can I help you?"
 
             if not final_tool_calls:

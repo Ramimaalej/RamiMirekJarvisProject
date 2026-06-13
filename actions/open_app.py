@@ -14,6 +14,33 @@ except ImportError:
 
 _SYSTEM = platform.system()
 
+def _detect_terminal() -> str:
+    if _SYSTEM != "Linux":
+        return "gnome-terminal"
+    # GNOME: read the default terminal from gsettings
+    try:
+        import subprocess
+        gs = subprocess.run(
+            ["gsettings", "get", "org.gnome.desktop.default-applications.terminal", "exec"],
+            capture_output=True, text=True, timeout=5
+        )
+        if gs.returncode == 0:
+            term = gs.stdout.strip().strip("'")
+            if term:
+                return term
+    except Exception:
+        pass
+    # xdg-terminal: queries the system default
+    xdg = shutil.which("xdg-terminal")
+    if xdg:
+        return xdg
+    for term in ["gnome-terminal", "konsole", "xfce4-terminal", "lxterminal",
+                  "terminator", "alacritty", "kitty", "xterm", "mate-terminal",
+                  "tilix", "sakura", "deepin-terminal"]:
+        if shutil.which(term):
+            return term
+    return "xterm"
+
 _APP_ALIASES: dict[str, dict[str, str]] = {
 
     "chrome":             {"Windows": "chrome",                  "Darwin": "Google Chrome",        "Linux": "google-chrome"},
@@ -37,7 +64,7 @@ _APP_ALIASES: dict[str, dict[str, str]] = {
     "vscode":             {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
     "visual studio code": {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
     "code":               {"Windows": "code",                    "Darwin": "Visual Studio Code",   "Linux": "code"},
-    "terminal":           {"Windows": "wt",                      "Darwin": "Terminal",             "Linux": "gnome-terminal"},
+    "terminal":           {"Windows": "wt",                      "Darwin": "Terminal",             "Linux": _detect_terminal()},
     "cmd":                {"Windows": "cmd.exe",                 "Darwin": "Terminal",             "Linux": "bash"},
     "powershell":         {"Windows": "powershell.exe",          "Darwin": "Terminal",             "Linux": "bash"},
     "postman":            {"Windows": "Postman",                 "Darwin": "Postman",              "Linux": "postman"},
@@ -473,11 +500,16 @@ def open_app(
         return "Could not open Wikipedia."
 
     try:
-        # If resolved to a URL, open directly in browser
+        # If resolved to a URL, open via Playwright (same session as browser_control)
         if normalized.startswith("http"):
-            if _open_url(normalized):
+            try:
+                from actions.browser_control import browser_control
+                browser_control(parameters={"action": "go_to", "url": normalized})
                 return f"Opened {app_name} in your browser."
-            return f"Could not open {app_name}."
+            except Exception:
+                if _open_url(normalized):
+                    return f"Opened {app_name} in your browser."
+                return f"Could not open {app_name}."
 
         # Otherwise try to launch as a native app
         if launcher(normalized):

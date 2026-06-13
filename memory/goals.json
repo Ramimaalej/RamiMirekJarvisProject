@@ -1,0 +1,68 @@
+{
+  "goals": [
+    {
+      "id": "goal-1781288391",
+      "title": "Learn Kubernetes",
+      "description": "",
+      "status": "active",
+      "phased": false,
+      "progress": 0.0,
+      "created": "2026-06-12T19:19:51.033013",
+      "steps": [
+        {
+          "id": "step-0",
+          "title": "Course: complete Learn Kubernetes course",
+          "done": false
+        },
+        {
+          "id": "step-1",
+          "title": "Practice: complete Learn Kubernetes practice",
+          "done": false
+        },
+        {
+          "id": "step-2",
+          "title": "Project: complete Learn Kubernetes project",
+          "done": false
+        },
+        {
+          "id": "step-3",
+          "title": "Review: complete Learn Kubernetes review",
+          "done": false
+        }
+      ],
+      "current_step": 0
+    },
+    {
+      "id": "goal-1781288440",
+      "title": "Learn Kubernetes",
+      "description": "",
+      "status": "active",
+      "phased": false,
+      "progress": 0.0,
+      "created": "2026-06-12T19:20:40.079806",
+      "steps": [
+        {
+          "id": "step-0",
+          "title": "Course: complete Learn Kubernetes course",
+          "done": false
+        },
+        {
+          "id": "step-1",
+          "title": "Practice: complete Learn Kubernetes practice",
+          "done": false
+        },
+        {
+          "id": "step-2",
+          "title": "Project: complete Learn Kubernetes project",
+          "done": false
+        },
+        {
+          "id": "step-3",
+          "title": "Review: complete Learn Kubernetes review",
+          "done": false
+        }
+      ],
+      "current_step": 0
+    }
+  ]
+}

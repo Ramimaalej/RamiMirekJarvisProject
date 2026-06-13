@@ -18,15 +18,18 @@ def _ddg_search(query: str, max_results: int = 6) -> list[dict]:
     try:
         from ddgs import DDGS
     except ImportError:
-        from duckduckgo_search import DDGS
+        try:
+            from duckduckgo_search import DDGS
+        except ImportError:
+            return []
 
     results = []
     with DDGS() as ddgs:
         for r in ddgs.text(query, max_results=max_results):
             results.append({
                 "title":   r.get("title",  ""),
-                "snippet": r.get("body",   ""),
-                "url":     r.get("href",   ""),
+                "snippet": r.get("body", r.get("snippet", "")),
+                "url":     r.get("href",   r.get("link", "")),
             })
     return results
 

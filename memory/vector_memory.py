@@ -37,6 +37,8 @@ def _get_embedding_url() -> str:
     cfg = _get_config()
     url = cfg.get("llm_url", "http://localhost:11434").rstrip("/")
     provider = _get_provider()
+    if cfg.get("embed_url"):
+        return cfg["embed_url"].rstrip("/")
     if provider == "ollama":
         return f"{url}/api/embeddings"
     if "/v1" in url:
@@ -52,6 +54,9 @@ _OPENAI_EMBED_MODELS = {
     "openrouter": "openai/text-embedding-3-small",
 }
 
+_embed_cache: dict[str, list[float]] = {}
+_embed_warned: set[str] = set()
+
 def _get_embed_headers() -> dict:
     cfg = _get_config()
     key = cfg.get("llm_api_key", "").strip()
@@ -61,13 +66,16 @@ def _get_embed_headers() -> dict:
 
 def _embed(text: str) -> list[float]:
     provider = _get_provider()
+    cfg = _get_config()
     embed_url = _get_embedding_url()
     headers = _get_embed_headers()
 
+    # Allow explicit override in config
+    embed_model = cfg.get("embed_model") or _OPENAI_EMBED_MODELS.get(provider, "text-embedding-ada-002")
+
     if provider == "ollama":
-        payload = {"model": _EMBED_MODEL, "prompt": text[:1000]}
+        payload = {"model": embed_model, "prompt": text[:1000]}
     else:
-        embed_model = _OPENAI_EMBED_MODELS.get(provider, "text-embedding-ada-002")
         payload = {
             "model": embed_model,
             "input": text[:1000],
@@ -79,6 +87,13 @@ def _embed(text: str) -> list[float]:
         if provider == "ollama":
             return data.get("embedding", [])
         return data.get("data", [{}])[0].get("embedding", [])
+    except requests.exceptions.HTTPError as e:
+        key = (provider, embed_url)
+        if key not in _embed_warned:
+            print(f"[VectorMemory] Embedding API not available ({provider} @ {embed_url}): {e.response.status_code}")
+            print(f"[VectorMemory] Set 'embed_url' and 'embed_model' in api_keys.json to use a working embedding endpoint.")
+            _embed_warned.add(key)
+        return []
     except Exception as e:
         print(f"[VectorMemory] Embedding failed ({provider} @ {embed_url}): {e}")
         return []
@@ -178,9 +193,42 @@ def search_conversation(query: str, top_k: int = 3, threshold: float = 0.25) -> 
         results = [{"score": s, **{k: v for k, v in c.items() if k != "embedding"}} for s, c in scored[:top_k]]
         return results
 
+def _search_memory_with_emb(query_emb: list[float], top_k: int = 5, threshold: float = 0.3) -> list[dict]:
+    if not query_emb:
+        return []
+    with _lock:
+        store = _load_store()
+        scored = []
+        for m in store.get("memories", []):
+            if not m.get("embedding"):
+                continue
+            sim = _cosine_similarity(query_emb, m["embedding"])
+            if sim >= threshold:
+                scored.append((sim, m))
+        scored.sort(reverse=True, key=lambda x: x[0])
+        return [{"score": s, **{k: v for k, v in m.items() if k != "embedding"}} for s, m in scored[:top_k]]
+
+
+def _search_conversation_with_emb(query_emb: list[float], top_k: int = 3, threshold: float = 0.25) -> list[dict]:
+    if not query_emb:
+        return []
+    with _lock:
+        store = _load_store()
+        scored = []
+        for c in store.get("conversations", []):
+            if not c.get("embedding"):
+                continue
+            sim = _cosine_similarity(query_emb, c["embedding"])
+            if sim >= threshold:
+                scored.append((sim, c))
+        scored.sort(reverse=True, key=lambda x: x[0])
+        return [{"score": s, **{k: v for k, v in c.items() if k != "embedding"}} for s, c in scored[:top_k]]
+
+
 def get_relevant_context(query: str, top_k: int = 5) -> str:
-    mems = search_memory(query, top_k=top_k)
-    convs = search_conversation(query, top_k=3)
+    query_emb = _embed(query)
+    mems = _search_memory_with_emb(query_emb, top_k=top_k, threshold=0.3)
+    convs = _search_conversation_with_emb(query_emb, top_k=3, threshold=0.25)
     parts = []
     if mems:
         parts.append("[Relevant Memories]")

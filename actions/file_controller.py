@@ -170,7 +170,7 @@ def _safe_trash(target: Path) -> str:
             "Permanent deletion is disabled for safety."
         )
     send2trash.send2trash(str(target))
-    return f"Moved to Trash: {target.name}"
+    return f"Moved to Trash: {target.name} (previously at {target.resolve()})"
 
 
 def list_files(path: str = "desktop", show_hidden: bool = False) -> str:
@@ -212,21 +212,42 @@ def create_file(path: str, name: str = "", content: str = "") -> str:
             return f"Access denied: {target}"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content, encoding="utf-8")
-        return f"File created: {target.name}"
+        return f"File created: {target.name} at {target.resolve()}"
     except Exception as e:
         return f"Could not create file: {e}"
 
 
 def create_folder(path: str, name: str = "") -> str:
     try:
-        base   = _resolve_path(path)
+        # Detect OS and set default base to user's home / root directory
+        # Windows -> C:\Users\user, Linux/Fedora -> /home/user, Mac -> /Users/user
+        if not path or path.lower() in ("desktop", "home"):
+            base = Path.home()
+        else:
+            base = _resolve_path(path)
+
         target = (base / name) if name else base
         if not _is_safe_path(target):
             return f"Access denied: {target}"
+
         if target.exists() and not target.is_dir():
             target.unlink()
-        target.mkdir(parents=True, exist_ok=True)
-        return f"Folder created: {target.name}"
+
+        # Run directory creation natively using terminal shell commands (cd then mkdir)
+        parent_dir = str(target.parent.resolve())
+        folder_name = target.name
+
+        if is_windows():
+            cmd = f'cd /d "{parent_dir}" && mkdir "{folder_name}"'
+        else:
+            cmd = f'cd "{parent_dir}" && mkdir "{folder_name}"'
+
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if res.returncode != 0:
+            # Fallback to python mkdir if shell command fails
+            target.mkdir(parents=True, exist_ok=True)
+
+        return f"Folder created: {target.name} at {target.resolve()}"
     except Exception as e:
         return f"Could not create folder: {e}"
 
@@ -276,7 +297,7 @@ def move_file(path: str, name: str = "", destination: str = "") -> str:
 
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(src), str(dst))
-        return f"Moved: {src.name} → {dst.parent.name}/"
+        return f"Moved: {src.resolve()} → {dst.resolve()}"
 
     except Exception as e:
         return f"Could not move: {e}"
@@ -307,7 +328,7 @@ def copy_file(path: str, name: str = "", destination: str = "") -> str:
         else:
             shutil.copy2(str(src), str(dst))
 
-        return f"Copied: {src.name} → {dst.parent.name}/"
+        return f"Copied: {src.resolve()} → {dst.resolve()}"
 
     except Exception as e:
         return f"Could not copy: {e}"
@@ -329,7 +350,7 @@ def rename_file(path: str, name: str = "", new_name: str = "") -> str:
             return f"A file named '{new_name}' already exists here."
 
         target.rename(new_path)
-        return f"Renamed: {target.name} → {new_name}"
+        return f"Renamed: {target.name} → {new_name} at {new_path.resolve()}"
 
     except Exception as e:
         return f"Could not rename: {e}"
@@ -367,7 +388,7 @@ def write_file(path: str, name: str = "", content: str = "",
         with open(target, mode, encoding="utf-8") as f:
             f.write(content)
         action = "Appended to" if append else "Written to"
-        return f"{action}: {target.name}"
+        return f"{action}: {target.name} at {target.resolve()}"
     except Exception as e:
         return f"Could not write file: {e}"
 
@@ -593,7 +614,7 @@ def compress(path: str, name: str = "", archive_name: str = "", format: str = "z
             return f"Unsupported format: {format}. Use zip, tar, tar.gz, tgz, tar.bz2"
 
         size = _format_size(archive_path.stat().st_size)
-        return f"Compressed to {archive_name} ({size})"
+        return f"Compressed to {archive_name} ({size}) at {archive_path.resolve()}"
     except Exception as e:
         return f"Compression failed: {e}"
 
@@ -622,7 +643,7 @@ def extract(path: str, name: str = "", destination: str = "") -> str:
             return f"Unsupported archive format: {suffix}"
 
         count = sum(1 for _ in dst.rglob("*"))
-        return f"Extracted {count} items to {dst.name}/"
+        return f"Extracted {count} items to {dst.resolve()}"
     except Exception as e:
         return f"Extraction failed: {e}"
 
@@ -661,7 +682,7 @@ def download(url: str, destination: str = "downloads", filename: str = "") -> st
                 f.write(chunk)
 
         size = _format_size(filepath.stat().st_size)
-        return f"Downloaded {filepath.name} ({size}) to {dst_dir.name}/"
+        return f"Downloaded {filepath.name} ({size}) to {filepath.resolve()}"
     except ImportError:
         return "requests module required for download. Run: pip install requests"
     except Exception as e:
@@ -696,7 +717,7 @@ def edit_file(path: str, name: str = "", old_string: str = "", new_string: str =
             count = 1
 
         target.write_text(content, encoding="utf-8")
-        return f"Edited {target.name}: {count} replacement(s) made."
+        return f"Edited {target.name} at {target.resolve()}: {count} replacement(s) made."
     except PermissionError:
         return f"Permission denied: {target}"
     except Exception as e:
@@ -711,7 +732,7 @@ def file_controller(
 ) -> str:
     params = parameters or {}
     action = params.get("action", "").lower().strip()
-    path   = params.get("path", "desktop")
+    path   = params.get("path", "home")
     name   = params.get("name", "")
 
     if player:

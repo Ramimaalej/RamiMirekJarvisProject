@@ -2,26 +2,27 @@
 get_location.py — Device-accurate location for JARVIS on Linux.
 
 Priority chain:
-  1. GeoClue2  — the GNOME/Linux location daemon (WiFi + GPS positioning).
-                 Accurate to street level. Requires the user to allow
-                 location access in GNOME Settings → Privacy → Location.
-  2. Browser Geolocation (HTML5 API via Playwright) — fallback when
-                 GeoClue2 is unavailable.
-  3. IP geolocation — last resort, city-level only (may show ISP city,
-                 not your actual city).
+  1. GeoClue2  — GNOME/Linux location daemon (WiFi + GPS).
+  2. NetworkManager (nmcli) — reads the WiFi AP your laptop is connected
+                to, then resolves it via geolocation APIs.
+  3. IP geolocation — last resort, city-level.
 
 Reverse geocoding: Nominatim / OpenStreetMap (free, no API key).
 """
 
 from __future__ import annotations
+import subprocess
 import threading
+import re
 import requests
 
 from memory.memory_manager import load_memory as _load_memory
 
+# ── Module-level cache so we don't re-fetch every time ────────────────────
+_LOC_CACHE: dict | None = None
 
-_TIMEOUT   = 8   # seconds to wait for a location fix
-_REV_TIMEOUT = 5  # seconds for reverse-geocode HTTP request
+_TIMEOUT    = 8
+_REV_TIMEOUT = 5
 
 
 # ── Reverse geocoding (lat/lon → human address) ───────────────────────────────
@@ -122,42 +123,68 @@ def _geoclue2_location() -> tuple[float, float] | None:
     return result[0] if result else None
 
 
-# ── Method 2: Browser HTML5 Geolocation (Playwright) ─────────────────────────
+# ── Method 2: NetworkManager (nmcli) — WiFi AP → geolocation ──────────────
 
-def _browser_location() -> tuple[float, float] | None:
+def _nmcli_location() -> dict | None:
     """
-    Open a headless browser page and use the HTML5 Geolocation API.
-    Playwright must be installed: pip install playwright && playwright install chromium
+    Get your laptop's location by reading the connected WiFi AP info
+    via nmcli, then looking up the BSSID in a geolocation API.
     """
     try:
-        from playwright.sync_api import sync_playwright
+        # Get active connection info (no root needed)
+        out = subprocess.check_output(
+            ["nmcli", "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"],
+            timeout=8, stderr=subprocess.DEVNULL,
+        ).decode("utf-8", errors="replace")
 
-        html = """
-        <script>
-        navigator.geolocation.getCurrentPosition(
-            p => document.title = p.coords.latitude + ',' + p.coords.longitude,
-            e => document.title = 'ERROR:' + e.message,
-            {enableHighAccuracy: true, timeout: 6000}
-        );
-        </script>"""
+        wifi_conn = None
+        for line in out.strip().split("\n"):
+            parts = line.split(":")
+            if len(parts) >= 2 and parts[1] == "wifi":
+                wifi_conn = parts[0]
+                break
 
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(headless=True)
-            ctx     = browser.new_context(
-                permissions=["geolocation"],
-                geolocation=None,          # let the OS supply it
+        if not wifi_conn:
+            return None
+
+        # Get BSSID from the active WiFi connection
+        out2 = subprocess.check_output(
+            ["nmcli", "-t", "-f", "GENERAL.HWADDR", "connection", "show", wifi_conn],
+            timeout=8, stderr=subprocess.DEVNULL,
+        ).decode("utf-8", errors="replace").strip()
+
+        bssid = out2.split(":")[-1].strip() if ":" in out2 else None
+        if not bssid:
+            return None
+
+        # Try to look up via Unwired Labs geolocation API
+        try:
+            r = requests.post(
+                "https://us1.unwiredlabs.com/v2/process",
+                json={"wifi": [{"bssid": bssid}], "address": 1},
+                timeout=5,
             )
-            page = ctx.new_page()
-            page.set_content(html)
-            page.wait_for_timeout(7000)    # wait up to 7 s for fix
-            title = page.title()
-            browser.close()
-
-            if title and "," in title and not title.startswith("ERROR"):
-                parts = title.split(",")
-                return float(parts[0]), float(parts[1])
-    except Exception as exc:
-        print(f"[Location] Browser geolocation error: {exc}")
+            if r.status_code == 200:
+                d = r.json()
+                if d.get("status") == "ok":
+                    lat = d.get("lat")
+                    lon = d.get("lon")
+                    if lat and lon:
+                        geo = _reverse_geocode(lat, lon)
+                        return {
+                            "city":     geo.get("city", ""),
+                            "region":   geo.get("region", ""),
+                            "country":  geo.get("country", ""),
+                            "latitude": lat,
+                            "longitude": lon,
+                            "timezone": "",
+                            "source":   "wifi",
+                            "bssid":    bssid,
+                        }
+        except Exception:
+            pass
+    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+        pass
     return None
 
 
@@ -199,23 +226,27 @@ def get_location(
     parameters: dict | None = None,
     player=None,
     session_memory=None,
+    force_refresh: bool = False,
 ) -> str:
     """
     Detect the user's real location.
-    Tries GeoClue2 → browser geolocation → IP (last resort).
+    Tries GeoClue2 → nmcli WiFi → saved memory → IP (last resort).
+    Caches the result so subsequent calls are instant.
+    Pass force_refresh=True to re-detect.
     """
+    global _LOC_CACHE
+
+    if _LOC_CACHE is not None and not force_refresh:
+        data, source = _LOC_CACHE
+        _log(f"Location from cache: {data.get('city', '')}", player)
+        return _format_location(data, source)
+
     data: dict = {}
     source = "unknown"
 
-    # ── Method 1: GeoClue2 ───────────────────────────────────────────────────
+    # ── Method 1: GeoClue2 (GPS/WiFi positioning) ────────────────────────────
     coords = _geoclue2_location()
 
-    # ── Method 2: Browser geolocation ───────────────────────────────────────
-    if coords is None:
-        _log("GeoClue2 unavailable, trying browser geolocation…", player)
-        coords = _browser_location()
-
-    # ── Reverse-geocode device coordinates ───────────────────────────────────
     if coords:
         lat, lon = coords
         geo = _reverse_geocode(lat, lon)
@@ -226,13 +257,20 @@ def get_location(
             "postcode":  geo.get("postcode", ""),
             "latitude":  round(lat, 4),
             "longitude": round(lon, 4),
-            "timezone":  "",
-            "source":    "device",
+            "source":    "gps",
         }
-        source = "device (WiFi/GPS)"
+        source = "GPS/WiFi"
 
-    # ── Check memory for user-stated city before IP fallback ────────────────
-    if not data or not data.get("city"):
+    # ── Method 2: NetworkManager (nmcli) WiFi BSSID → geolocation API ───────
+    if not data.get("city"):
+        _log("Trying WiFi-based geolocation via nmcli…", player)
+        wifi_data = _nmcli_location()
+        if wifi_data and wifi_data.get("city"):
+            data   = wifi_data
+            source = "WiFi (BSSID lookup)"
+
+    # ── Check memory for user-stated city ───────────────────────────────────
+    if not data.get("city"):
         try:
             mem = _load_memory()
             saved_city = mem.get("identity", {}).get("city", {})
@@ -247,30 +285,34 @@ def get_location(
                     "longitude": "",
                     "source":    "memory",
                 }
-                source = "saved (you told me)"
+                source = "saved memory"
                 _log(f"Using saved city from memory: {saved_city}", player)
         except Exception as exc:
             print(f"[Location] Memory check failed: {exc}")
 
     # ── Method 3: IP fallback ────────────────────────────────────────────────
-    if not data or not data.get("city"):
-        _log("Device location unavailable, falling back to IP geolocation "
-             "(may be inaccurate — reflects ISP location).", player)
+    if not data.get("city"):
+        _log("Falling back to IP geolocation (may be approximate).", player)
         ip_data = _ip_location()
         if ip_data:
             data   = ip_data
             source = "IP (approximate)"
 
-    if not data or not data.get("city"):
+    if not data.get("city"):
         msg = (
-            "Sir, I was unable to determine your current location. "
-            "Please make sure Location Services are enabled in "
-            "GNOME Settings → Privacy → Location Services."
+            "Unable to determine your location. Please enable Location "
+            "Services (GNOME Settings → Privacy → Location) or make sure "
+            "you're connected to WiFi."
         )
         _log(msg, player)
         return msg
 
-    # ── Build spoken response ─────────────────────────────────────────────────
+    # ── Cache and return ─────────────────────────────────────────────────────
+    _LOC_CACHE = (data, source)
+    return _format_location(data, source)
+
+
+def _format_location(data: dict, source: str) -> str:
     city    = data.get("city", "")
     region  = data.get("region", "")
     country = data.get("country", "")
@@ -280,31 +322,21 @@ def get_location(
     location_str = city
     if region and region != city:
         location_str += f", {region}"
-    location_str += f", {country}"
+    if country:
+        location_str += f", {country}"
 
     parts = [f"You are currently in {location_str}."]
     if lat and lon:
-        parts.append(f"Coordinates: {lat}°N, {lon}°E.")
-    if source == "IP (approximate)":
-        parts.append(
-            "Note: this location is based on your IP address and may "
-            "not reflect your exact city."
-        )
+        try:
+            parts.append(f"Coordinates: {float(lat):.4f}°N, {float(lon):.4f}°E.")
+        except (ValueError, TypeError):
+            pass
+    if "approximate" in source:
+        parts.append("This is based on your IP address and may not be exact.")
 
     msg = " ".join(parts)
-
-    summary = (
-        f"Location ({source}): {location_str} | "
-        f"Coords: {lat}, {lon}"
-    )
-    _log(summary, player)
-
-    if session_memory:
-        try:
-            session_memory.set_last_search(query="get_location", response=summary)
-        except Exception:
-            pass
-
+    summary = f"Location ({source}): {location_str} | Coords: {lat}, {lon}"
+    _log(summary, None)
     return msg
 
 

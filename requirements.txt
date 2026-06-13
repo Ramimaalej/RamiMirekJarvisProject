@@ -15,9 +15,11 @@ sounddevice
 numpy
 soundfile
 requests
+python-dotenv
 
 # ── Web automation & search ───────────────────────────────────────────────
 playwright
+browser-use
 beautifulsoup4
 duckduckgo-search
 
@@ -28,6 +30,31 @@ pygetwindow
 send2trash
 mss
 opencv-python
+openwakeword
+
+# ── New Feature Dependencies ─────────────────────────────────────────────
+APScheduler
+PyGithub
+screeninfo
+plaid-python
+zeroconf
+livekit-api
+livekit-rtc
+
+# ── Accessibility (platform-specific) ────────────────────────────────────
+pyatspi ; sys_platform == "linux"
+pyobjc  ; sys_platform == "darwin"
+UIAutomation ; sys_platform == "win32"
+
+# ── Everything SDK (Windows) ─────────────────────────────────────────────
+everything-sdk ; sys_platform == "win32"
+
+# ── New Feature Dependencies (phase 2) ───────────────────────────────────
+networkx
+hvac
+fastapi
+uvicorn[standard]
+websockets
 
 # ── OS control (Windows only) ─────────────────────────────────────────────
 pywinauto ; sys_platform == "win32"
