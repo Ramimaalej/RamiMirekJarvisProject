@@ -57,6 +57,17 @@ def _base_dir() -> Path:
     return Path(__file__).resolve().parent
 
 BASE_DIR   = _base_dir()
+
+# ── Persistent asyncio event loop (avoids repeated asyncio.run() overhead) ──
+_ASYNC_LOOP = asyncio.new_event_loop()
+threading.Thread(target=_ASYNC_LOOP.run_forever, daemon=True, name="async-loop").start()
+
+def _run_async(coro):
+    """Schedule a coroutine on the persistent loop and block for the result."""
+    fut = asyncio.run_coroutine_threadsafe(coro, _ASYNC_LOOP)
+    return fut.result()
+
+
 CONFIG_DIR = BASE_DIR / "config"
 API_FILE   = CONFIG_DIR / "api_keys.json"
 
@@ -2355,7 +2366,7 @@ class WorkspacePanel(QWidget):
             creds_path = Path(__file__).resolve().parent / "gws" / "credentials.json"
             if not creds_path.exists():
                 return
-            emails = asyncio.run(gws_bridge.get_unread_emails(limit=10))
+            emails = _run_async(gws_bridge.get_unread_emails(limit=10))
             if not isinstance(emails, list):
                 emails = []
             self._main_window._log_sig.emit(f"GWS: {len(emails)} unread emails")
@@ -2387,7 +2398,7 @@ class WorkspacePanel(QWidget):
             creds_path = Path(__file__).resolve().parent / "gws" / "credentials.json"
             if not creds_path.exists():
                 return
-            events = asyncio.run(gws_bridge.get_todays_agenda())
+            events = _run_async(gws_bridge.get_todays_agenda())
             if not isinstance(events, list):
                 events = []
             self._main_window._log_sig.emit(f"GWS: {len(events)} agenda items")
@@ -2419,7 +2430,7 @@ class WorkspacePanel(QWidget):
     def _do_search_drive(self, query: str):
         try:
             import gws_bridge
-            files = asyncio.run(gws_bridge.search_files(query=query))
+            files = _run_async(gws_bridge.search_files(query=query))
             if not isinstance(files, list):
                 files = []
             self._main_window._log_sig.emit(f"GWS: {len(files)} drive files found")
@@ -2483,7 +2494,7 @@ class WorkspacePanel(QWidget):
         def _do():
             try:
                 import gws_bridge
-                ev = asyncio.run(gws_bridge.create_meet(
+                ev = _run_async(gws_bridge.create_meet(
                     title="Instant Meeting",
                     date=date_str,
                     time=time_str,
@@ -2512,7 +2523,7 @@ class WorkspacePanel(QWidget):
         def _do():
             try:
                 import gws_bridge
-                asyncio.run(gws_bridge.delete_event(event_id=event_id))
+                _run_async(gws_bridge.delete_event(event_id=event_id))
                 self._main_window._log_sig.emit(f"GWS: Event {event_id} deleted")
                 self._refresh_calendar()
             except Exception as e:
