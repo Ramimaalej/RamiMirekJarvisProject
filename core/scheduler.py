@@ -7,6 +7,8 @@ from typing import Callable
 import sys
 import re
 
+from core.workflows import schedule_flow
+
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
@@ -130,6 +132,7 @@ class Scheduler:
                 self._execute(job)
             time.sleep(5)
 
+    @schedule_flow(name="Scheduled Job")
     def _execute(self, job: dict):
         print(f"[Scheduler] Running: {job['name']}")
         try:

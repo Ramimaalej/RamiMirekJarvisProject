@@ -24,10 +24,32 @@ from PyQt6.QtGui import (
     QRadialGradient, QShortcut,
 )
 from PyQt6.QtWidgets import (
-    QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
-    QMainWindow, QPushButton, QScrollArea, QSizePolicy, QStackedWidget, QTextEdit,
-    QVBoxLayout, QWidget, QProgressBar,
+    QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
+    QMainWindow, QPushButton, QScrollArea, QSizePolicy, QSplitter, QStackedWidget, QTextEdit,
+    QVBoxLayout, QWidget, QProgressBar, QGridLayout,
 )
+
+from actions.timer_scheduler import list_timers
+
+def request_api_key(service_name: str, key_name: str = "") -> str:
+    """Show a modal dialog asking for an API key. Saves to config if provided."""
+    app = QApplication.instance()
+    if not app:
+        return ""
+    parent = app.activeWindow()
+    key_name = key_name or f"{service_name.lower().replace(' ', '_')}_api_key"
+    result, ok = QInputDialog.getText(
+        parent,
+        f"API Key Required — {service_name}",
+        f"{service_name} requires an API key.\nEnter your {service_name} API key:",
+        QLineEdit.EchoMode.Password,
+    )
+    if ok and result.strip():
+        from memory.config_manager import save_config
+        save_config({key_name: result.strip()})
+        return result.strip()
+    return ""
+
 
 def _base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -38,42 +60,84 @@ BASE_DIR   = _base_dir()
 CONFIG_DIR = BASE_DIR / "config"
 API_FILE   = CONFIG_DIR / "api_keys.json"
 
-_DEFAULT_W, _DEFAULT_H = 980, 700
-_MIN_W,     _MIN_H     = 820, 580
-_LEFT_W  = 148
-_RIGHT_W = 340
+_DEFAULT_W, _DEFAULT_H = 1200, 780
+_MIN_W,     _MIN_H     = 960, 620
+_LEFT_W  = 185
+_RIGHT_W = 360
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
+_API_SERVICES = [
+    ("OpenAI API",     "openai_api_key"),
+    ("Google Gemini",  "gemini_api_key"),
+    ("ElevenLabs TTS", "elevenlabs_api_key"),
+    ("GWS (Gmail)",    "gws_credentials"),
+    ("Plaid Finance",  "plaid_client_id"),
+    ("GitHub API",     "github_access_token"),
+    ("PostgreSQL DB",  "postgres_host"),
+    ("Docker Daemon",  "docker_host"),
+]
+
 
 class C:
-    BG        = "#000000"
-    PANEL     = "#0d0d0d"
-    PANEL2    = "#141414"
-    BORDER    = "#222222"
-    BORDER_B  = "#333333"
-    BORDER_A  = "#2a2a2a"
-    PRI       = "#ffffff"
-    PRI_DIM   = "#666666"
-    PRI_GHO   = "#111111"
-    ACC       = "#7c8aff"
-    ACC_DIM   = "#3d4480"
-    ACC_GHO   = "#1e2040"
-    GREEN     = "#88ff88"
-    GREEN_D   = "#44aa44"
-    RED       = "#ff4444"
-    MUTED_C   = "#666666"
-    TEXT      = "#ffffff"
-    TEXT_DIM  = "#555555"
-    TEXT_MED  = "#888888"
-    WHITE     = "#ffffff"
-    DARK      = "#000000"
-    BAR_BG    = "#1a1a1a"
+    BG        = "#0a0a0a"
+    PANEL     = "#111111"
+    PANEL2    = "#181818"
+    BORDER    = "#1e1e1e"
+    BORDER_B  = "#2a2a2a"
+    BORDER_A  = "#252525"
+    PRI       = "#eeeeee"
+    PRI_DIM   = "#555555"
+    PRI_GHO   = "#141414"
+    ACC       = "#6c7bef"
+    ACC_DIM   = "#353b6a"
+    ACC_GHO   = "#1a1d3a"
+    GREEN     = "#7ae07a"
+    GREEN_D   = "#3a8a3a"
+    RED       = "#e04444"
+    MUTED_C   = "#555555"
+    TEXT      = "#eeeeee"
+    TEXT_DIM  = "#4a4a4a"
+    TEXT_MED  = "#7a7a7a"
+    WHITE     = "#eeeeee"
+    DARK      = "#0a0a0a"
+    BAR_BG    = "#151515"
+
+    @classmethod
+    def apply_theme(cls, light_mode: bool):
+        if light_mode:
+            cls.BG        = "#f8f9fa"
+            cls.PANEL     = "#ffffff"
+            cls.PANEL2    = "#f0f2f5"
+            cls.BORDER    = "#e0e0e0"
+            cls.BORDER_B  = "#d0d0d0"
+            cls.BORDER_A  = "#cccccc"
+            cls.PRI       = "#000000"
+            cls.PRI_DIM   = "#888888"
+            cls.PRI_GHO   = "#e0e0e0"
+            cls.TEXT      = "#111111"
+            cls.TEXT_DIM  = "#666666"
+            cls.TEXT_MED  = "#444444"
+            cls.BAR_BG    = "#e0e0e0"
+        else:
+            cls.BG        = "#000000"
+            cls.PANEL     = "#0d0d0d"
+            cls.PANEL2    = "#141414"
+            cls.BORDER    = "#222222"
+            cls.BORDER_B  = "#333333"
+            cls.BORDER_A  = "#2a2a2a"
+            cls.PRI       = "#ffffff"
+            cls.PRI_DIM   = "#666666"
+            cls.PRI_GHO   = "#111111"
+            cls.TEXT      = "#ffffff"
+            cls.TEXT_DIM  = "#555555"
+            cls.TEXT_MED  = "#888888"
+            cls.BAR_BG    = "#1a1a1a"
 
 _FONT = "Cantarell"
-_FONT_SZ = 10
-_FONT_SZ_SM = 9
-_FONT_SZ_XS = 8
+_FONT_SZ = 12
+_FONT_SZ_SM = 10
+_FONT_SZ_XS = 9
 
 
 def qcol(h: str, a: int = 255) -> QColor:
@@ -578,7 +642,7 @@ class MetricBar(QWidget):
         self._color = color
         self._value = 0.0       # 0–100
         self._text  = "--"
-        self.setFixedHeight(38)
+        self.setFixedHeight(44)
         self.setMinimumWidth(80)
 
     def set_value(self, pct: float, text: str):
@@ -593,32 +657,32 @@ class MetricBar(QWidget):
 
         p.setBrush(QBrush(qcol(C.PANEL2)))
         p.setPen(QPen(qcol(C.BORDER), 1))
-        p.drawRoundedRect(QRectF(1, 1, W - 2, H - 2), 4, 4)
+        p.drawRoundedRect(QRectF(1, 1, W - 2, H - 2), 6, 6)
 
-        bar_h   = 3
-        bar_y   = H - bar_h - 5
-        bar_w   = W - 12
-        bar_x   = 6
+        bar_h   = 4
+        bar_y   = H - bar_h - 8
+        bar_w   = W - 16
+        bar_x   = 8
         fill_w  = int(bar_w * self._value / 100)
 
         p.setBrush(QBrush(qcol(C.BAR_BG)))
         p.setPen(Qt.PenStyle.NoPen)
-        p.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h), 1.5, 1.5)
+        p.drawRoundedRect(QRectF(bar_x, bar_y, bar_w, bar_h), 2, 2)
 
         a = max(60, min(255, int(100 + self._value * 1.5)))
         bar_col = qcol(C.WHITE, a)
 
         if fill_w > 0:
             p.setBrush(QBrush(bar_col))
-            p.drawRoundedRect(QRectF(bar_x, bar_y, fill_w, bar_h), 1.5, 1.5)
+            p.drawRoundedRect(QRectF(bar_x, bar_y, fill_w, bar_h), 2, 2)
 
-        p.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        p.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         p.setPen(QPen(qcol(C.TEXT_DIM), 1))
-        p.drawText(QRectF(8, 5, 50, 14), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._label)
+        p.drawText(QRectF(10, 6, 50, 16), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, self._label)
 
-        p.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        p.setFont(QFont("Courier New", 10, QFont.Weight.Bold))
         p.setPen(QPen(qcol(C.TEXT) if self._text != "--" else qcol(C.TEXT_DIM), 1))
-        p.drawText(QRectF(0, 4, W - 6, 16), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._text)
+        p.drawText(QRectF(0, 5, W - 10, 18), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, self._text)
 
 class LogWidget(QTextEdit):
     _sig = pyqtSignal(str)
@@ -626,25 +690,34 @@ class LogWidget(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
-        self.setFont(QFont(_FONT, _FONT_SZ))
+        self.setFont(QFont(_FONT, _FONT_SZ_SM))
         self.setStyleSheet(f"""
             QTextEdit {{
                 background: {C.PANEL};
                 color: {C.TEXT};
                 border: 1px solid {C.BORDER};
-                border-radius: 6px;
-                padding: 8px;
+                border-radius: 8px;
+                padding: 10px;
                 selection-background-color: {C.ACC_GHO};
+                font-size: 13px;
+                line-height: 1.5;
             }}
             QScrollBar:vertical {{
-                background: {C.BG};
-                width: 6px;
+                background: transparent;
+                width: 5px;
                 border: none;
+                margin: 2px 0;
             }}
             QScrollBar::handle:vertical {{
                 background: {C.BORDER};
                 border-radius: 3px;
-                min-height: 20px;
+                min-height: 30px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background: {C.BORDER_B};
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                height: 0;
             }}
         """)
         self._queue: list[str] = []
@@ -658,6 +731,32 @@ class LogWidget(QTextEdit):
 
     def append_log(self, text: str):
         self._sig.emit(text)
+
+    def append_instant(self, text: str, tag: str = "ai"):
+        """Append text instantly without typing animation."""
+        cur = self.textCursor()
+        cur.movePosition(cur.MoveOperation.End)
+        fmt = cur.charFormat()
+
+        # Tag-based prefix + coloring
+        prefix_map = {
+            "you":  ("You",  qcol(C.WHITE)),
+            "ai":   ("Jarvis", qcol(C.ACC)),
+            "err":  ("Error", qcol(C.RED)),
+            "file": ("File",  qcol(C.TEXT_MED)),
+            "sys":  ("System", qcol(C.TEXT_DIM)),
+        }
+        prefix, col = prefix_map.get(tag, ("", qcol(C.TEXT)))
+
+        fmt.setForeground(QBrush(qcol(C.TEXT_DIM)))
+        fmt.setFont(QFont(_FONT, 8, QFont.Weight.Bold))
+        cur.insertText(f"\n[{prefix}] ", fmt)
+
+        fmt.setForeground(QBrush(col))
+        fmt.setFont(QFont(_FONT, _FONT_SZ_SM))
+        cur.insertText(text, fmt)
+        self.setTextCursor(cur)
+        self.ensureCursorVisible()
 
     def _enqueue(self, text: str):
         self._queue.append(text)
@@ -677,34 +776,46 @@ class LogWidget(QTextEdit):
         elif tl.startswith("file:"):   self._tag = "file"
         elif "err" in tl:              self._tag = "err"
         else:                          self._tag = "sys"
-        self._tmr.start(6)
+        self._tmr.start(8)
 
     def _step(self):
         if self._pos < len(self._text):
             ch  = self._text[self._pos]
             cur = self.textCursor()
+            cur.movePosition(cur.MoveOperation.End)
             fmt = cur.charFormat()
+
+            if self._pos == 0:
+                # Insert tag prefix at start of line
+                prefix_map = {
+                    "you":  ("You",  qcol(C.WHITE)),
+                    "ai":   ("Jarvis", qcol(C.ACC)),
+                    "err":  ("Error", qcol(C.RED)),
+                    "file": ("File",  qcol(C.TEXT_MED)),
+                    "sys":  ("System", qcol(C.TEXT_DIM)),
+                }
+                prefix, _ = prefix_map.get(self._tag, ("", qcol(C.TEXT)))
+                fmt.setForeground(QBrush(qcol(C.TEXT_DIM)))
+                fmt.setFont(QFont(_FONT, 8, QFont.Weight.Bold))
+                cur.insertText(f"\n[{prefix}] ", fmt)
+
             col = {
                 "you":  qcol(C.WHITE),
                 "ai":   qcol(C.PRI),
-                "err":  qcol(C.TEXT_DIM),
+                "err":  qcol(C.RED),
                 "file": qcol(C.TEXT_MED),
                 "sys":  qcol(C.TEXT_DIM),
             }.get(self._tag, qcol(C.TEXT))
             fmt.setForeground(QBrush(col))
-            cur.movePosition(cur.MoveOperation.End)
+            fmt.setFont(QFont(_FONT, _FONT_SZ_SM))
             cur.insertText(ch, fmt)
             self.setTextCursor(cur)
             self.ensureCursorVisible()
             self._pos += 1
         else:
             self._tmr.stop()
-            cur = self.textCursor()
-            cur.movePosition(cur.MoveOperation.End)
-            cur.insertText("\n")
-            self.setTextCursor(cur)
             self.ensureCursorVisible()
-            QTimer.singleShot(20, self._next)
+            QTimer.singleShot(15, self._next)
 
 _FILE_ICONS = {
     "image":   ("🖼", "#00d4ff"), "video":   ("🎬", "#ff6b00"),
@@ -931,7 +1042,8 @@ class SetupOverlay(QWidget):
     def __init__(self, parent=None, initial: dict | None = None, mode: str = "init"):
         super().__init__(parent)
         self._mode = mode
-        _init = initial or {}
+        self._init = initial or {}
+        _init = self._init
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.setStyleSheet(f"""
             SetupOverlay {{
@@ -1017,12 +1129,33 @@ class SetupOverlay(QWidget):
                 """)
 
         # ── Header ──────────────────────────────────────────────────── #
+        header_layout = QHBoxLayout()
+        text_layout = QVBoxLayout()
         if mode == "config":
-            layout.addWidget(_lbl("CONFIGURATION", 12, True))
-            layout.addWidget(_lbl("Update J.A.R.V.I.S. settings and click Apply.", 8, col=C.PRI_DIM))
+            text_layout.addWidget(_lbl("CONFIGURATION", 12, True, align=Qt.AlignmentFlag.AlignLeft))
+            text_layout.addWidget(_lbl("Update J.A.R.V.I.S. settings and click Apply.", 8, col=C.PRI_DIM, align=Qt.AlignmentFlag.AlignLeft))
         else:
-            layout.addWidget(_lbl("INITIALISATION REQUIRED", 12, True))
-            layout.addWidget(_lbl("Configure J.A.R.V.I.S. before first boot.", 8, col=C.PRI_DIM))
+            text_layout.addWidget(_lbl("INITIALISATION REQUIRED", 12, True, align=Qt.AlignmentFlag.AlignLeft))
+            text_layout.addWidget(_lbl("Configure J.A.R.V.I.S. before first boot.", 8, col=C.PRI_DIM, align=Qt.AlignmentFlag.AlignLeft))
+        header_layout.addLayout(text_layout)
+        
+        self._theme_combo = QComboBox()
+        self._theme_combo.setFixedHeight(26)
+        self._theme_combo.addItem("Dark", userData="dark")
+        self._theme_combo.addItem("Light", userData="light")
+        _cur_theme = _init.get("theme", "dark")
+        self._theme_combo.setCurrentIndex(1 if _cur_theme == "light" else 0)
+        self._theme_combo.setStyleSheet(f"""
+            QComboBox {{
+                background: {C.PANEL2}; color: {C.TEXT};
+                border: 1px solid {C.BORDER}; border-radius: 4px; padding: 2px 6px;
+                font-family: '{_FONT}'; font-size: 9pt;
+            }}
+            QComboBox::drop-down {{ border: none; width: 16px; }}
+        """)
+        header_layout.addWidget(self._theme_combo, alignment=Qt.AlignmentFlag.AlignRight)
+        layout.addLayout(header_layout)
+        
         layout.addWidget(_sep())
 
         # ── STT ──────────────────────────────────────────────────────── #
@@ -1084,102 +1217,6 @@ class SetupOverlay(QWidget):
         self._stt_lang_input.setText(_init.get("stt_language", "auto"))
         stt_lang_row.addWidget(self._stt_lang_input)
         layout.addLayout(stt_lang_row)
-        layout.addWidget(_sep())
-
-        # ── LLM ──────────────────────────────────────────────────────── #
-        layout.addWidget(_lbl("LOCAL LLM", 7, col=C.TEXT_DIM,
-                               align=Qt.AlignmentFlag.AlignLeft))
-
-        # Provider toggle: Ollama vs LM Studio / OpenAI-compatible vs NVIDIA NIM vs OpenRouter
-        llm_prov_row, self._llm_prov_btns = _toggle_row(
-            [
-                ("ollama",       "Ollama"),
-                ("openai",       "OpenAI / LM Studio"),
-                ("nvidia_nim",   "NVIDIA NIM"),
-                ("openrouter",   "OpenRouter"),
-            ],
-            lambda: self._sel_llm_provider,
-            self._set_llm_provider,
-        )
-        layout.addLayout(llm_prov_row)
-
-        # Hint label — changes based on provider
-        _LLM_HINTS = {
-            "ollama":     "ollama.com  ·  run: ollama pull qwen2.5:3b",
-            "openai":     "lmstudio.ai  ·  start Local Server first, then pick model",
-            "nvidia_nim": "build.nvidia.com  ·  requires NVIDIA API key",
-            "openrouter": "openrouter.ai  ·  requires OpenRouter API key",
-        }
-        self._llm_hint_lbl = _lbl(
-            _LLM_HINTS.get(self._sel_llm_provider, ""),
-            7, col=C.TEXT_DIM, align=Qt.AlignmentFlag.AlignLeft
-        )
-        layout.addWidget(self._llm_hint_lbl)
-
-        # LLM API key — shown only for cloud providers
-        self._llm_api_key_widget = QWidget()
-        self._llm_api_key_widget.setStyleSheet("background: transparent;")
-        ak_row = QHBoxLayout(self._llm_api_key_widget)
-        ak_row.setContentsMargins(0, 0, 0, 0)
-        ak_row.setSpacing(5)
-        ak_row.addWidget(_lbl("API Key:", 7, col=C.TEXT_MED,
-                               align=Qt.AlignmentFlag.AlignRight))
-        self._llm_api_key_input = _input("API key for cloud provider", pw=True)
-        self._llm_api_key_input.setText(_init.get("llm_api_key", ""))
-        ak_row.addWidget(self._llm_api_key_input)
-        layout.addWidget(self._llm_api_key_widget)
-        is_cloud_init = self._sel_llm_provider in ("nvidia_nim", "openrouter")
-        self._llm_api_key_widget.setVisible(is_cloud_init)
-
-        llm_row = QHBoxLayout(); llm_row.setSpacing(5)
-        llm_row.addWidget(_lbl("URL:", 7, col=C.TEXT_MED,
-                                align=Qt.AlignmentFlag.AlignRight))
-        _LLM_DEFAULT_URLS = {
-            "ollama":     "http://localhost:11434",
-            "openai":     "http://localhost:1234",
-            "nvidia_nim": "https://integrate.api.nvidia.com/v1",
-            "openrouter": "https://openrouter.ai/api/v1",
-        }
-        _default_url = _init.get("llm_url",
-                                  _LLM_DEFAULT_URLS.get(self._sel_llm_provider, "http://localhost:11434"))
-        self._llm_url_input = _input("http://localhost:11434")
-        self._llm_url_input.setText(_default_url)
-        llm_row.addWidget(self._llm_url_input, stretch=2)
-        llm_row.addWidget(_lbl("Model:", 7, col=C.TEXT_MED,
-                                align=Qt.AlignmentFlag.AlignRight))
-        self._llm_model_input = _input("e.g.  qwen2.5:3b  /  llama3.2  /  mistral")
-        self._llm_model_input.setText(_init.get("llm_model", ""))
-        llm_row.addWidget(self._llm_model_input, stretch=2)
-        layout.addLayout(llm_row)
-
-        # ── Test LLM connection ─────────────────────────────────────────── #
-        test_row = QHBoxLayout(); test_row.setSpacing(5)
-        self._test_btn = QPushButton("Test Connection")
-        self._test_btn.setFixedHeight(30)
-        self._test_btn.setFont(QFont(_FONT, 9, QFont.Weight.Bold))
-        self._test_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._test_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER}; border-radius: 4px;
-                padding: 4px 12px;
-            }}
-            QPushButton:hover {{
-                background: {C.ACC_GHO}; border: 1px solid {C.ACC};
-                color: {C.ACC};
-            }}
-            QPushButton:disabled {{
-                color: {C.TEXT_DIM}; border: 1px solid {C.BORDER};
-            }}
-        """)
-        self._test_btn.clicked.connect(self._test_connection)
-        test_row.addWidget(self._test_btn)
-        self._test_status = QLabel("")
-        self._test_status.setFont(QFont("Courier New", 7))
-        self._test_status.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
-        test_row.addWidget(self._test_status, stretch=1)
-        layout.addLayout(test_row)
-
         layout.addWidget(_sep())
 
         # ── TTS ──────────────────────────────────────────────────────── #
@@ -1261,18 +1298,7 @@ class SetupOverlay(QWidget):
         ks_row.addWidget(self._kokoro_speed_combo)
         layout.addWidget(self._kokoro_speed_widget)
 
-        # ElevenLabs key — only visible when ElevenLabs is selected
-        self._el_key_widget = QWidget()
-        self._el_key_widget.setStyleSheet("background: transparent;")
-        el_row = QHBoxLayout(self._el_key_widget)
-        el_row.setContentsMargins(0, 0, 0, 0)
-        el_row.setSpacing(5)
-        el_row.addWidget(_lbl("API Key:", 7, col=C.TEXT_MED,
-                               align=Qt.AlignmentFlag.AlignRight))
-        self._el_key_input = _input("ElevenLabs API key", pw=True)
-        self._el_key_input.setText(_init.get("elevenlabs_api_key", ""))
-        el_row.addWidget(self._el_key_input)
-        layout.addWidget(self._el_key_widget)
+        # ElevenLabs key input moved to Providers Overlay
 
         layout.addWidget(_sep())
 
@@ -1348,49 +1374,9 @@ class SetupOverlay(QWidget):
 
         if hasattr(self, "_kokoro_speed_widget"):
             self._kokoro_speed_widget.setVisible(is_kokoro)
-        if hasattr(self, "_el_key_widget"):
-            self._el_key_widget.setVisible(key == "elevenlabs")
 
     def _set_llm_provider(self, key: str):
         self._sel_llm_provider = key
-        if not hasattr(self, "_llm_prov_btns"):
-            return
-        for k, btn in self._llm_prov_btns.items():
-            active = (k == key)
-            btn.setStyleSheet(f"""
-                QPushButton {{
-                    background: {'transparent' if not active else C.PANEL2};
-                    color: {C.TEXT if active else C.TEXT_DIM};
-                    border: {f'1px solid {C.TEXT_MED}' if active else f'1px solid {C.BORDER}'};
-                    border-radius: 3px;
-                }}
-                QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.TEXT_DIM}; }}
-            """)
-        _LLM_HINTS = {
-            "ollama":     "ollama.com  ·  run: ollama pull qwen2.5:3b",
-            "openai":     "lmstudio.ai  ·  start Local Server first, then pick model",
-            "nvidia_nim": "build.nvidia.com  ·  requires NVIDIA API key",
-            "openrouter": "openrouter.ai  ·  requires OpenRouter API key",
-        }
-        _LLM_URLS = {
-            "ollama":     "http://localhost:11434",
-            "openai":     "http://localhost:1234",
-            "nvidia_nim": "https://integrate.api.nvidia.com/v1",
-            "openrouter": "https://openrouter.ai/api/v1",
-        }
-        # Show/hide API key field for cloud providers
-        is_cloud = key in ("nvidia_nim", "openrouter")
-        if hasattr(self, "_llm_api_key_widget"):
-            self._llm_api_key_widget.setVisible(is_cloud)
-        # Update URL placeholder and text
-        if hasattr(self, "_llm_url_input"):
-            new_url = _LLM_URLS.get(key, "http://localhost:11434")
-            self._llm_url_input.setPlaceholderText(new_url)
-            cur = self._llm_url_input.text().strip()
-            if not cur or cur in _LLM_URLS.values():
-                self._llm_url_input.setText(new_url)
-        if hasattr(self, "_llm_hint_lbl"):
-            self._llm_hint_lbl.setText(_LLM_HINTS.get(key, ""))
 
     def _set_stt(self, key: str):
         self._sel_stt = key
@@ -1431,81 +1417,9 @@ class SetupOverlay(QWidget):
         self._update_tts_ui(key)
 
     def _test_connection(self):
-        self._test_btn.setEnabled(False)
-        self._test_status.setText("Testing…")
-        self._test_status.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
-        QApplication.processEvents()
-        threading.Thread(target=self._do_test, daemon=True).start()
-
-    def _do_test(self):
-        url  = self._llm_url_input.text().strip().rstrip("/")
-        provider = getattr(self, "_sel_llm_provider", "ollama")
-        msg = ""
-
-        try:
-            import requests as _req
-            if provider == "ollama":
-                resp = _req.get(f"{url}/api/tags", timeout=8)
-                if resp.status_code == 200:
-                    models = (resp.json().get("models") or [])
-                    model = self._llm_model_input.text().strip()
-                    found = any(
-                        model in (m.get("name") or m.get("model") or "")
-                        for m in models
-                    )
-                    if found:
-                        msg = f"✅  Connected · '{model}' available"
-                    else:
-                        names = [m.get("name", "?") for m in models][:6]
-                        hint = ", ".join(names) if names else "none pulled"
-                        msg = f"⚠️  Connected · '{model}' not found · pulled: {hint}"
-                else:
-                    msg = f"❌  Server returned {resp.status_code}"
-            else:
-                headers = {}
-                key = self._llm_api_key_input.text().strip() if hasattr(self, "_llm_api_key_input") else ""
-                if key:
-                    headers["Authorization"] = f"Bearer {key}"
-                if provider == "openrouter":
-                    headers["HTTP-Referer"] = "https://github.com/anomalyco/opencode"
-                    headers["X-Title"] = "MARK XL"
-                ep = f"{url}/v1/models" if "/v1" in url else f"{url}/v1/models"
-                resp = _req.get(ep, headers=headers, timeout=8)
-                if resp.status_code in (200, 401):
-                    if resp.status_code == 200:
-                        models = resp.json().get("data", [])
-                        model = self._llm_model_input.text().strip()
-                        found = any(
-                            model in (m.get("id") or "")
-                            for m in models
-                        )
-                        if found:
-                            msg = f"✅  Connected · '{model}' available"
-                        else:
-                            msg = f"⚠️  Connected · model list returned ({len(models)} available)"
-                    else:
-                        msg = "✅  Server reachable (auth required — key format looks right)"
-                else:
-                    msg = f"❌  Server returned {resp.status_code}"
-        except Exception as e:
-            msg = f"❌  {type(e).__name__}: {e}"
-
-        self._test_status.setText(msg)
-        is_ok = msg.startswith("✅")
-        self._test_status.setStyleSheet(
-            f"color: {C.TEXT if is_ok else C.TEXT_DIM}; background: transparent;"
-        )
-        self._test_btn.setEnabled(True)
+        pass
 
     def _submit(self):
-        llm_model = self._llm_model_input.text().strip()
-        if not llm_model:
-            self._llm_model_input.setStyleSheet(
-                self._llm_model_input.styleSheet() +
-                f" QLineEdit {{ border: 1px solid {C.TEXT_DIM}; }}"
-            )
-            return
-
         # STT model: combo for Whisper, text input for Vosk
         if self._sel_stt == "whisper":
             stt_model = self._whisper_combo.currentText()
@@ -1519,31 +1433,447 @@ class SetupOverlay(QWidget):
         else:
             tts_voice = self._tts_voice_input.text().strip() or "en-US-GuyNeural"
             tts_speed = "1.0"
-
-        _provider = getattr(self, "_sel_llm_provider", "ollama")
-        _LLM_DEFAULT_URLS = {
-            "ollama":     "http://localhost:11434",
-            "openai":     "http://localhost:1234",
-            "nvidia_nim": "https://integrate.api.nvidia.com/v1",
-            "openrouter": "https://openrouter.ai/api/v1",
-        }
-        _default_url = _LLM_DEFAULT_URLS.get(_provider, "http://localhost:11434")
-        cfg = {
+        
+        cfg = dict(self._init)
+        cfg.update({
+            "theme":              self._theme_combo.currentData(),
             "stt_engine":         self._sel_stt,
             "stt_model":          stt_model,
             "stt_language":       self._stt_lang_input.text().strip() or "auto",
-            "llm_provider":       _provider,
-            "llm_url":            self._llm_url_input.text().strip() or _default_url,
-            "llm_model":          llm_model,
-            "llm_api_key":        self._llm_api_key_input.text().strip() if hasattr(self, "_llm_api_key_input") else "",
             "tts_engine":         self._sel_tts,
             "tts_voice":          tts_voice,
             "tts_speed":          tts_speed,
-            "elevenlabs_api_key": self._el_key_input.text().strip(),
-        }
+        })
         if self._sel_stt == "vosk" and stt_model:
             cfg["vosk_model_path"] = stt_model
+            
+        # Update current theme immediately if changed
+        if cfg["theme"] != self._init.get("theme"):
+            C.apply_theme(cfg["theme"] == "light")
+            
         self.done.emit(json.dumps(cfg))
+
+
+class ConnectionsOverlay(QWidget):
+    done = pyqtSignal(str)
+
+    def __init__(self, parent=None, initial: dict | None = None, active_tab_key: str | None = None):
+        super().__init__(parent)
+        self._init = initial or {}
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        
+        bg_color = "rgba(240, 242, 245, 245)" if C.BG.lower() in ("#ffffff", "#f8f9fa") else "rgba(10, 10, 10, 245)"
+        self.setStyleSheet(f"""
+            ConnectionsOverlay {{
+                background: {bg_color};
+                border: 1px solid {C.BORDER};
+                border-radius: 8px;
+            }}
+        """)
+
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(18, 14, 18, 14)
+        main_layout.setSpacing(12)
+
+        # Header Row
+        header_lay = QHBoxLayout()
+        title_lbl = QLabel("CONNECTION CENTER")
+        title_lbl.setFont(QFont(_FONT, 12, QFont.Weight.Bold))
+        title_lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent; border: none;")
+        desc_lbl = QLabel("Manage AI credentials, databases, local APIs, and workspace tokens")
+        desc_lbl.setFont(QFont(_FONT, 8))
+        desc_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
+        
+        header_lay.addWidget(title_lbl)
+        header_lay.addSpacing(10)
+        header_lay.addWidget(desc_lbl)
+        header_lay.addStretch()
+        main_layout.addLayout(header_lay)
+
+        # Content horizontal layout (Sidebar + Stack)
+        content_lay = QHBoxLayout()
+        content_lay.setSpacing(16)
+        
+        # Sidebar widget
+        sidebar = QWidget()
+        sidebar.setFixedWidth(190)
+        sidebar.setStyleSheet("background: transparent; border: none;")
+        sidebar_lay = QVBoxLayout(sidebar)
+        sidebar_lay.setContentsMargins(0, 0, 0, 0)
+        sidebar_lay.setSpacing(6)
+
+        self.stack = QStackedWidget()
+        self.inputs = {}
+
+        def _card(title: str, fields: list[tuple[str, str, bool, str]], check_keys: list[str]) -> QWidget:
+            card = QWidget()
+            card.setStyleSheet(f"""
+                QWidget {{
+                    background: {C.PANEL2};
+                    border: 1px solid {C.BORDER};
+                    border-radius: 6px;
+                }}
+            """)
+            card_lay = QVBoxLayout(card)
+            card_lay.setContentsMargins(12, 10, 12, 10)
+            card_lay.setSpacing(6)
+
+            header = QWidget()
+            header.setStyleSheet("background: transparent; border: none;")
+            h_lay = QHBoxLayout(header)
+            h_lay.setContentsMargins(0, 0, 0, 0)
+            h_lay.setSpacing(6)
+
+            dot = QLabel("●")
+            dot.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+            
+            lbl = QLabel(title)
+            lbl.setFont(QFont(_FONT, 9, QFont.Weight.Bold))
+            lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent; border: none;")
+
+            status_lbl = QLabel("Disconnected")
+            status_lbl.setFont(QFont("Courier New", 7))
+            
+            h_lay.addWidget(dot)
+            h_lay.addWidget(lbl)
+            h_lay.addStretch()
+            h_lay.addWidget(status_lbl)
+            card_lay.addWidget(header)
+
+            form = QWidget()
+            form.setStyleSheet("background: transparent; border: none;")
+            form_lay = QGridLayout(form)
+            form_lay.setContentsMargins(0, 4, 0, 0)
+            form_lay.setSpacing(6)
+
+            card_inputs = []
+            for idx, (f_label, f_key, is_pw, desc) in enumerate(fields):
+                f_lbl = QLabel(f_label)
+                f_lbl.setFont(QFont(_FONT, 8))
+                f_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
+                
+                inp = QLineEdit()
+                inp.setPlaceholderText(desc)
+                inp.setFixedHeight(26)
+                if is_pw:
+                    inp.setEchoMode(QLineEdit.EchoMode.Password)
+                inp.setStyleSheet(f"""
+                    QLineEdit {{
+                        background: {C.PANEL}; color: {C.TEXT};
+                        border: 1px solid {C.BORDER}; border-radius: 4px; padding: 4px 8px;
+                        font-family: '{_FONT}'; font-size: 9pt;
+                    }}
+                    QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
+                """)
+                val = self._init.get(f_key, "")
+                if not val and f_key == "ollama_url":
+                    val = "http://localhost:11434"
+                inp.setText(val)
+                
+                form_lay.addWidget(f_lbl, idx, 0)
+                form_lay.addWidget(inp, idx, 1)
+                
+                self.inputs[f_key] = inp
+                card_inputs.append((f_key, inp))
+
+            card_lay.addWidget(form)
+
+            def update_status():
+                is_set = True
+                for ck in check_keys:
+                    val = self.inputs[ck].text().strip()
+                    if ck == "gws_credentials":
+                        from pathlib import Path
+                        path_to_check = Path(val) if val else (CONFIG_DIR.parent / "gws" / "credentials.json")
+                        if not path_to_check.exists():
+                            is_set = False
+                            break
+                    elif not val:
+                        is_set = False
+                        break
+                
+                col = C.GREEN if is_set else C.RED
+                dot.setStyleSheet(f"color: {col}; background: transparent; border: none;")
+                status_lbl.setText("Connected" if is_set else "Disconnected")
+                status_lbl.setStyleSheet(f"color: {col}; background: transparent; border: none;")
+
+            for _, inp in card_inputs:
+                inp.textChanged.connect(update_status)
+            
+            update_status()
+            return card
+
+        categories = [
+            ("🤖 AI Engines", 0),
+            ("🎙️ Voice & Media", 1),
+            ("💼 Workspace & SaaS", 2),
+            ("🗄️ Databases", 3),
+            ("🐳 Infrastructure", 4),
+        ]
+
+        sidebar_items = []
+        for cat_name, cat_id in categories:
+            btn = QPushButton(cat_name)
+            btn.setFixedHeight(32)
+            btn.setFont(QFont(_FONT, 9))
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            
+            # Create page
+            page = QWidget()
+            page.setStyleSheet("background: transparent;")
+            page_lay = QVBoxLayout(page)
+            page_lay.setContentsMargins(0, 0, 0, 0)
+            
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+            
+            scroll_content = QWidget()
+            scroll_content.setStyleSheet("background: transparent;")
+            scroll_lay = QVBoxLayout(scroll_content)
+            scroll_lay.setContentsMargins(0, 0, 10, 0)
+            scroll_lay.setSpacing(10)
+            
+            if cat_id == 0:
+                scroll_lay.addWidget(_card("Ollama", [("Base URL", "ollama_url", False, "http://localhost:11434")], ["ollama_url"]))
+                scroll_lay.addWidget(_card("OpenAI", [("API Key", "openai_api_key", True, "sk-...")], ["openai_api_key"]))
+                scroll_lay.addWidget(_card("Google Gemini", [("API Key", "gemini_api_key", True, "AIzaSy...")], ["gemini_api_key"]))
+                scroll_lay.addWidget(_card("Anthropic Claude", [("API Key", "anthropic_api_key", True, "sk-ant-...")], ["anthropic_api_key"]))
+                scroll_lay.addWidget(_card("DeepSeek", [("API Key", "deepseek_api_key", True, "sk-...")], ["deepseek_api_key"]))
+                scroll_lay.addWidget(_card("Groq", [("API Key", "groq_api_key", True, "gsk_...")], ["groq_api_key"]))
+                scroll_lay.addWidget(_card("OpenRouter", [("API Key", "openrouter_api_key", True, "sk-or-...")], ["openrouter_api_key"]))
+                scroll_lay.addWidget(_card("Mistral", [("API Key", "mistral_api_key", True, "Mistral Key")], ["mistral_api_key"]))
+                scroll_lay.addWidget(_card("LM Studio", [("Base URL", "lmstudio_url", False, "http://localhost:1234/v1")], ["lmstudio_url"]))
+            elif cat_id == 1:
+                scroll_lay.addWidget(_card("ElevenLabs TTS", [("API Key", "elevenlabs_api_key", True, "ElevenLabs Key")], ["elevenlabs_api_key"]))
+                scroll_lay.addWidget(_card("LiveKit Voice", [("API Key", "livekit_api_key", True, "API Key"), ("API Secret", "livekit_api_secret", True, "API Secret")], ["livekit_api_key", "livekit_api_secret"]))
+                scroll_lay.addWidget(_card("Spotify Integration", [("Client ID", "spotify_client_id", False, "Client ID"), ("Client Secret", "spotify_client_secret", True, "Client Secret")], ["spotify_client_id", "spotify_client_secret"]))
+                scroll_lay.addWidget(_card("YouTube API", [("API Key", "youtube_api_key", True, "YouTube API Key")], ["youtube_api_key"]))
+            elif cat_id == 2:
+                # ── Google Workspace with OAuth ────────────────────────────
+                gws_card = _card("Google Workspace (Gmail/Calendar/Drive)",
+                                 [("Client ID", "gws_client_id", False, "OAuth Client ID from Google Cloud"),
+                                  ("Client Secret", "gws_client_secret", True, "OAuth Client Secret")],
+                                 ["gws_client_id", "gws_client_secret"])
+                # Add Sign in with Google button
+                from actions.google_workspace import is_authenticated, start_oauth_flow, has_credentials_json, revoke_auth, save_credentials_json, on_auth_change
+                gws_btn_row = QHBoxLayout()
+                gws_btn_row.setContentsMargins(10, 0, 10, 8)
+                gws_signin_btn = QPushButton("Sign in with Google")
+                gws_signin_btn.setFixedHeight(30)
+                gws_signin_btn.setFont(QFont(_FONT, 8, QFont.Weight.Bold))
+                gws_signin_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                gws_signin_btn.setStyleSheet(f"""
+                    QPushButton {{ background: {C.ACC}; color: #fff; border: none; border-radius: 4px; padding: 4px 12px; }}
+                    QPushButton:hover {{ background: {C.ACC_GHO}; }}
+                    QPushButton:disabled {{ background: {C.PANEL2}; color: {C.TEXT_DIM}; }}
+                """)
+                gws_status = QLabel("")
+                gws_status.setFont(QFont("Courier New", 7))
+                gws_status.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+                gws_btn_row.addWidget(gws_signin_btn)
+                gws_btn_row.addWidget(gws_status, stretch=1)
+
+                # Revoke button
+                gws_revoke_btn = QPushButton("Revoke")
+                gws_revoke_btn.setFixedHeight(26)
+                gws_revoke_btn.setFont(QFont(_FONT, 7))
+                gws_revoke_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                gws_revoke_btn.setStyleSheet(f"""
+                    QPushButton {{ background: transparent; color: {C.TEXT_DIM}; border: 1px solid {C.BORDER}; border-radius: 4px; padding: 2px 8px; }}
+                    QPushButton:hover {{ background: {C.RED}; color: #fff; border: 1px solid {C.RED}; }}
+                """)
+                gws_revoke_btn.setVisible(False)
+                gws_btn_row.addWidget(gws_revoke_btn)
+
+                def _gws_update_auth_status():
+                    ok = is_authenticated()
+                    gws_signin_btn.setEnabled(has_credentials_json() and not ok)
+                    gws_revoke_btn.setVisible(ok)
+                    gws_status.setText("✓ Authenticated" if ok else "")
+                    gws_status.setStyleSheet(f"color: {C.GREEN if ok else C.TEXT_DIM}; background: transparent;")
+
+                def _gws_do_signin():
+                    gws_signin_btn.setEnabled(False)
+                    gws_status.setText("Opening browser…")
+                    def _on_result(success: bool, msg: str):
+                        gws_status.setText(msg)
+                        _gws_update_auth_status()
+                    # Save credentials from inputs before auth
+                    gws_client_id = self.inputs.get("gws_client_id", QLineEdit()).text().strip()
+                    gws_client_secret = self.inputs.get("gws_client_secret", QLineEdit()).text().strip()
+                    if gws_client_id and gws_client_secret:
+                        save_credentials_json(gws_client_id, gws_client_secret)
+                    start_oauth_flow(on_result=_on_result)
+
+                gws_signin_btn.clicked.connect(_gws_do_signin)
+                gws_revoke_btn.clicked.connect(lambda: (revoke_auth(), _gws_update_auth_status()))
+                on_auth_change(lambda _: _gws_update_auth_status())
+
+                # Watch credential inputs for sign-in button state
+                def _gws_watch_creds(*_):
+                    cid = self.inputs.get("gws_client_id", QLineEdit()).text().strip()
+                    sec = self.inputs.get("gws_client_secret", QLineEdit()).text().strip()
+                    gws_signin_btn.setEnabled(bool(cid and sec) and not is_authenticated())
+                for k in ("gws_client_id", "gws_client_secret"):
+                    if k in self.inputs:
+                        self.inputs[k].textChanged.connect(_gws_watch_creds)
+
+                # Add the button row below the card
+                gws_card.layout().addLayout(gws_btn_row)
+                scroll_lay.addWidget(gws_card)
+                _gws_update_auth_status()
+                scroll_lay.addWidget(_card("Plaid Finance", [("Client ID", "plaid_client_id", False, "Plaid Client ID"), ("Secret", "plaid_secret", True, "Plaid Secret"), ("Access Token", "plaid_access_token", True, "Access Token")], ["plaid_client_id", "plaid_secret", "plaid_access_token"]))
+                scroll_lay.addWidget(_card("GitHub API", [("Personal Access Token", "github_access_token", True, "ghp_...")], ["github_access_token"]))
+                scroll_lay.addWidget(_card("Fantastic Jobs", [("API Key", "fantastic_jobs_api_key", True, "Job Search API Key")], ["fantastic_jobs_api_key"]))
+                scroll_lay.addWidget(_card("Slack Bot", [("Bot User OAuth Token", "slack_bot_token", True, "xoxb-...")], ["slack_bot_token"]))
+                scroll_lay.addWidget(_card("Discord Bot", [("Bot Token", "discord_bot_token", True, "Discord Bot Token")], ["discord_bot_token"]))
+            elif cat_id == 3:
+                scroll_lay.addWidget(_card("PostgreSQL Database", [
+                    ("Host", "postgres_host", False, "localhost"),
+                    ("Port", "postgres_port", False, "5432"),
+                    ("Username", "postgres_user", False, "postgres"),
+                    ("Password", "postgres_password", True, "Password"),
+                    ("Database Name", "postgres_db", False, "postgres")
+                ], ["postgres_host", "postgres_user"]))
+                scroll_lay.addWidget(_card("MySQL Database", [
+                    ("Host", "mysql_host", False, "localhost"),
+                    ("Port", "mysql_port", False, "3306"),
+                    ("Username", "mysql_user", False, "root"),
+                    ("Password", "mysql_password", True, "Password"),
+                    ("Database Name", "mysql_db", False, "mysql")
+                ], ["mysql_host", "mysql_user"]))
+                scroll_lay.addWidget(_card("MongoDB", [("Connection URI", "mongodb_uri", True, "mongodb://localhost:27017")], ["mongodb_uri"]))
+                scroll_lay.addWidget(_card("Redis", [
+                    ("Host", "redis_host", False, "localhost"),
+                    ("Port", "redis_port", False, "6379"),
+                    ("Password", "redis_password", True, "Password")
+                ], ["redis_host"]))
+            elif cat_id == 4:
+                scroll_lay.addWidget(_card("Docker Daemon", [("Docker Host", "docker_host", False, "unix:///var/run/docker.sock or localhost:2375")], ["docker_host"]))
+                scroll_lay.addWidget(_card("Kubernetes", [("Kubeconfig Path", "kubeconfig_path", False, "~/.kube/config")], ["kubeconfig_path"]))
+                scroll_lay.addWidget(_card("AWS Cloud", [
+                    ("AWS Access Key ID", "aws_access_key_id", False, "AKIA..."),
+                    ("AWS Secret Access Key", "aws_secret_access_key", True, "Secret Key"),
+                    ("AWS Region", "aws_region", False, "us-east-1")
+                ], ["aws_access_key_id", "aws_secret_access_key"]))
+                scroll_lay.addWidget(_card("Google Cloud Platform (GCP)", [
+                    ("Project ID", "gcp_project_id", False, "my-gcp-project"),
+                    ("Service Account Credentials Path", "gcp_credentials_path", False, "/path/to/credentials.json")
+                ], ["gcp_project_id", "gcp_credentials_path"]))
+            
+            scroll_lay.addStretch()
+            scroll.setWidget(scroll_content)
+            page_lay.addWidget(scroll)
+            self.stack.addWidget(page)
+
+            # Bind sidebar switch
+            def bind_click(idx=cat_id):
+                return lambda: self._switch_tab(idx)
+            btn.clicked.connect(bind_click())
+            sidebar_lay.addWidget(btn)
+            sidebar_items.append((btn, cat_id))
+
+        self.sidebar_items = sidebar_items
+        sidebar_lay.addStretch()
+        content_lay.addWidget(sidebar)
+        content_lay.addWidget(self.stack, 1)
+        main_layout.addLayout(content_lay, 1)
+
+        def refresh_sidebar_styles(active_idx):
+            for btn, cid in self.sidebar_items:
+                if cid == active_idx:
+                    btn.setStyleSheet(f"""
+                        QPushButton {{
+                            background: {C.ACC}; color: {C.WHITE};
+                            border: none; border-radius: 6px;
+                            padding: 8px 12px; font-weight: bold; text-align: left;
+                        }}
+                    """)
+                else:
+                    btn.setStyleSheet(f"""
+                        QPushButton {{
+                            background: transparent; color: {C.TEXT_MED};
+                            border: 1px solid transparent; border-radius: 6px;
+                            padding: 8px 12px; text-align: left;
+                        }}
+                        QPushButton:hover {{
+                            background: {C.PANEL2}; color: {C.TEXT};
+                            border: 1px solid {C.BORDER};
+                        }}
+                    """)
+        self.refresh_sidebar_styles = refresh_sidebar_styles
+
+        # Initial selection mapping or tab
+        initial_idx = 0
+        if active_tab_key:
+            if active_tab_key in ("elevenlabs_api_key", "livekit_api_key", "spotify_client_id", "youtube_api_key"):
+                initial_idx = 1
+            elif active_tab_key in ("gws_credentials", "plaid_client_id", "github_access_token", "fantastic_jobs_api_key", "slack_bot_token", "discord_bot_token"):
+                initial_idx = 2
+            elif active_tab_key in ("postgres_host", "mysql_host", "mongodb_uri", "redis_host"):
+                initial_idx = 3
+            elif active_tab_key in ("docker_host", "kubeconfig_path", "aws_access_key_id", "gcp_project_id"):
+                initial_idx = 4
+        
+        self.stack.setCurrentIndex(initial_idx)
+        self.refresh_sidebar_styles(initial_idx)
+
+        # Footer Action Bar
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        status_tip = QLabel("Settings are saved locally to config/api_keys.json")
+        status_tip.setFont(QFont(_FONT, 8))
+        status_tip.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; border: none;")
+        btn_row.addWidget(status_tip)
+        btn_row.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setFont(QFont(_FONT, 10))
+        cancel_btn.setFixedHeight(34)
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {C.TEXT_MED};
+                border: 1px solid {C.BORDER}; border-radius: 6px;
+                padding: 4px 16px;
+            }}
+            QPushButton:hover {{
+                color: {C.TEXT}; border: 1px solid {C.TEXT_MED};
+            }}
+        """)
+        cancel_btn.clicked.connect(self.hide)
+        btn_row.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Save & Apply")
+        save_btn.setFont(QFont(_FONT, 10, QFont.Weight.Bold))
+        save_btn.setFixedHeight(34)
+        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.ACC}; color: {C.WHITE};
+                border: none; border-radius: 6px;
+                padding: 4px 16px;
+            }}
+            QPushButton:hover {{
+                background: {C.ACC_DIM};
+            }}
+        """)
+        save_btn.clicked.connect(self._submit)
+        btn_row.addWidget(save_btn)
+
+        main_layout.addLayout(btn_row)
+
+    def _switch_tab(self, idx):
+        self.stack.setCurrentIndex(idx)
+        self.refresh_sidebar_styles(idx)
+
+    def _submit(self):
+        cfg = {k: v.text().strip() for k, v in self.inputs.items()}
+        self.done.emit(json.dumps(cfg))
+
+ProvidersOverlay = ConnectionsOverlay
 
 
 class StartupPanel(QWidget):
@@ -2022,13 +2352,15 @@ class WorkspacePanel(QWidget):
     def _do_refresh_gmail(self):
         try:
             import gws_bridge
+            creds_path = Path(__file__).resolve().parent / "gws" / "credentials.json"
+            if not creds_path.exists():
+                return
             emails = asyncio.run(gws_bridge.get_unread_emails(limit=10))
             if not isinstance(emails, list):
                 emails = []
             self._main_window._log_sig.emit(f"GWS: {len(emails)} unread emails")
         except Exception as e:
             emails = []
-            self._main_window._log_sig.emit(f"GWS: email fetch failed — {e}")
         self._update_gmail_ui(emails)
 
     def _update_gmail_ui(self, emails: list):
@@ -2052,13 +2384,15 @@ class WorkspacePanel(QWidget):
     def _do_refresh_calendar(self):
         try:
             import gws_bridge
+            creds_path = Path(__file__).resolve().parent / "gws" / "credentials.json"
+            if not creds_path.exists():
+                return
             events = asyncio.run(gws_bridge.get_todays_agenda())
             if not isinstance(events, list):
                 events = []
             self._main_window._log_sig.emit(f"GWS: {len(events)} agenda items")
         except Exception as e:
             events = []
-            self._main_window._log_sig.emit(f"GWS: calendar fetch failed — {e}")
         self._update_cal_ui(events)
 
     def _update_cal_ui(self, events: list):
@@ -2187,7 +2521,9 @@ class WorkspacePanel(QWidget):
 
 
 class MainWindow(QMainWindow):
-    _log_sig     = pyqtSignal(str)
+    write_log     = pyqtSignal(str)
+    write_log_instant = pyqtSignal(str, str)
+    _log_sig = write_log
     _state_sig   = pyqtSignal(str)
     _loc_sig     = pyqtSignal(str)
     _startup_sig = pyqtSignal(str, str)  # action, data — thread-safe startup panel control
@@ -2222,25 +2558,39 @@ class MainWindow(QMainWindow):
         self._header_widget = self._build_header()
         root.addWidget(self._header_widget)
 
-        body = QHBoxLayout()
-        body.setContentsMargins(0, 0, 0, 0)
-        body.setSpacing(0)
+        body = QSplitter(Qt.Orientation.Horizontal)
+        body.setHandleWidth(4)
+        body.setChildrenCollapsible(False)
+        body.setStyleSheet(f"""
+            QSplitter::handle {{
+                background: {C.BORDER};
+                margin: 4px 0;
+            }}
+            QSplitter::handle:hover {{
+                background: {C.ACC};
+            }}
+        """)
 
         self._left_panel = self._build_left_panel()
-        body.addWidget(self._left_panel, stretch=0)
+        body.addWidget(self._left_panel)
 
         self.hud = HudCanvas(face_path)
         self.hud.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.hud.clicked.connect(self._on_hud_clicked)
-        body.addWidget(self.hud, stretch=5)
+        body.addWidget(self.hud)
 
         self._right_panel = self._build_right_panel()
-        body.addWidget(self._right_panel, stretch=0)
+        body.addWidget(self._right_panel)
+
+        body.setStretchFactor(0, 0)
+        body.setStretchFactor(1, 1)
+        body.setStretchFactor(2, 0)
+        body.setSizes([_LEFT_W, 800, _RIGHT_W])
 
         if hasattr(self, '_ws_panel'):
             self._ws_panel.set_main_window(self)
 
-        root.addLayout(body, stretch=1)
+        root.addWidget(body, stretch=1)
         self._footer_widget = self._build_footer()
         root.addWidget(self._footer_widget)
 
@@ -2256,6 +2606,7 @@ class MainWindow(QMainWindow):
         self._update_metrics()
 
         self._log_sig.connect(self._log.append_log)
+        self.write_log_instant.connect(self._log.append_instant)
         self._state_sig.connect(self._apply_state)
         self._loc_sig.connect(self._update_location)
         self._startup_sig.connect(self._on_startup_sig)
@@ -2332,6 +2683,13 @@ class MainWindow(QMainWindow):
         if self._overlay and self._overlay.isVisible():
             ow, oh = 520, 580
             self._overlay.setGeometry(
+                (cw.width()  - ow) // 2,
+                (cw.height() - oh) // 2,
+                ow, oh,
+            )
+        if getattr(self, "_overlay_prov", None) and self._overlay_prov.isVisible():
+            ow, oh = min(cw.width() - 20, 850), min(cw.height() - 20, 600)
+            self._overlay_prov.setGeometry(
                 (cw.width()  - ow) // 2,
                 (cw.height() - oh) // 2,
                 ow, oh,
@@ -2431,29 +2789,73 @@ class MainWindow(QMainWindow):
         except Exception:
             self._proc_lbl.setText("PROC  --")
 
+        self._update_status_bar()
+        self._update_connections()
+        self._update_timer_display()
+
+    def _update_timer_display(self):
+        try:
+            timers = list_timers()
+            if timers:
+                sec = int(timers[0]["remaining_sec"])
+                m, s = divmod(sec, 60)
+                if len(timers) > 1:
+                    self._status_timer.setText(f"⏱ {m:02d}:{s:02d} +{len(timers)-1}")
+                else:
+                    self._status_timer.setText(f"⏱ {m:02d}:{s:02d}")
+                self._status_timer.setVisible(True)
+            else:
+                self._status_timer.setVisible(False)
+        except Exception:
+            self._status_timer.setVisible(False)
 
     def _build_header(self) -> QWidget:
         w = QWidget()
         w.setObjectName("header_widget")
-        w.setFixedHeight(44)
-        w.setStyleSheet(f"background: {C.PANEL}; border-bottom: 1px solid {C.BORDER};")
+        w.setFixedHeight(48)
+        w.setStyleSheet(f"""
+            #header_widget {{
+                background: {C.PANEL};
+                border-bottom: 1px solid {C.BORDER};
+            }}
+        """)
         lay = QHBoxLayout(w)
-        lay.setContentsMargins(14, 0, 14, 0)
+        lay.setContentsMargins(16, 0, 16, 0)
 
         title = QLabel("J.A.R.V.I.S")
-        title.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
+        title.setFont(QFont("Courier New", 13, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {C.ACC}; background: transparent;")
         lay.addWidget(title)
+
+        lay.addSpacing(20)
+
+        self._status_mic   = QLabel("●  MIC")
+        self._status_ai    = QLabel("●  AI")
+        self._status_net   = QLabel("●  NET")
+        self._status_cam   = QLabel("●  CAM")
+        self._status_mem   = QLabel("●  MEM")
+        self._status_timer = QLabel("")
+        self._status_timer.setFont(QFont("Courier New", 9))
+        self._status_timer.setStyleSheet(f"color: {C.GREEN}; background: transparent; padding: 0 8px;")
+
+        for lbl in (self._status_mic, self._status_ai, self._status_net,
+                     self._status_cam, self._status_mem):
+            lbl.setFont(QFont("Courier New", 9))
+            lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; padding: 0 8px;")
+            lay.addWidget(lbl)
+
+        lay.addWidget(self._status_timer)
+
         lay.addStretch()
 
-        right_col = QVBoxLayout(); right_col.setSpacing(2)
+        right_col = QVBoxLayout(); right_col.setSpacing(1)
         self._clock_lbl = QLabel("00:00")
-        self._clock_lbl.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+        self._clock_lbl.setFont(QFont("Courier New", 14, QFont.Weight.Bold))
         self._clock_lbl.setStyleSheet(f"color: {C.WHITE}; background: transparent;")
         self._clock_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         right_col.addWidget(self._clock_lbl)
         self._date_lbl = QLabel("")
-        self._date_lbl.setFont(QFont("Courier New", 7))
+        self._date_lbl.setFont(QFont("Courier New", 8))
         self._date_lbl.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         self._date_lbl.setAlignment(Qt.AlignmentFlag.AlignRight)
         right_col.addWidget(self._date_lbl)
@@ -2466,11 +2868,24 @@ class MainWindow(QMainWindow):
 
     def _build_left_panel(self) -> QWidget:
         w = QWidget()
+        w.setObjectName("left_panel")
         w.setFixedWidth(_LEFT_W)
-        w.setStyleSheet(f"background: {C.BG}; border-right: 1px solid {C.BORDER};")
+        w.setStyleSheet(f"""
+            #left_panel {{
+                background: {C.PANEL};
+                border-right: 1px solid {C.BORDER};
+            }}
+        """)
         lay = QVBoxLayout(w)
-        lay.setContentsMargins(8, 10, 8, 10)
-        lay.setSpacing(5)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        # ── Metrics section ──
+        metrics_wrap = QWidget()
+        metrics_wrap.setStyleSheet(f"background: transparent;")
+        m_wrap_lay = QVBoxLayout(metrics_wrap)
+        m_wrap_lay.setContentsMargins(10, 12, 10, 8)
+        m_wrap_lay.setSpacing(5)
 
         self._bar_cpu = MetricBar("CPU")
         self._bar_mem = MetricBar("MEM")
@@ -2480,20 +2895,33 @@ class MainWindow(QMainWindow):
 
         for bar in [self._bar_cpu, self._bar_mem, self._bar_net,
                     self._bar_gpu, self._bar_tmp]:
-            lay.addWidget(bar)
+            m_wrap_lay.addWidget(bar)
 
-        lay.addSpacing(6)
+        m_wrap_lay.addSpacing(4)
+
+        # ── Section header for system info ──
+        sec = QLabel("SYSTEM")
+        sec.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        sec.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; padding: 2px 0; letter-spacing: 1px;")
+        m_wrap_lay.addWidget(sec)
+
+        m_wrap_lay.addSpacing(2)
 
         info_panel = QWidget()
-        info_panel.setStyleSheet(
-            f"background: {C.PANEL2}; border: 1px solid {C.BORDER}; border-radius: 4px;"
-        )
+        info_panel.setObjectName("info_panel")
+        info_panel.setStyleSheet(f"""
+            #info_panel {{
+                background: {C.PANEL2};
+                border: 1px solid {C.BORDER};
+                border-radius: 6px;
+            }}
+        """)
         ip_lay = QVBoxLayout(info_panel)
-        ip_lay.setContentsMargins(6, 5, 6, 5)
-        ip_lay.setSpacing(3)
+        ip_lay.setContentsMargins(8, 7, 8, 7)
+        ip_lay.setSpacing(4)
 
         self._uptime_lbl = QLabel("UP  --:--")
-        self._uptime_lbl.setFont(QFont("Courier New", 8))
+        self._uptime_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
         self._uptime_lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent; border: none;")
         ip_lay.addWidget(self._uptime_lbl)
 
@@ -2513,84 +2941,133 @@ class MainWindow(QMainWindow):
         self._loc_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
         ip_lay.addWidget(self._loc_lbl)
 
-        lay.addWidget(info_panel)
+        try:
+            import json
+            cfg = json.loads(Path("config/api_keys.json").read_text(encoding="utf-8"))
+            cur_llm = cfg.get("llm_model", "")
+        except Exception:
+            cur_llm = ""
+        self._llm_lbl = QLabel(f"LLM  {cur_llm if cur_llm else '--'}")
+        self._llm_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        self._llm_lbl.setStyleSheet(f"color: {C.ACC}; background: transparent; border: none;")
+        ip_lay.addWidget(self._llm_lbl)
+
+        m_wrap_lay.addWidget(info_panel)
+        lay.addWidget(metrics_wrap)
+
+        # ── Separator ──
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setStyleSheet(f"background: transparent; border: none; border-top: 1px solid {C.BORDER}; margin: 0 10px; max-height: 1px;")
+        lay.addWidget(sep)
+
+        # ── Connections section ──
+        conn_wrap = QWidget()
+        conn_wrap.setStyleSheet("background: transparent;")
+        conn_lay = QVBoxLayout(conn_wrap)
+        conn_lay.setContentsMargins(10, 8, 10, 8)
+        conn_lay.setSpacing(2)
+
+        header_lay = QHBoxLayout()
+        header_lay.setSpacing(0)
+        title = QLabel("SERVICES")
+        title.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; border: none; letter-spacing: 1px;")
+        header_lay.addWidget(title)
+        header_lay.addStretch()
+        add_btn = QPushButton("+")
+        add_btn.setFixedSize(20, 20)
+        add_btn.setFont(QFont("Courier New", 11))
+        add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        add_btn.setStyleSheet(
+            f"QPushButton {{ background: transparent; color: {C.TEXT_DIM}; "
+            f"border: 1px solid {C.BORDER}; border-radius: 4px; }}"
+            f"QPushButton:hover {{ color: {C.GREEN}; border: 1px solid {C.GREEN}; "
+            f"background: {C.PANEL2}; }}"
+        )
+        add_btn.clicked.connect(self._on_add_connection)
+        header_lay.addWidget(add_btn)
+        conn_lay.addLayout(header_lay)
+
+        conn_lay.addSpacing(4)
+
+        self._conn_rows: list[tuple[QLabel, QLabel, str, str]] = []
+        for svc, key in _API_SERVICES:
+            dot = QLabel("●")
+            dot.setFont(QFont("Courier New", 9))
+            lbl = QLabel(svc)
+            lbl.setFont(QFont(_FONT, 9))
+            lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
+
+            row = QWidget()
+            row.setObjectName(f"conn_row_{svc.lower().replace(' ', '_')}")
+            row.setCursor(Qt.CursorShape.PointingHandCursor)
+            row.setStyleSheet(
+                f"QWidget {{ background: transparent; border-radius: 4px; padding: 2px 4px; }}"
+                f"QWidget:hover {{ background: {C.PRI_GHO}; }}"
+            )
+            rlay = QHBoxLayout(row)
+            rlay.setContentsMargins(4, 3, 4, 3)
+            rlay.setSpacing(6)
+            rlay.addWidget(dot)
+            rlay.addWidget(lbl, 1)
+
+            row.mousePressEvent = lambda e, s=svc, k=key: self._on_conn_click(s, k)
+
+            conn_lay.addWidget(row)
+            self._conn_rows.append((dot, lbl, svc, key))
+
+        self._conn_panel = conn_wrap
+        lay.addWidget(conn_wrap)
         lay.addStretch()
 
         return w
     def _build_right_panel(self) -> QWidget:
         w = QWidget()
-        w.setFixedWidth(_RIGHT_W)
-        w.setStyleSheet(f"background: {C.BG}; border-left: 1px solid {C.BORDER};")
+        w.setObjectName("right_panel")
+        w.setMinimumWidth(280)
+        w.resize(_RIGHT_W, w.height())
+        w.setStyleSheet(f"""
+            #right_panel {{
+                background: {C.BG};
+                border-left: 1px solid {C.BORDER};
+            }}
+        """)
         lay = QVBoxLayout(w)
-        lay.setContentsMargins(8, 8, 8, 8)
-        lay.setSpacing(6)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
 
-        # ── Mode toggle bar ─────────────────────────────────────────────
-        mode_row = QHBoxLayout(); mode_row.setSpacing(4)
-        self._mode_log_btn = QPushButton("Log")
-        self._mode_log_btn.setFixedHeight(26)
-        self._mode_log_btn.setFont(QFont(_FONT, _FONT_SZ_SM))
-        self._mode_log_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._mode_log_btn.clicked.connect(lambda: self._set_right_mode(0))
-        self._mode_log_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER}; border-radius: 4px;
-                padding: 2px 10px;
-            }}
-            QPushButton:hover {{ color: {C.ACC}; border: 1px solid {C.ACC}; }}
-        """)
-        mode_row.addWidget(self._mode_log_btn)
+        # ── Chat header ──
+        chat_header = QLabel("CHAT")
+        chat_header.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
+        chat_header.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 1px; padding: 0 2px;")
+        lay.addWidget(chat_header)
 
-        self._mode_ws_btn = QPushButton("Workspace")
-        self._mode_ws_btn.setFixedHeight(26)
-        self._mode_ws_btn.setFont(QFont(_FONT, _FONT_SZ_SM))
-        self._mode_ws_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._mode_ws_btn.clicked.connect(lambda: self._set_right_mode(1))
-        self._mode_ws_btn.setStyleSheet(f"""
-            QPushButton {{
-                background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER}; border-radius: 4px;
-                padding: 2px 10px;
-            }}
-            QPushButton:hover {{ color: {C.ACC}; border: 1px solid {C.ACC}; }}
-        """)
-        mode_row.addWidget(self._mode_ws_btn)
-
-        mode_row.addStretch()
-        lay.addLayout(mode_row)
-
-        # ── Stack: LOG ↔ WORKSPACE ─────────────────────────────────────
-        self._right_stack = QStackedWidget()
-        self._right_stack.setStyleSheet("background: transparent;")
-
+        # ── Chat log ──
         self._log = LogWidget()
-        self._right_stack.addWidget(self._log)
+        lay.addWidget(self._log, stretch=1)
 
-        self._ws_panel = WorkspacePanel()
-        self._right_stack.addWidget(self._ws_panel)
-
-        lay.addWidget(self._right_stack, stretch=1)
-
-        # ── Input ──────────────────────────────────────────────────────
+        # ── Input ──
         self._input = QLineEdit()
         self._input.setPlaceholderText("Type a command or question…")
-        self._input.setFont(QFont(_FONT, _FONT_SZ))
-        self._input.setFixedHeight(38)
+        self._input.setFont(QFont(_FONT, _FONT_SZ_SM))
+        self._input.setFixedHeight(42)
         self._input.setStyleSheet(f"""
             QLineEdit {{
                 background: {C.PANEL2}; color: {C.WHITE};
-                border: 1px solid {C.BORDER}; border-radius: 6px; padding: 4px 10px;
+                border: 1px solid {C.BORDER}; border-radius: 8px;
+                padding: 4px 14px;
+                font-size: 13px;
             }}
             QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
         """)
         self._input.returnPressed.connect(self._send)
         lay.addWidget(self._input)
 
-        # ── Buttons ────────────────────────────────────────────────────
-        btn_row = QHBoxLayout(); btn_row.setSpacing(4)
+        # ── Buttons ──
+        btn_row = QHBoxLayout(); btn_row.setSpacing(6)
         self._mute_btn = QPushButton("Mic")
-        self._mute_btn.setFixedHeight(30)
+        self._mute_btn.setFixedHeight(32)
         self._mute_btn.setFont(QFont(_FONT, _FONT_SZ_SM))
         self._mute_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._mute_btn.clicked.connect(self._toggle_mute)
@@ -2600,19 +3077,20 @@ class MainWindow(QMainWindow):
         for label, cb in [
             ("Fullscreen", self._toggle_fullscreen),
             ("Settings", self._show_config),
+            ("Connections", self._show_connections),
             ("Island", self._toggle_island),
         ]:
             btn = QPushButton(label)
-            btn.setFixedHeight(30)
+            btn.setFixedHeight(32)
             btn.setFont(QFont(_FONT, _FONT_SZ_SM))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background: transparent; color: {C.TEXT_DIM};
-                    border: 1px solid {C.BORDER}; border-radius: 4px;
-                    padding: 2px 10px;
+                    border: 1px solid {C.BORDER}; border-radius: 5px;
+                    padding: 2px 12px;
                 }}
-                QPushButton:hover {{ color: {C.ACC}; border: 1px solid {C.ACC}; }}
+                QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.ACC}; background: {C.PRI_GHO}; }}
             """)
             btn.clicked.connect(cb)
             btn_row.addWidget(btn)
@@ -2620,15 +3098,7 @@ class MainWindow(QMainWindow):
         btn_row.addStretch()
         lay.addLayout(btn_row)
 
-        self._set_right_mode(0)
         return w
-
-    def _set_right_mode(self, idx: int):
-        self._right_stack.setCurrentIndex(idx)
-        active = f"background: {C.PANEL2}; color: {C.TEXT}; border: 1px solid {C.TEXT_DIM}; border-radius: 3px;"
-        inactive = f"background: transparent; color: {C.TEXT_DIM}; border: 1px solid {C.BORDER}; border-radius: 3px;"
-        self._mode_log_btn.setStyleSheet(f"QPushButton {{ {active if idx == 0 else inactive} }}")
-        self._mode_ws_btn.setStyleSheet(f"QPushButton {{ {active if idx == 1 else inactive} }}")
 
     def _build_input_row(self) -> QHBoxLayout:
         row = QHBoxLayout(); row.setSpacing(5)
@@ -2664,13 +3134,24 @@ class MainWindow(QMainWindow):
     def _build_footer(self) -> QWidget:
         w = QWidget()
         w.setObjectName("footer_widget")
-        w.setFixedHeight(20)
-        w.setStyleSheet(f"background: {C.BG}; border-top: 1px solid {C.BORDER};")
-        lay = QHBoxLayout(w); lay.setContentsMargins(14, 0, 14, 0)
-        l = QLabel("MARK XL  ·  [F4] Mute  ·  [F11] FS  ·  [F12] Island")
-        l.setFont(QFont("Courier New", 7))
+        w.setFixedHeight(24)
+        w.setStyleSheet(f"""
+            #footer_widget {{
+                background: {C.PANEL};
+                border-top: 1px solid {C.BORDER};
+            }}
+        """)
+        lay = QHBoxLayout(w); lay.setContentsMargins(16, 0, 16, 0)
+        l = QLabel("MARK XL  ·  [F4] Mute  ·  [F11] Fullscreen  ·  [F12] Island")
+        l.setFont(QFont("Courier New", 8))
         l.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
         lay.addWidget(l)
+
+        lay.addStretch()
+        self._footer_llm = QLabel("ollama · qwen2.5:0.5b")
+        self._footer_llm.setFont(QFont("Courier New", 8))
+        self._footer_llm.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent;")
+        lay.addWidget(self._footer_llm)
         return w
 
     def _on_file_selected(self, path: str):
@@ -2694,6 +3175,7 @@ class MainWindow(QMainWindow):
         self._muted = not self._muted
         self.hud.muted = self._muted
         self._style_mute_btn()
+        self._update_status_bar()
         if self._muted:
             self._apply_state("MUTED")
             self._log.append_log("SYS: Microphone muted.")
@@ -2732,6 +3214,84 @@ class MainWindow(QMainWindow):
     def _apply_state(self, state: str):
         self.hud.state    = state
         self.hud.speaking = (state == "SPEAKING")
+        self._update_status_bar()
+
+    def _set_status_lbl(self, lbl: QLabel, color: str, text: str):
+        lbl.setText(f"●  {text}")
+        lbl.setStyleSheet(f"color: {color}; background: transparent; padding: 0 6px;")
+
+    def _update_status_bar(self):
+        mic_col = C.GREEN if not self._muted else C.RED
+        self._set_status_lbl(self._status_mic, mic_col, "MIC")
+
+        state = getattr(self.hud, 'state', 'INITIALISING')
+        if state in ("THINKING", "SPEAKING"):
+            ai_col = C.GREEN
+        elif state in ("LISTENING", "PROCESSING"):
+            ai_col = "#ffcc00"
+        elif state == "MUTED":
+            ai_col = C.RED
+        else:
+            ai_col = C.TEXT_DIM
+        self._set_status_lbl(self._status_ai, ai_col, "AI")
+
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            s.connect(("8.8.8.8", 53))
+            s.close()
+            self._set_status_lbl(self._status_net, C.GREEN, "NET")
+        except Exception:
+            self._set_status_lbl(self._status_net, C.RED, "NET")
+
+        try:
+            import subprocess
+            r = subprocess.run(["lsof", "/dev/video*"], capture_output=True, text=True, timeout=1)
+            cam_ok = bool(r.stdout.strip())
+        except Exception:
+            cam_ok = False
+        self._set_status_lbl(self._status_cam, C.GREEN if cam_ok else C.MUTED_C, "CAM")
+
+        try:
+            from memory.vector_memory import get_memory_count
+            cnt = get_memory_count()
+        except Exception:
+            cnt = 0
+        mem_col = C.GREEN if cnt > 0 else C.MUTED_C
+        lbl = f"MEM  {cnt}"
+        self._status_mem.setText(f"●  {lbl}")
+        self._status_mem.setStyleSheet(f"color: {mem_col}; background: transparent; padding: 0 6px;")
+
+    def _load_config_dict(self) -> dict:
+        try:
+            return json.loads(API_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def _key_is_set(self, key: str) -> bool:
+        if key == "gws_credentials":
+            return (CONFIG_DIR.parent / "gws" / "credentials.json").exists()
+        cfg = self._load_config_dict()
+        val = cfg.get(key, "")
+        return bool(val) and val.strip() != ""
+
+    def _update_connections(self):
+        import os
+        cfg = self._load_config_dict()
+        for dot, lbl, svc, key in self._conn_rows:
+            is_set = self._key_is_set(key)
+            col = C.GREEN if is_set else C.RED
+            dot.setStyleSheet(f"color: {col}; background: transparent; border: none;")
+            lbl.setStyleSheet(
+                f"color: {C.TEXT if is_set else C.TEXT_DIM}; background: transparent; border: none;"
+            )
+
+    def _on_conn_click(self, svc_name: str, key_name: str):
+        self._show_connections(active_tab_key=key_name)
+
+    def _on_add_connection(self):
+        self._show_connections()
 
     def _check_config(self) -> bool:
         if not API_FILE.exists(): return False
@@ -2816,6 +3376,82 @@ class MainWindow(QMainWindow):
         self._log.append_log(f"SYS: Config updated. LLM={llm} | STT={stt} | TTS={tts}")
         if self._on_reconfigure_cb:
             self._on_reconfigure_cb(cfg)
+        # Update left-panel LLM label
+        try:
+            self._update_llm_label(cfg)
+        except Exception:
+            pass
+
+    def _show_connections(self, active_tab_key: str | None = None):
+        if getattr(self, "_overlay_prov", None) and self._overlay_prov.isVisible():
+            return
+        import json
+        from pathlib import Path
+        current = {}
+        try:
+            current = json.loads(Path("config/api_keys.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        ov = ConnectionsOverlay(self.centralWidget(), initial=current, active_tab_key=active_tab_key)
+        cw = self.centralWidget()
+        ow, oh = min(cw.width() - 20, 850), min(cw.height() - 20, 600)
+        ov.setGeometry(
+            (cw.width()  - ow) // 2,
+            (cw.height() - oh) // 2,
+            ow, oh,
+        )
+        ov.done.connect(self._on_providers_done)
+        ov.show()
+        self._overlay_prov = ov
+
+    def _show_providers(self):
+        self._show_connections()
+
+    def _on_providers_done(self, diff_json: str):
+        import json
+        import os
+        from pathlib import Path
+        try:
+            diff = json.loads(diff_json)
+        except Exception:
+            diff = {}
+        
+        current = {}
+        API_FILE = Path("config/api_keys.json")
+        try:
+            current = json.loads(API_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+        
+        current.update(diff)
+        
+        os.makedirs("config", exist_ok=True)
+        API_FILE.write_text(json.dumps(current, indent=4), encoding="utf-8")
+        if getattr(self, "_overlay_prov", None):
+            self._overlay_prov.hide()
+            self._overlay_prov = None
+            
+        self._log.append_log("SYS: Providers updated.")
+        if self._on_reconfigure_cb:
+            self._on_reconfigure_cb(current)
+        # Refresh LLM label after providers change
+        try:
+            self._update_llm_label(current)
+        except Exception:
+            pass
+
+    def _update_llm_label(self, cfg: dict | None = None):
+        try:
+            if cfg is None:
+                import json
+                cfg = json.loads(Path("config/api_keys.json").read_text(encoding="utf-8"))
+            model = cfg.get("llm_model", "")
+            provider = cfg.get("llm_provider", "")
+            text = f"LLM  {model}" if model else f"LLM  ({provider})"
+            if hasattr(self, '_llm_lbl'):
+                self._llm_lbl.setText(text)
+        except Exception:
+            pass
 
 
 class _RootShim:
@@ -2831,6 +3467,12 @@ class JarvisUI:
     def __init__(self, face_path: str, size=None):
         self._app = QApplication.instance() or QApplication(sys.argv)
         self._app.setStyle("Fusion")
+        try:
+            import json
+            cfg = json.loads(Path("config/api_keys.json").read_text(encoding="utf-8"))
+            C.apply_theme(cfg.get("theme", "dark") == "light")
+        except Exception:
+            pass
         self._win = MainWindow(face_path)
         self._win.show()
         self.root = _RootShim(self._app)
@@ -2873,8 +3515,27 @@ class JarvisUI:
     def write_log(self, text: str):
         self._win._log_sig.emit(text)
 
+    def write_log_instant(self, text: str, tag: str = "ai"):
+        self._win.write_log_instant.emit(text, tag)
+
     def set_location(self, loc_text: str):
         self._win._loc_sig.emit(loc_text)
+
+    def request_api_key(self, service_name: str, key_name: str = "") -> str:
+        """Thread-safe — asks user for an API key via modal dialog."""
+        from PyQt6.QtWidgets import QInputDialog, QLineEdit
+        k = key_name or f"{service_name.lower().replace(' ', '_')}_api_key"
+        result, ok = QInputDialog.getText(
+            self._win,
+            f"API Key Required — {service_name}",
+            f"{service_name} requires an API key.\nEnter your {service_name} API key:",
+            QLineEdit.EchoMode.Password,
+        )
+        if ok and result.strip():
+            from memory.config_manager import save_config
+            save_config({k: result.strip()})
+            return result.strip()
+        return ""
 
     # ── Startup panel (all thread-safe) ──────────────────────────────────
     def show_startup_panel(self) -> None:

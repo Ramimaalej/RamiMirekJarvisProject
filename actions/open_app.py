@@ -125,6 +125,10 @@ _WEB_APPS: dict[str, str] = {
     "outlook":         "https://outlook.com",
     "onedrive":        "https://onedrive.live.com",
     "wikipedia":       "https://en.wikipedia.org/wiki/",
+    "pinterest":       "https://pinterest.com",
+    "instagram":       "https://instagram.com",
+    "tiktok":          "https://tiktok.com",
+    "snapchat":        "https://snapchat.com",
 }
 
 # Words that are context clues, not part of the app name (strip these from input)
@@ -265,8 +269,7 @@ def _launch_windows(app_name: str) -> bool:
     if shutil.which(app_name) or shutil.which(app_name.split(".")[0]):
         try:
             subprocess.Popen(
-                app_name,
-                shell=True,
+                [app_name],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -277,7 +280,8 @@ def _launch_windows(app_name: str) -> bool:
 
     if ":" in app_name:
         try:
-            subprocess.Popen(f"start {app_name}", shell=True)
+            opener = {"Linux": ["xdg-open"], "Darwin": ["open"], "Windows": ["start"]}.get(_SYSTEM, ["xdg-open"])
+            subprocess.Popen(opener + [app_name])
             time.sleep(1.0)
             return True
         except Exception:
@@ -439,7 +443,7 @@ def _open_url(url: str) -> bool:
         elif _SYSTEM == "Darwin":
             subprocess.Popen(["open", url])
         else:
-            subprocess.Popen(["start", url], shell=True)
+            subprocess.Popen(["start", url])
         time.sleep(1.5)
         return True
     except Exception as e:
@@ -500,6 +504,34 @@ def open_app(
         return "Could not open Wikipedia."
 
     try:
+        # Handle common folder names → open in file manager
+        _FOLDER_ALIASES = {
+            "downloads":  "~/Downloads",
+            "download":   "~/Downloads",
+            "documents":  "~/Documents",
+            "document":   "~/Documents",
+            "desktop":    "~/Desktop",
+            "pictures":   "~/Pictures",
+            "picture":    "~/Pictures",
+            "photos":     "~/Pictures",
+            "music":      "~/Music",
+            "videos":     "~/Videos",
+            "video":      "~/Videos",
+            "home":       "~",
+            "root":       "/",
+        }
+        folder_key = normalized.lower().replace(" ", "")
+        if folder_key in _FOLDER_ALIASES:
+            folder_path = os.path.expanduser(_FOLDER_ALIASES[folder_key])
+            if _SYSTEM == "Linux":
+                subprocess.Popen(["xdg-open", folder_path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif _SYSTEM == "Darwin":
+                subprocess.Popen(["open", folder_path])
+            else:
+                subprocess.Popen(["explorer", folder_path])
+            return f"Opened {folder_key} folder."
+
         # If resolved to a URL, open via Playwright (same session as browser_control)
         if normalized.startswith("http"):
             try:

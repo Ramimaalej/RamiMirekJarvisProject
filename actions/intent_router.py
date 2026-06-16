@@ -34,6 +34,90 @@ logger = logging.getLogger("intent_router")
 # Patterns are matched in order — first match wins.
 
 _INTENTS: list[dict[str, Any]] = [
+    # ── Greetings (instant — no LLM) ──────────────────────────────────
+    {
+        "name": "greeting",
+        "subsystem": "general",
+        "patterns": [
+            r"^(hi|hello|hey|yo|sup|good\s+(morning|afternoon|evening)|howdy|what'?s\s+up)",
+        ],
+        "handler": "greeting",
+        "params": {"response": "Hello! How can I help you?"},
+        "requires_ai": False,
+    },
+
+    # ── Personal Info (save memory directly, no LLM needed) ──────────
+    {
+        "name": "save_memory",
+        "subsystem": "memory",
+        "patterns": [
+            r"^(my\s+name\s+is)\s+(.+)",
+            r"^(i'?m?\s+called)\s+(.+)",
+            r"^(call\s+me)\s+(.+)",
+            r"^(you\s+can\s+call\s+me)\s+(.+)",
+        ],
+        "handler": "save_memory",
+        "params": {"category": "identity", "key": "name"},
+        "requires_ai": False,
+    },
+    {
+        "name": "save_memory",
+        "subsystem": "memory",
+        "patterns": [
+            r"^my\s+(email|mail)\s+is\s+(.+)",
+            r"^my\s+(email|mail)\s+address\s+is\s+(.+)",
+        ],
+        "handler": "save_memory",
+        "params": {"category": "identity", "key": "email"},
+        "requires_ai": False,
+    },
+    {
+        "name": "save_memory",
+        "subsystem": "memory",
+        "patterns": [
+            r"^(i\s+live\s+in)\s+(.+)",
+            r"^(i'?m?\s+from)\s+(.+)",
+            r"^(i\s+am\s+from)\s+(.+)",
+            r"^my\s+city\s+is\s+(.+)",
+        ],
+        "handler": "save_memory",
+        "params": {"category": "identity", "key": "city"},
+        "requires_ai": False,
+    },
+    {
+        "name": "save_memory",
+        "subsystem": "memory",
+        "patterns": [
+            r"^my\s+(phone|number|cell)\s+is\s+(.+)",
+            r"^(call\s+me\s+at)\s+(.+)",
+        ],
+        "handler": "save_memory",
+        "params": {"category": "identity", "key": "phone"},
+        "requires_ai": False,
+    },
+    {
+        "name": "save_memory",
+        "subsystem": "memory",
+        "patterns": [
+            r"^my\s+birthday\s+is\s+(.+)",
+        ],
+        "handler": "save_memory",
+        "params": {"category": "identity", "key": "birthday"},
+        "requires_ai": False,
+    },
+    {
+        "name": "save_memory",
+        "subsystem": "memory",
+        "patterns": [
+            r"^i'?m?\s+(\d+)\s*(?:years?\s+old)?\s*$",
+            r"^i\s+am\s+(\d+)\s*(?:years?\s+old)?\s*$",
+            r"^my\s+age\s+is\s+(\d+)",
+        ],
+        "handler": "save_memory",
+        "params": {"category": "identity", "key": "age"},
+        "requires_ai": False,
+    },
+
     # ── Gmail / Email ─────────────────────────────────────────────────
     {
         "name": "gmail_get_unread",
@@ -113,8 +197,9 @@ _INTENTS: list[dict[str, Any]] = [
         "name": "web_search",
         "subsystem": "browser",
         "patterns": [
-            r"^(search|google|look\s+up|find\s+(out|on\s+the\s+web)|what\s+is|who\s+is)",
-            r"^(weather|news|stock|price|bitcoin)",
+            r"^(search|google|look\s+up|find\s+(out|on\s+the\s+web)|who\s+is)",
+            r"^(what\s+is)\s+(?!my\s+(budget|spending|tasks?|schedule|calendar|agenda))",
+            r"^(price|bitcoin)",
             r"\?$",
         ],
         "handler": "web_search",
@@ -182,6 +267,7 @@ _INTENTS: list[dict[str, Any]] = [
             r"(increase|decrease)\s+(volume|brightness)",
             r"^(mute|unmute|lock|shutdown|restart|sleep)",
             r"(screenshot|screen\s+shot)",
+            r"(speed\s*test|internet\s+speed|check\s+(my\s+)?(internet|connection|network)\s+(speed|connection))",
         ],
         "handler": "computer_settings",
         "params": {},
@@ -201,12 +287,27 @@ _INTENTS: list[dict[str, Any]] = [
         "name": "weather_report",
         "subsystem": "system",
         "patterns": [
-            r"^(weather|temperature|forecast|how\s+cold|how\s+hot)",
+            r"(weather|temperature|forecast)",
+            r"how\s+(cold|hot|warm)\s+(is\s+)?(it\s+)?",
             r"rain\s+(today|tomorrow)",
+            r"(what'?s|what\s+is)\s+the\s+weather",
         ],
         "handler": "weather_report",
         "params": {},
         "requires_ai": False,
+    },
+    {
+        "name": "get_datetime",
+        "subsystem": "system",
+        "patterns": [
+            r"^(what\s+(day|time|date))\s+(is\s+)?(it\s+)?",
+            r"^(what'?s\s+the\s+(time|date|day))",
+            r"^(current\s+)?(date|time|day|hour|minute)",
+            r"(today'?s\s+)?(date|day)",
+        ],
+        "handler": "get_datetime",
+        "params": {},
+        "requires_ai": True,
     },
     {
         "name": "maps",
@@ -228,7 +329,8 @@ _INTENTS: list[dict[str, Any]] = [
         "patterns": [
             r"^(stock\s+price|share\s+price|stock|price)\s+(of\s+)?(.+)",
             r"(what'?s|what\s+is)\s+(.+)\s+(stock|price|share|ticker|trading\s+at)",
-            r"how\s+(much|are)\s+(.+)",
+            r"how\s+much\s+(?!.*(budget|spend|expense|transaction|finance))(.+)\s+(stock|price|share|cost)",
+            r"how\s+(much)\s+(is|does|do)\s+(.+)",
         ],
         "handler": "stock_price",
         "params": {},
@@ -243,6 +345,19 @@ _INTENTS: list[dict[str, Any]] = [
             r"(get|fetch|show|read)\s+(me\s+)?(the\s+)?news",
         ],
         "handler": "news",
+        "params": {},
+        "requires_ai": False,
+    },
+    {
+        "name": "books",
+        "patterns": [
+            r"who\s+wrote\s+",
+            r"book\s+(by|about|called|titled|named)",
+            r"author\s+of\s+",
+            r"search\s+(for\s+)?(a\s+)?book",
+            r"(find|look\s+up)\s+(a\s+)?book",
+        ],
+        "handler": "books",
         "params": {},
         "requires_ai": False,
     },
@@ -276,10 +391,13 @@ _INTENTS: list[dict[str, Any]] = [
         "patterns": [
             r"^(play|search)\s+(a\s+)?(video|youtube)",
             r"play\s+.*\s+on\s+youtube",
+            r"open\s+.+\s+(in|on)\s+youtube",      # "open X in/on youtube" (not bare "open youtube")
             r"youtube\s+(search|find)\s+(.+)",
             r"search\s+youtube\s+for\s+(.+)",
             r"channel\s+(stats?|info|details?)\s+(of\s+)?(.+)",
             r"(subscriber|subscribers?|views?|videos?|stats?)\s+(for\s+)?(.+)",
+            r"download\s+(a\s+)?(youtube\s+)?video(.+)",
+            r"(youtube\s+)?video\s+download(.+)",
         ],
         "handler": "youtube_video",
         "params": {},
@@ -295,6 +413,32 @@ _INTENTS: list[dict[str, Any]] = [
             r"how\s+(are|is)\s+(my|the)\s+(goals?|progress|project)",
         ],
         "handler": "goals",
+        "params": {"action": "summary"},
+        "requires_ai": False,
+    },
+    {
+        "name": "tasks",
+        "subsystem": "tasks",
+        "patterns": [
+            r"^(what are|show|list|get)\s+(my\s+)?(tasks?|todo|to-do|to do)",
+            r"what('?s| is)\s+(my\s+)?(tasks?|todo)",
+            r"^(any|do I have)\s+(tasks?|todo)",
+        ],
+        "handler": "tasks",
+        "params": {"action": "list"},
+        "requires_ai": False,
+    },
+
+    # ── Budget ────────────────────────────────────────────────────────
+    {
+        "name": "budget",
+        "subsystem": "finance",
+        "patterns": [
+            r"(budget|spending|expenses?|transactions?|finance)",
+            r"how\s+much\s+(did|have|do)\s+i\s+(spend|spent)",
+            r"(add|log|record)\s+(a\s+)?(transaction|expense|spending)",
+        ],
+        "handler": "budget",
         "params": {"action": "summary"},
         "requires_ai": False,
     },
@@ -349,6 +493,21 @@ _INTENTS: list[dict[str, Any]] = [
         "requires_ai": False,
     },
 
+    # ── Screen Explain (vision — what's on screen) ────────────────────
+    {
+        "name": "screen_explain",
+        "subsystem": "vision",
+        "patterns": [
+            r"^(what('?s| is| do you see)\s+(on\s+)?(my\s+)?(screen|display|monitor))",
+            r"^(what\s+do\s+you\s+see)\b",
+            r"^(describe|analyze|look\s+at|read)\s+(my\s+)?(screen|display)",
+            r"(what|what'?s)\s+on\s+(my\s+)?(screen|display)",
+        ],
+        "handler": "screen_explain",
+        "params": {},
+        "requires_ai": False,
+    },
+
     # ── Capabilities ─────────────────────────────────────────────────
     {
         "name": "capabilities_list",
@@ -372,6 +531,19 @@ _INTENTS: list[dict[str, Any]] = [
         ],
         "handler": "context",
         "params": {"action": "summary"},
+        "requires_ai": False,
+    },
+
+    # ── Image Generation ─────────────────────────────────────────────
+    {
+        "name": "generate_image",
+        "subsystem": "vision",
+        "patterns": [
+            r"^(generate|create|make|draw|render|produce)\s+(an?\s+)?(image|picture|photo|illustration|art|drawing|render)\s+(of\s+)?",
+            r"^(generate|create|make|draw)\s+(me\s+)?(an?\s+)?(image|picture|photo)\s+",
+        ],
+        "handler": "generate_image",
+        "params": {},
         "requires_ai": False,
     },
 
@@ -534,6 +706,23 @@ _INTENTS: list[dict[str, Any]] = [
         "params": {"action": "share"},
         "requires_ai": True,
     },
+
+    # ── Hermes Agent (complex multi-step tasks) ──────────────────────
+    {
+        "name": "hermes_task",
+        "subsystem": "hermes",
+        "patterns": [
+            r"^(research|investigate|analyze|study|examine)\s+",
+            r"^(write|draft|compose|create|generate)\s+(a\s+)?(report|document|article|analysis|summary)",
+            r"^(compare|contrast)\s+",
+            r"^(plan|design|architect)\s+(a\s+)?(system|architecture|solution|workflow)",
+            r"^(refactor|restructure|redesign|rewrite)\s+",
+            r"^(debug|troubleshoot|fix)\s+(this\s+)?(complex|complicated|multi)",
+        ],
+        "handler": "agent_task",
+        "params": {},
+        "requires_ai": False,
+    },
 ]
 
 
@@ -665,10 +854,57 @@ class IntentRouter:
             else:
                 params["query"] = text
 
+        elif intent["name"] == "generate_image":
+            prompt = text[match.end():].strip().rstrip("!?., ")
+            prompt = re.sub(r"^(of|with|showing|featuring|containing)\s+", "", prompt).strip()
+            if prompt:
+                params["prompt"] = prompt
+            else:
+                params["prompt"] = text
+
+        elif intent["name"] == "hermes_task":
+            goal = text[match.end():].strip().rstrip("!?., ")
+            if goal:
+                params["goal"] = goal
+            else:
+                params["goal"] = text
+
+        elif intent["name"] == "youtube_video":
+            query = ""
+            # Try capture groups first ("search youtube for X" has X in group(1))
+            if match.re.groups > 0:
+                g = match.group(match.re.groups)
+                if g and g not in ("in", "on", "the"):
+                    query = g.strip()
+            if not query:
+                query = text[match.end():].strip().rstrip("!?., ")
+            # "open/play/search X in/on youtube" → extract X
+            if not query:
+                in_match = re.search(r"\s+(?:in|on)\s+youtube\s*$", text)
+                if in_match:
+                    query = text[:in_match.start()].strip()
+            if query:
+                for prefix in ["play ", "search ", "open ", "a ", "an ", "the "]:
+                    if query.lower().startswith(prefix):
+                        query = query[len(prefix):].strip()
+            if not query:
+                query = text
+            params["action"] = "play"
+            params["query"] = query
+
+        elif intent["name"] == "save_memory":
+            value = match.group(match.re.groups).strip().rstrip("!?., ")
+            if value:
+                # Trim at conjunctions to prevent compound sentences
+                value = re.split(r'\s+(and|but|also|then|however)\s+', value, maxsplit=1)[0].strip()
+                params["value"] = value
+
         elif intent["name"] == "weather_report":
-            city_match = re.search(r"in\s+(\w[\w\s]*\w)", text)
+            city_match = re.search(r"in\s+(\w[\w\s]*?\w)(?:\s+(today|tomorrow|now|\?|\.))?\s*$", text)
             if city_match:
-                params["city"] = city_match.group(1)
+                params["city"] = city_match.group(1).strip()
+            elif re.search(r"(weather|forecast)", text):
+                params["city"] = text.split()[-1].strip("?.,!")
 
         elif intent["name"] == "obsidian_save":
             content = text[match.end():].strip().rstrip("!?., ")
@@ -688,6 +924,12 @@ class IntentRouter:
                 days_match = re.search(r"(\d+)\s+days?", text)
                 params["days"] = int(days_match.group(1)) if days_match else 7
 
+        elif intent["name"] == "budget":
+            if re.search(r"(this\s+month|monthly|this month)", text):
+                params["period"] = "month"
+            elif re.search(r"(today|this day)", text):
+                params["period"] = "today"
+
         elif intent["name"] == "github_list_issues":
             if re.search(r"(PRs?|pull\s+requests)", text):
                 params["action"] = "list_prs"
@@ -695,16 +937,26 @@ class IntentRouter:
         elif intent["name"] == "computer_settings":
             if "volume" in text or "sound" in text:
                 params["action"] = "volume"
-                if "up" in text or "increase" in text:
-                    params["description"] = "volume_up"
-                elif "down" in text or "decrease" in text or "reduce" in text:
-                    params["description"] = "volume_down"
-                elif "mute" in text:
-                    params["description"] = "volume_mute"
-                elif re.search(r"(\d+)", text):
+                if re.search(r"(\d+)", text):
                     level = re.search(r"(\d+)", text)
-                    params["description"] = "volume_set"
-                    params["value"] = level.group(1) if level else "50"
+                    target = int(level.group(1))
+                    if 0 <= target <= 100:
+                        params["description"] = "volume_set"
+                        params["value"] = str(target)
+                    elif target > 100:
+                        pass
+                if "description" not in params:
+                    if ("microphone" in text or "mic" in text) and "mute" in text:
+                        params["action"] = "jarvis_mic"
+                        params["description"] = "toggle_mute"
+                    elif "up" in text or "increase" in text:
+                        params["description"] = "volume_up"
+                    elif "down" in text or "decrease" in text or "reduce" in text:
+                        params["description"] = "volume_down"
+                    elif "mute" in text and "unmute" not in text:
+                        params["description"] = "volume_mute"
+                    elif "unmute" in text:
+                        params["description"] = "volume_mute"
             elif "brightness" in text:
                 params["action"] = "brightness"
                 if "up" in text or "increase" in text:
@@ -719,6 +971,8 @@ class IntentRouter:
                 params["action"] = "restart"
             elif "screenshot" in text:
                 params["action"] = "screenshot"
+            elif re.search(r"speed\s*test|internet\s+speed|network\s+speed|connection\s+speed", text):
+                params["action"] = "speedtest"
 
         return params
 

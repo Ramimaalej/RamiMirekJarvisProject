@@ -18,8 +18,8 @@ class FinanceClient:
         try:
             import plaid
             from plaid.api import plaid_api
-        except ImportError:
-            raise ImportError("plaid-python not installed — pip install plaid-python")
+        except ImportError as exc:
+            raise ValueError("Plaid support is missing — install plaid-python") from exc
 
         if not self._client_id or not self._secret:
             raise ValueError(

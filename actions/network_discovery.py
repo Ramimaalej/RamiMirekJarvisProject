@@ -1,3 +1,4 @@
+import ipaddress
 import logging
 import socket
 from typing import Any
@@ -110,26 +111,35 @@ def _discover_local_ips() -> list[dict[str, Any]]:
 
 def get_local_ips() -> list[str]:
     ips = []
+
+    def _add_if_ipv4(value: str) -> None:
+        try:
+            parsed = ipaddress.ip_address(value)
+        except ValueError:
+            return
+        if parsed.version == 4 and str(parsed) not in ips:
+            ips.append(str(parsed))
+
     try:
         hostname = socket.gethostname()
-        ips.append(socket.gethostbyname(hostname))
+        _add_if_ipv4(socket.gethostbyname(hostname))
     except Exception:
         pass
+
     try:
         for info in socket.getaddrinfo(hostname, None):
-            addr = info[4][0]
-            if addr not in ips and addr.startswith(("192.", "10.", "172.")):
-                ips.append(addr)
+            _add_if_ipv4(info[4][0])
     except Exception:
         pass
+
     try:
         import subprocess
         proc = subprocess.run(
             ["hostname", "-I"], capture_output=True, text=True, timeout=5
         )
         for ip in proc.stdout.strip().split():
-            if ip not in ips:
-                ips.append(ip)
+            _add_if_ipv4(ip)
     except Exception:
         pass
+
     return ips

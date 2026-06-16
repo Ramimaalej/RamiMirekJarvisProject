@@ -1,1 +1,12 @@
-gws/
+__pycache__/
+*.pyc
+*.pyo
+android-app/node_modules/
+android-app/.expo/
+android-app/android/
+android-app/ios/
+node_modules/
+logs/
+.env
+*.log
+PyWhatKit_DB.txt

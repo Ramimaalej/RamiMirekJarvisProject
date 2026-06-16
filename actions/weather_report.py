@@ -1,3 +1,4 @@
+import re
 import requests
 
 _WEATHER_EMOJIS = {
@@ -30,20 +31,7 @@ def _geocode(city: str) -> tuple[float, float] | None:
     return None
 
 
-def weather_action(
-    parameters: dict,
-    player=None,
-    session_memory=None,
-) -> str:
-    city = (parameters or {}).get("city", "").strip()
-    if not city:
-        return "Sir, which city do you want the weather for?"
-
-    coords = _geocode(city)
-    if not coords:
-        return f"Sir, I couldn't find a city named '{city}'."
-
-    lat, lon = coords
+def _fetch_weather(lat: float, lon: float, city: str) -> str | None:
     try:
         r = requests.get(
             "https://api.open-meteo.com/v1/forecast",
@@ -63,7 +51,7 @@ def weather_action(
         r.raise_for_status()
         data = r.json()
     except Exception as e:
-        return f"Sir, I couldn't fetch the weather: {e}"
+        return None
 
     current = data.get("current", {})
     daily = data.get("daily", {})
@@ -75,21 +63,50 @@ def weather_action(
     wcode = current.get("weather_code", 0)
     emoji = _WEATHER_EMOJIS.get(wcode, "")
 
-    parts = [f"Currently {emoji} {temp}°C in {city.title()}, feels like {feels}°C."]
+    parts = [f"{emoji} {temp}°C (feels {feels}°C)"]
     if humidity is not None:
-        parts.append(f"Humidity {humidity}%.")
+        parts.append(f"humidity {humidity}%")
     if wind is not None:
-        parts.append(f"Wind {wind} km/h.")
-
+        parts.append(f"wind {wind} km/h")
     if daily:
         high = daily.get("temperature_2m_max", [None])[0]
         low = daily.get("temperature_2m_min", [None])[0]
         precip = daily.get("precipitation_sum", [None])[0]
         if high is not None and low is not None:
-            parts.append(f"Today: H{high}°C L{low}°C.")
+            parts.append(f"H{high}°C L{low}°C")
         if precip and precip > 0:
-            parts.append(f"Precipitation {precip}mm.")
+            parts.append(f"{precip}mm rain")
 
-    msg = " ".join(parts)
-    print(f"[Weather] {msg}")
-    return msg
+    line = f"{city.title()}: " + ", ".join(parts)
+    print(f"[Weather] {line}")
+    return line
+
+
+def weather_action(
+    parameters: dict,
+    player=None,
+    session_memory=None,
+) -> str:
+    raw = (parameters or {}).get("city", "").strip()
+    if not raw:
+        return "Sir, which city do you want the weather for?"
+
+    cities = re.split(r'\s+(?:vs|and|or)\s+|,', raw)
+    cities = [c.strip() for c in cities if c.strip()]
+
+    results = []
+    for city in cities:
+        coords = _geocode(city)
+        if not coords:
+            results.append(f"{city.title()}: not found")
+            continue
+        lat, lon = coords
+        line = _fetch_weather(lat, lon, city)
+        if line:
+            results.append(line)
+        else:
+            results.append(f"{city.title()}: fetch failed")
+
+    if len(results) == 1:
+        return results[0]
+    return " | ".join(results)

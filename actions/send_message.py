@@ -149,8 +149,19 @@ def _desktop_send(app_name: str, receiver: str, message: str) -> str:
     time.sleep(0.3)
     return f"Message sent to {receiver} via {app_name}."
 
+_DEFAULT_CC = "+216"  # Tunisia
+
 def _send_whatsapp(receiver: str, message: str) -> str:
-    return _desktop_send("WhatsApp", receiver, message)
+    try:
+        import pywhatkit
+        # Prepend default country code if missing
+        phone = receiver.strip()
+        if not phone.startswith("+"):
+            phone = _DEFAULT_CC + phone
+        pywhatkit.sendwhatmsg_instantly(phone, message, wait_time=30, tab_close=True)
+        return f"Message sent to {receiver} via WhatsApp."
+    except Exception as e:
+        return f"WhatsApp failed: {e}"
 
 def _send_telegram(receiver: str, message: str) -> str:
     return _desktop_send("Telegram", receiver, message)

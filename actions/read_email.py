@@ -25,7 +25,7 @@ def _open_url(url: str) -> bool:
         elif _SYSTEM == "Darwin":
             subprocess.Popen(["open", url])
         else:
-            subprocess.Popen(["start", url], shell=True)
+            subprocess.Popen(["start", url])
         time.sleep(1.5)
         return True
     except Exception as e:

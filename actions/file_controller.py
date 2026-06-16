@@ -237,15 +237,7 @@ def create_folder(path: str, name: str = "") -> str:
         parent_dir = str(target.parent.resolve())
         folder_name = target.name
 
-        if is_windows():
-            cmd = f'cd /d "{parent_dir}" && mkdir "{folder_name}"'
-        else:
-            cmd = f'cd "{parent_dir}" && mkdir "{folder_name}"'
-
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        if res.returncode != 0:
-            # Fallback to python mkdir if shell command fails
-            target.mkdir(parents=True, exist_ok=True)
+        target.mkdir(parents=True, exist_ok=True)
 
         return f"Folder created: {target.name} at {target.resolve()}"
     except Exception as e:
@@ -542,7 +534,17 @@ def open_folder(path: str, name: str = "") -> str:
         if not _is_safe_path(target):
             return f"Access denied: {target}"
         if not target.exists():
-            return f"Path not found: {target}"
+            # Fallback: open browser search with the query
+            query = f"{name or path}"
+            encoded = urllib.parse.quote(query)
+            search_url = f"https://www.google.com/search?q={encoded}"
+            if _OS == "Windows":
+                subprocess.Popen(["start", search_url])
+            elif _OS == "Darwin":
+                subprocess.Popen(["open", search_url])
+            else:
+                subprocess.Popen(["xdg-open", search_url])
+            return f"I couldn't find '{query}' locally. I opened a web search for you instead."
         target_str = str(target)
         if _OS == "Windows":
             os.startfile(target_str)

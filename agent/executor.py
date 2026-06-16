@@ -15,6 +15,7 @@ from typing import Callable
 from agent.planner       import create_plan, replan
 from agent.error_handler import analyze_error, generate_fix, ErrorDecision
 from core.llm_client     import call_llm_text
+from core.workflows      import agent_flow, step_task, tool_task
 
 
 def get_base_dir() -> Path:
@@ -253,6 +254,7 @@ class AgentExecutor:
 
     MAX_REPLAN_ATTEMPTS = 2
 
+    @agent_flow(name="Agent Execution")
     def execute(
         self,
         goal:        str,

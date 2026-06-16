@@ -35,6 +35,21 @@ def stock_price_action(parameters: dict | None = None, player=None) -> str:
     symbols = parameters.get("symbols") or parameters.get("symbol") or ""
     if isinstance(symbols, str):
         symbols = [s.strip() for s in symbols.replace(",", " ").split() if s.strip()]
+
+    # Map common names to Yahoo Finance symbols
+    crypto_map = {
+        "bitcoin": "BTC-USD", "btc": "BTC-USD",
+        "ethereum": "ETH-USD", "eth": "ETH-USD",
+        "solana": "SOL-USD", "sol": "SOL-USD",
+        "ripple": "XRP-USD", "xrp": "XRP-USD",
+        "cardano": "ADA-USD", "ada": "ADA-USD",
+        "dogecoin": "DOGE-USD", "doge": "DOGE-USD",
+        "polkadot": "DOT-USD", "dot": "DOT-USD",
+        "litecoin": "LTC-USD", "ltc": "LTC-USD",
+        "chainlink": "LINK-USD", "link": "LINK-USD",
+        "avalanche": "AVAX-USD", "avax": "AVAX-USD",
+    }
+    symbols = [crypto_map.get(s.lower(), s) for s in symbols]
     if not symbols:
         return "Please provide a stock symbol (e.g. AAPL, TSLA, MSFT)."
 

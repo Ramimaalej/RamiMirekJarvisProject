@@ -65,6 +65,7 @@ from actions.game_updater import game_updater
 from actions.get_location import get_location
 from actions.file_processor import file_processor
 from core.scheduler import get_scheduler
+from core.safe_math import safe_math
 from agent.agent_manager import get_agent_manager
 from skills.skill_loader import get_active_skill_context, list_skills, reload_skills
 
@@ -744,9 +745,7 @@ class HeadlessJarvis:
             pct = float(m.group(1)); val = float(m.group(2))
             return f"{pct}% of {val} = {val * pct / 100}"
         try:
-            safe_globals = {"__builtins__": {}, "sqrt": _math.sqrt, "pi": _math.pi, "e": _math.e}
-            s = expr.replace(" ", "").replace("^", "**")
-            result = eval(s, safe_globals, {})
+            result = safe_math(expr)
             return f"{expr} = {result}"
         except Exception as e:
             return f"Could not calculate: {e}"

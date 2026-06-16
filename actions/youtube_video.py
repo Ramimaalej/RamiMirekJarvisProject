@@ -478,6 +478,57 @@ def _handle_channel_stats(parameters: dict, player, speak) -> str:
         return f"Could not fetch channel stats, sir: {e}"
 
 
+def _handle_download(parameters: dict, player, speak) -> str:
+    url = parameters.get("url", "").strip()
+    if not url:
+        return "Please provide a YouTube URL to download, sir."
+    if not _is_valid_youtube_url(url):
+        return "That doesn't appear to be a valid YouTube URL, sir."
+
+    fmt = parameters.get("format", "mp4").strip().lower()
+    download_dir = Path.home() / "Downloads"
+    download_dir.mkdir(parents=True, exist_ok=True)
+
+    if player:
+        player.write_log(f"[YouTube] Downloading: {url}")
+    if speak:
+        speak("Starting download, sir. This may take a moment.")
+
+    try:
+        import shutil
+        yt_dlp_path = shutil.which("yt-dlp") or "yt-dlp"
+        cmd = [yt_dlp_path, "-o", str(download_dir / "%(title)s.%(ext)s")]
+
+        if fmt == "mp3":
+            cmd += ["-x", "--audio-format", "mp3"]
+        elif fmt == "best":
+            cmd += ["-f", "best"]
+        else:
+            cmd += ["-f", f"bestvideo[ext={fmt}]+bestaudio[ext=m4a]/best[ext={fmt}]/best"]
+
+        cmd.append(url)
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            err = result.stderr.strip() or result.stdout.strip()
+            return f"Download failed: {err[:500]}"
+
+        title = ""
+        for line in result.stdout.splitlines():
+            if "[download]" in line and "Destination" in line:
+                title = line.split("Destination:", 1)[-1].strip()
+                break
+        if not title:
+            title = result.stdout.splitlines()[-1] if result.stdout.strip() else url
+
+        return f"Downloaded: {title}"
+
+    except subprocess.TimeoutExpired:
+        return "Download timed out (5 minutes), sir."
+    except Exception as e:
+        return f"Download failed, sir: {e}"
+
+
 _ACTION_MAP = {
     "play":          _handle_play,
     "summarize":     _handle_summarize,
@@ -485,6 +536,7 @@ _ACTION_MAP = {
     "trending":      _handle_trending,
     "search":        _handle_search,
     "channel_stats": _handle_channel_stats,
+    "download":      _handle_download,
 }
 
 

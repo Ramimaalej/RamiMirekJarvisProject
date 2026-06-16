@@ -230,7 +230,7 @@ def get_location(
 ) -> str:
     """
     Detect the user's real location.
-    Tries GeoClue2 → nmcli WiFi → saved memory → IP (last resort).
+    Tries GeoClue2 → saved memory → nmcli WiFi → IP (last resort).
     Caches the result so subsequent calls are instant.
     Pass force_refresh=True to re-detect.
     """
@@ -261,15 +261,7 @@ def get_location(
         }
         source = "GPS/WiFi"
 
-    # ── Method 2: NetworkManager (nmcli) WiFi BSSID → geolocation API ───────
-    if not data.get("city"):
-        _log("Trying WiFi-based geolocation via nmcli…", player)
-        wifi_data = _nmcli_location()
-        if wifi_data and wifi_data.get("city"):
-            data   = wifi_data
-            source = "WiFi (BSSID lookup)"
-
-    # ── Check memory for user-stated city ───────────────────────────────────
+    # ── Check memory for user-stated city (fastest — skip nmcli if known) ──
     if not data.get("city"):
         try:
             mem = _load_memory()
@@ -289,6 +281,14 @@ def get_location(
                 _log(f"Using saved city from memory: {saved_city}", player)
         except Exception as exc:
             print(f"[Location] Memory check failed: {exc}")
+
+    # ── Method 2: NetworkManager (nmcli) WiFi BSSID → geolocation API ───────
+    if not data.get("city"):
+        _log("Trying WiFi-based geolocation via nmcli…", player)
+        wifi_data = _nmcli_location()
+        if wifi_data and wifi_data.get("city"):
+            data   = wifi_data
+            source = "WiFi (BSSID lookup)"
 
     # ── Method 3: IP fallback ────────────────────────────────────────────────
     if not data.get("city"):

@@ -42,6 +42,16 @@ import requests
 # Avoids splitting on decimals (3.5) because those have no space after the dot.
 _SENT_END = re.compile(r'(?<=[.!?])\s+|(?<=\n)\s*\n')
 
+# ---------------------------------------------------------------------------
+# Config cache — avoids repeated disk reads within the same turn
+# ---------------------------------------------------------------------------
+# _load_config() is called by get_llm_provider(), get_llm_settings(), and
+# get_llm_headers() on every LLM call — potentially 6+ times per turn.
+# A 5-second TTL collapses these into a single JSON parse per turn.
+_CONFIG_CACHE:     dict  = {}
+_CONFIG_CACHE_AT:  float = 0.0
+_CONFIG_TTL:       float = 30.0  # seconds — reduced disk reads per turn
+
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
@@ -53,12 +63,12 @@ CONFIG_PATH = BASE_DIR / "config" / "api_keys.json"
 
 _DEFAULTS = {
     "llm_url":      "http://localhost:11434",
-    "llm_model":    "llama3.2",
+    "llm_model":    "qwen2.5:0.5b",
     "llm_provider": "ollama",
 }
 
 _PROVIDER_DEFAULTS: dict[str, tuple[str, str]] = {
-    "ollama":      ("http://localhost:11434",                  "llama3.2"),
+    "ollama":      ("http://localhost:11434",                  "qwen2.5:0.5b"),
     "openai":      ("http://localhost:1234",                   "llama3.2"),
     "nvidia-nim":  ("https://integrate.api.nvidia.com/v1",    "meta/llama-3.1-8b-instruct"),
     "openrouter":  ("https://openrouter.ai/api/v1",           "openai/gpt-4o-mini"),
@@ -82,10 +92,23 @@ def get_llm_provider() -> str:
 
 
 def _load_config() -> dict:
+    global _CONFIG_CACHE, _CONFIG_CACHE_AT
+    now = time.monotonic()
+    if now - _CONFIG_CACHE_AT < _CONFIG_TTL:
+        return _CONFIG_CACHE
     try:
-        return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        _CONFIG_CACHE    = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        _CONFIG_CACHE_AT = now
     except Exception:
-        return {}
+        pass  # return stale cache on error
+    return _CONFIG_CACHE
+
+
+def invalidate_config_cache() -> None:
+    """Call this immediately after writing a new config file so the next
+    LLM call picks up the changes without waiting for TTL expiry."""
+    global _CONFIG_CACHE_AT
+    _CONFIG_CACHE_AT = 0.0
 
 
 def get_openai_endpoints(url: str) -> tuple[str, str]:
@@ -217,46 +240,34 @@ def warmup_model(system_prompt: str | None = None) -> bool:
     """
     Pre-load the model AND prime Ollama's KV prefix cache.
 
-    Why the system_prompt matters
-    ─────────────────────────────
-    Ollama caches the KV attention state of the prompt prefix across requests.
-    If warmup includes the same system prompt that real requests will use, Ollama
-    evaluates those tokens ONCE at startup.  Every subsequent request only needs
-    to evaluate the small delta (user message ± time context) instead of the full
-    300-500 token system prompt → drops first-token latency from ~17 s to <1 s.
+    Cloud providers (nvidia-nim, openrouter, openai) are always-on in the cloud
+    — there is nothing to "warm up" on our side.  Making an API round-trip just
+    to confirm they are reachable adds 3-30 s of blocking startup time for no
+    benefit.  We skip the warmup call entirely for those providers.
 
-    Pass the *static* part of the system prompt (the JARVIS protocol text, without
-    timestamps or per-minute context) so the prefix stays valid across calls.
+    For Ollama: the warmup sends the full static system prompt so Ollama
+    evaluates and caches its KV state once.  Every real request then only needs
+    to evaluate the small dynamic tail, dropping first-token latency from ~17 s
+    to <1 s.
     """
     url, model = get_llm_settings()
     provider   = get_llm_provider()
     model = ensure_ollama_model(model) if provider == "ollama" else model
-    print(f"[LLM] Warming up '{model}' ({provider})…")
 
+    # ── Cloud providers: skip warmup ──────────────────────────────────────────
+    # nvidia-nim, openrouter and openai host models in the cloud.  Their models
+    # are always loaded; a "warmup" API call would only waste time and quota.
+    if _is_openai_compatible(provider):
+        print(f"[LLM] '{model}' ({provider}) — cloud provider, skipping warmup.")
+        return True
+
+    # ── Ollama only from here ─────────────────────────────────────────────────
+    print(f"[LLM] Warming up '{model}' (ollama) — priming KV cache…")
     messages: list[dict] = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": "hi"})
 
-    if _is_openai_compatible(provider):
-        endpoint, _ = get_openai_endpoints(url)
-        headers = get_llm_headers()
-        payload = {
-            "model":      model,
-            "messages":   messages,
-            "stream":     False,
-            "max_tokens": 1,
-        }
-        try:
-            resp = requests.post(endpoint, json=payload, headers=headers, timeout=180)
-            resp.raise_for_status()
-            print(f"[LLM] '{model}' ready ({provider}).")
-            return True
-        except Exception as e:
-            print(f"[LLM] Warmup failed (non-fatal): {e}")
-            return False
-
-    # ── Ollama ──────────────────────────────────────────────────────────────
     payload = {
         "model":      model,
         "messages":   messages,
@@ -264,7 +275,7 @@ def warmup_model(system_prompt: str | None = None) -> bool:
         "keep_alive": -1,
         # num_gpu:99 → push ALL transformer layers to GPU (Ollama caps at available)
         # This is safe even without a GPU — Ollama silently ignores if n_gpu_layers=0
-        "options":    {"num_predict": 1, "num_gpu": 99},
+        "options":    {"num_predict": 1, "num_gpu": 99, "num_thread": 4},
     }
     try:
         resp = requests.post(f"{url}/api/chat", json=payload, timeout=180)
@@ -274,6 +285,7 @@ def warmup_model(system_prompt: str | None = None) -> bool:
     except Exception as e:
         print(f"[LLM] Warmup failed (non-fatal): {e}")
         return False
+
 
 
 def get_llm_settings() -> tuple[str, str]:
@@ -311,7 +323,7 @@ def call_llm(
             "model":      model,
             "messages":   messages,
             "stream":     False,
-            "max_tokens": 150,
+            "max_tokens": 2048,
         }
         if tools:
             payload["tools"]       = tools
@@ -352,7 +364,7 @@ def call_llm(
         "messages":   messages,
         "stream":     False,
         "keep_alive": -1,
-        "options":    {"num_predict": 150, "num_gpu": 99},
+        "options":    {"num_predict": 100, "num_gpu": 99, "num_thread": 4},
     }
     if tools:
         payload["tools"] = tools
@@ -420,7 +432,7 @@ def call_llm_text(
             "model":      m,
             "messages":   messages,
             "stream":     False,
-            "max_tokens": 600,
+            "max_tokens": 2048,
         }
         try:
             resp = requests.post(endpoint, json=payload, headers=headers, timeout=timeout)
@@ -434,7 +446,7 @@ def call_llm_text(
     m = ensure_ollama_model(m)
     endpoint = f"{url}/api/chat"
 
-    payload = {"model": m, "messages": messages, "stream": False, "keep_alive": -1, "options": {"num_predict": 600}}
+    payload = {"model": m, "messages": messages, "stream": False, "keep_alive": -1, "options": {"num_predict": 300, "num_thread": 4}}
 
     try:
         resp = requests.post(endpoint, json=payload, timeout=timeout)
@@ -476,7 +488,7 @@ def _stream_openai(
         "model":      model,
         "messages":   messages,
         "stream":     True,
-        "max_tokens": 150,
+        "max_tokens": 2048,
     }
     if tools:
         payload["tools"]       = tools
@@ -605,9 +617,7 @@ def call_llm_stream(
         "messages":   messages,
         "stream":     True,
         "keep_alive": -1,
-        # 150 tokens ≈ 100 words ≈ 3-4 sentences — enough for any voice reply.
-        # num_gpu:99 pushes all layers to GPU; num_thread removed (Ollama auto-tunes).
-        "options":    {"num_predict": 150, "num_gpu": 99},
+        "options":    {"num_predict": 100, "num_gpu": 99, "num_thread": 4},
     }
     if tools:
         payload["tools"] = tools

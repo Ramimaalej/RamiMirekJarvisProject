@@ -17,6 +17,9 @@ soundfile
 requests
 python-dotenv
 
+# ── Workflow orchestration ────────────────────────────────────────────────
+prefect>=3.0.0
+
 # ── Web automation & search ───────────────────────────────────────────────
 playwright
 browser-use
@@ -39,10 +42,10 @@ screeninfo
 plaid-python
 zeroconf
 livekit-api
-livekit-rtc
+# livekit-rtc has no Linux wheels — only installable on macOS/Windows
 
 # ── Accessibility (platform-specific) ────────────────────────────────────
-pyatspi ; sys_platform == "linux"
+# pyatspi — install via system package manager if needed: dnf install python3-pyatspi / apt install python3-pyatspi
 pyobjc  ; sys_platform == "darwin"
 UIAutomation ; sys_platform == "win32"
 

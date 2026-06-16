@@ -45,26 +45,28 @@ def _get_macos_wifi_interface() -> str:
         pass
     return "en0" 
 
-def volume_up():
+def volume_up(value: int = 10):
+    pct = f"+{value}%"
     if _OS == "Windows":
-        for _ in range(5): pyautogui.press("volumeup")
+        for _ in range(max(1, value // 2)): pyautogui.press("volumeup")
     elif _OS == "Darwin":
         subprocess.run(["osascript", "-e",
-            "set volume output volume (output volume of (get volume settings) + 10)"],
+            "set volume output volume (output volume of (get volume settings) + " + str(value) + ")"],
             capture_output=True)
     else:
-        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", "+10%"],
+        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", pct],
             capture_output=True)
 
-def volume_down():
+def volume_down(value: int = 10):
+    pct = f"-{value}%"
     if _OS == "Windows":
-        for _ in range(5): pyautogui.press("volumedown")
+        for _ in range(max(1, value // 2)): pyautogui.press("volumedown")
     elif _OS == "Darwin":
         subprocess.run(["osascript", "-e",
-            "set volume output volume (output volume of (get volume settings) - 10)"],
+            "set volume output volume (output volume of (get volume settings) - " + str(value) + ")"],
             capture_output=True)
     else:
-        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", "-10%"],
+        subprocess.run(["pactl", "set-sink-volume", "@DEFAULT_SINK@", pct],
             capture_output=True)
 
 def volume_mute():
@@ -104,6 +106,28 @@ def volume_set(value: int):
             capture_output=True)
         return
 
+def _xrandr_brightness(delta: float):
+    """Adjust screen brightness via xrandr using pure Python (no shell)."""
+    try:
+        out = subprocess.run(["xrandr", "--verbose"], capture_output=True, text=True, timeout=5).stdout
+        for line in out.splitlines():
+            if " connected" in line:
+                output = line.split()[0]
+                break
+        else:
+            return
+        for line in out.splitlines():
+            if "Brightness:" in line:
+                b = float(line.split(":")[1].strip())
+                break
+        else:
+            return
+        new_b = max(0.1, min(1.0, b + delta))
+        subprocess.run(["xrandr", "--output", output, "--brightness", f"{new_b}"],
+                       capture_output=True, timeout=5)
+    except Exception as e:
+        print(f"[Settings] xrandr brightness failed: {e}")
+
 def brightness_up():
     if _OS == "Darwin":
         subprocess.run(["osascript", "-e",
@@ -112,15 +136,9 @@ def brightness_up():
     elif _OS == "Linux":
         if subprocess.run(["which", "brightnessctl"],
                 capture_output=True).returncode == 0:
-            subprocess.run(["brightnessctl", "set", "+10%"], capture_output=True)
+            subprocess.run(["brightnessctl", "set", "10%+"], capture_output=True)
         else:
-            subprocess.run(
-                'xrandr --output $(xrandr | grep " connected" | head -1 | cut -d " " -f1)'
-                ' --brightness $(python3 -c "import subprocess; '
-                'b=float(subprocess.check_output([\"xrandr\",\"--verbose\"]).decode()'
-                '.split(\"Brightness:\")[1].split()[0]); print(min(1.0,b+0.1))")',
-                shell=True, capture_output=True
-            )
+            _xrandr_brightness(0.1)
     else:
         try:
             subprocess.run(
@@ -143,13 +161,7 @@ def brightness_down():
                 capture_output=True).returncode == 0:
             subprocess.run(["brightnessctl", "set", "10%-"], capture_output=True)
         else:
-            subprocess.run(
-                'xrandr --output $(xrandr | grep " connected" | head -1 | cut -d " " -f1)'
-                ' --brightness $(python3 -c "import subprocess; '
-                'b=float(subprocess.check_output([\"xrandr\",\"--verbose\"]).decode()'
-                '.split(\"Brightness:\")[1].split()[0]); print(max(0.1,b-0.1))")',
-                shell=True, capture_output=True
-            )
+            _xrandr_brightness(-0.1)
     else:
         try:
             subprocess.run(
@@ -657,6 +669,62 @@ def wifi_status() -> str:
     return "WiFi status not supported on this OS"
 
 
+def wifi_list() -> str:
+    """List available WiFi networks."""
+    if _OS == "Linux":
+        try:
+            result = subprocess.run(
+                ["nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.returncode != 0 or not result.stdout.strip():
+                return "No WiFi networks found or nmcli not available."
+            lines = result.stdout.strip().split("\n")
+            nets = []
+            for line in lines:
+                parts = line.split(":")
+                if len(parts) >= 3 and parts[0]:
+                    ssid = parts[0]
+                    signal = parts[1] + "%"
+                    sec = parts[2] if parts[2] else "open"
+                    nets.append(f"  {ssid}  ({signal}, {sec})")
+            if not nets:
+                return "No WiFi networks found."
+            return "Available WiFi networks:\n" + "\n".join(nets[:20])
+        except FileNotFoundError:
+            return "WiFi scanning requires nmcli (NetworkManager)."
+        except Exception as e:
+            return f"WiFi scan failed: {e}"
+    elif _OS == "Darwin":
+        try:
+            result = subprocess.run(
+                ["/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport", "-s"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.stdout.strip():
+                lines = result.stdout.strip().split("\n")[1:11]
+                return "Available WiFi networks:\n" + "\n".join(f"  {l}" for l in lines)
+            return "No WiFi networks found."
+        except Exception as e:
+            return f"WiFi scan failed: {e}"
+    elif _OS == "Windows":
+        try:
+            result = subprocess.run(
+                ["netsh", "wlan", "show", "networks"],
+                capture_output=True, text=True, timeout=10
+            )
+            if result.stdout.strip():
+                lines = result.stdout.strip().split("\n")
+                nets = [l.strip() for l in lines if "SSID" in l or l.strip().startswith("SSID")]
+                if not nets:
+                    nets = [l.strip() for l in lines if l.strip() and not l.startswith(" ") and ":" not in l]
+                return "Available WiFi networks:\n" + "\n".join(f"  {n}" for n in nets[:20])
+            return "No WiFi networks found."
+        except Exception as e:
+            return f"WiFi scan failed: {e}"
+    return "WiFi scanning not supported on this OS"
+
+
 def restart_computer():
     if _OS == "Windows":
         subprocess.run(["shutdown", "/r", "/t", "10"], capture_output=True)
@@ -676,6 +744,58 @@ def shutdown_computer():
             capture_output=True)
     else:
         subprocess.run(["systemctl", "poweroff"], capture_output=True)
+
+def check_webcam() -> str:
+    try:
+        import glob as _glob
+        video_devs = _glob.glob("/dev/video*")
+        if not video_devs:
+            return "No webcam detected on this system."
+        in_use = []
+        for dev in video_devs:
+            try:
+                r = subprocess.run(["lsof", dev], capture_output=True, text=True, timeout=5)
+                if r.stdout.strip():
+                    for line in r.stdout.strip().split("\n")[1:]:
+                        parts = line.split()
+                        if len(parts) >= 1:
+                            proc = parts[0]
+                            in_use.append(f"{dev}: {proc}")
+            except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+                pass
+        if in_use:
+            return f"Webcam is in use by:\n" + "\n".join(in_use)
+        return "Webcam is not currently in use by any app."
+    except Exception as e:
+        return f"Could not check webcam status: {e}"
+
+def generate_password(length: int = 16) -> str:
+    """Generate a secure alphanumeric password and copy to clipboard."""
+    import secrets as _secrets
+    import string as _string
+    chars = _string.ascii_letters + _string.digits
+    pw = ''.join(_secrets.choice(chars) for _ in range(length))
+    clipboard_write(pw)
+    return f"{pw}"
+
+
+def run_speedtest() -> str:
+    """Run internet speed test (fast mode) and return ping, download, upload."""
+    try:
+        import speedtest
+        st = speedtest.Speedtest()
+        st.get_servers()
+        st.get_best_server()
+        ping = st.results.ping
+        download = st.download(threads=2) / 1_000_000
+        upload = st.upload(threads=2) / 1_000_000
+        return (
+            f"Ping: {ping:.0f} ms · "
+            f"Download: {download:.1f} Mbps · "
+            f"Upload: {upload:.1f} Mbps"
+        )
+    except Exception as e:
+        return f"Speed test failed: {e}"
 
 ACTION_MAP: dict[str, callable] = {
     "volume_up":           volume_up,
@@ -743,8 +863,19 @@ ACTION_MAP: dict[str, callable] = {
     "battery":             battery_status,
     "battery_status":      battery_status,
     "wifi_status":         wifi_status,
+    "wifi_list":           wifi_list,
+    "list_wifi":           wifi_list,
     "restart":             restart_computer,
     "shutdown":            shutdown_computer,
+    "check_webcam":        check_webcam,
+    "webcam":              check_webcam,
+    "generate_password":   generate_password,
+    "password":            generate_password,
+    "random_data":         generate_password,
+    "random_password":     generate_password,
+    "speedtest":           run_speedtest,
+    "speed_test":          run_speedtest,
+    "internet_speed":      run_speedtest,
 }
 
 _DANGEROUS_ACTIONS = {"restart", "shutdown"}
@@ -895,6 +1026,13 @@ def computer_settings(
     if not action:
         return "No action could be determined."
 
+    # Mic mute detection — catches "mute the microphone" etc.
+    desc_lower = (description or "").lower()
+    if action == "mute" and any(w in desc_lower for w in ("microphone", " mic ")):
+        action = "jarvis_mic"
+    if action == "mute" and desc_lower.startswith("mute the microphone"):
+        action = "jarvis_mic"
+
     print(f"[Settings] Action: {action}  Value: {value}  OS: {_OS}")
     if player:
         player.write_log(f"[Settings] {action}")
@@ -978,12 +1116,35 @@ def computer_settings(
     if action == "wifi_status":
         return wifi_status()
 
+    if action == "jarvis_mic":
+        if player and hasattr(player, '_win') and hasattr(player._win, '_toggle_mute'):
+            try:
+                player._win._toggle_mute()
+            except Exception:
+                pass
+            muted = getattr(player._win, '_muted', False)
+            return f"Microphone {'muted' if muted else 'unmuted'}."
+        return "Mic control not available."
+
+    if action in ("speedtest", "speed_test", "internet_speed"):
+        if player:
+            player.write_log("[Speedtest] Running…")
+        return run_speedtest()
+
+    if action in ("generate_password", "password", "random_data", "random_password"):
+        length = int(value or params.get("length", 16))
+        pw = generate_password(length)
+        return f"Password generated and copied to clipboard: {pw}"
+
     func = ACTION_MAP.get(action)
     if not func:
         return f"Unknown action: '{raw_action}'."
 
     try:
-        func()
+        if action in ("volume_up", "volume_down") and value is not None:
+            func(int(value))
+        else:
+            func()
         return f"Done: {action}."
     except Exception as e:
         print(f"[Settings] Action failed ({action}): {e}")

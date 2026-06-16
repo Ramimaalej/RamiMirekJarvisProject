@@ -15,6 +15,12 @@ BASE_DIR = get_base_dir()
 VEC_PATH = BASE_DIR / "memory" / "vector_store.json"
 _lock = threading.Lock()
 
+# ── In-process vector-store cache ───────────────────────────────────────────────
+# _load_store() is called for every search AND every write.  Caching by file
+# mtime means repeated reads within the same turn hit RAM instead of disk.
+_store_cache: dict = {"memories": [], "conversations": []}
+_store_mtime: float = 0.0
+
 def _get_config():
     cfg_path = BASE_DIR / "config" / "api_keys.json"
     try:
@@ -33,7 +39,7 @@ def _get_provider() -> str:
         return "openai"
     return "ollama"
 
-def _get_embedding_url() -> str:
+def _get_embedding_url():
     cfg = _get_config()
     url = cfg.get("llm_url", "http://localhost:11434").rstrip("/")
     provider = _get_provider()
@@ -41,6 +47,8 @@ def _get_embedding_url() -> str:
         return cfg["embed_url"].rstrip("/")
     if provider == "ollama":
         return f"{url}/api/embeddings"
+    if provider == "nvidia-nim":
+        return None
     if "/v1" in url:
         return f"{url}/embeddings"
     return f"{url}/v1/embeddings"
@@ -56,6 +64,7 @@ _OPENAI_EMBED_MODELS = {
 
 _embed_cache: dict[str, list[float]] = {}
 _embed_warned: set[str] = set()
+_embeddings_disabled: bool = False
 
 def _get_embed_headers() -> dict:
     cfg = _get_config()
@@ -65,10 +74,21 @@ def _get_embed_headers() -> dict:
     return {"Content-Type": "application/json"}
 
 def _embed(text: str) -> list[float]:
+    global _embeddings_disabled
+    if _embeddings_disabled:
+        return []
+
     provider = _get_provider()
     cfg = _get_config()
     embed_url = _get_embedding_url()
     headers = _get_embed_headers()
+
+    if embed_url is None:
+        key = (provider, "none")
+        if key not in _embed_warned:
+            print(f"[VectorMemory] No embedding endpoint available for '{provider}'. Set 'embed_url' and 'embed_model' in config/api_keys.json to enable vector memory.")
+            _embed_warned.add(key)
+        return []
 
     # Allow explicit override in config
     embed_model = cfg.get("embed_model") or _OPENAI_EMBED_MODELS.get(provider, "text-embedding-ada-002")
@@ -81,7 +101,7 @@ def _embed(text: str) -> list[float]:
             "input": text[:1000],
         }
     try:
-        resp = requests.post(embed_url, json=payload, headers=headers, timeout=30)
+        resp = requests.post(embed_url, json=payload, headers=headers, timeout=3.0)
         resp.raise_for_status()
         data = resp.json()
         if provider == "ollama":
@@ -91,11 +111,14 @@ def _embed(text: str) -> list[float]:
         key = (provider, embed_url)
         if key not in _embed_warned:
             print(f"[VectorMemory] Embedding API not available ({provider} @ {embed_url}): {e.response.status_code}")
-            print(f"[VectorMemory] Set 'embed_url' and 'embed_model' in api_keys.json to use a working embedding endpoint.")
+            print(f"[VectorMemory] Disabling embeddings for this session to prevent response lag.")
             _embed_warned.add(key)
+        _embeddings_disabled = True
         return []
     except Exception as e:
         print(f"[VectorMemory] Embedding failed ({provider} @ {embed_url}): {e}")
+        print(f"[VectorMemory] Disabling embeddings for this session to prevent response lag.")
+        _embeddings_disabled = True
         return []
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -107,16 +130,29 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
     return float(np.dot(a, b) / norm)
 
 def _load_store() -> dict:
+    global _store_cache, _store_mtime
     if not VEC_PATH.exists():
         return {"memories": [], "conversations": []}
     try:
-        return json.loads(VEC_PATH.read_text(encoding="utf-8"))
+        mtime = VEC_PATH.stat().st_mtime
+        if mtime == _store_mtime:
+            return _store_cache          # cache hit
+        data = json.loads(VEC_PATH.read_text(encoding="utf-8"))
+        _store_cache = data
+        _store_mtime = mtime
+        return _store_cache
     except Exception:
         return {"memories": [], "conversations": []}
+
+def _invalidate_store_cache() -> None:
+    """Force the next _load_store() to re-read from disk."""
+    global _store_mtime
+    _store_mtime = 0.0
 
 def _save_store(store: dict) -> None:
     VEC_PATH.parent.mkdir(parents=True, exist_ok=True)
     VEC_PATH.write_text(json.dumps(store, indent=2, ensure_ascii=False), encoding="utf-8")
+    _invalidate_store_cache()  # next read must re-stat the file
 
 def store_memory(text: str, category: str = "general", source: str = "conversation") -> bool:
     emb = _embed(text)

@@ -104,17 +104,30 @@ def _play_audio_bytes(audio_bytes: bytes) -> None:
 # ---------------------------------------------------------------------------
 
 class EdgeTTSEngine:
-    """Microsoft EdgeTTS – free, requires internet."""
+    """Microsoft EdgeTTS – free, requires internet.
+    Reuses a single event loop for all requests to avoid per-call overhead.
+    """
 
     def __init__(self, voice: str = "en-US-GuyNeural"):
         self.voice = voice
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._lock = threading.Lock()
+
+    def _get_loop(self) -> asyncio.AbstractEventLoop:
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+        return self._loop
 
     def speak(self, text: str) -> None:
-        loop = asyncio.new_event_loop()
-        try:
-            audio_bytes = loop.run_until_complete(self._synth(text))
-        finally:
-            loop.close()
+        with self._lock:
+            loop = self._get_loop()
+            try:
+                audio_bytes = loop.run_until_complete(self._synth(text))
+            except RuntimeError:
+                loop.close()
+                self._loop = asyncio.new_event_loop()
+                loop = self._loop
+                audio_bytes = loop.run_until_complete(self._synth(text))
         if audio_bytes:
             _play_audio_bytes(audio_bytes)
 

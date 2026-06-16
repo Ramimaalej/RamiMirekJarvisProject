@@ -14,13 +14,17 @@ import requests
 from pathlib import Path
 from typing import Optional
 
-from playwright.async_api import (
-    async_playwright,
-    BrowserContext,
-    Page,
-    Playwright,
-    TimeoutError as PlaywrightTimeout,
-)
+try:
+    from playwright.async_api import (
+        async_playwright,
+        BrowserContext,
+        Page,
+        Playwright,
+        TimeoutError as PlaywrightTimeout,
+    )
+    _PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    _PLAYWRIGHT_AVAILABLE = False
 _OS = platform.system()   # "Windows" | "Darwin" | "Linux"
 
 def _normalize_url(url: str) -> str:
@@ -856,7 +860,7 @@ def _open_native(url: str) -> bool:
         elif platform.system() == "Darwin":
             subprocess.Popen(["open", url])
         else:
-            subprocess.Popen(["start", url], shell=True)
+            subprocess.Popen(["start", url])
         return True
     except Exception:
         return False
@@ -868,6 +872,8 @@ def browser_control(
     player=None,
     session_memory=None,
 ) -> str:
+    if not _PLAYWRIGHT_AVAILABLE:
+        return "Browser control requires playwright — install it with: pip install playwright && playwright install chromium"
     params  = parameters or {}
     action  = params.get("action", "").lower().strip()
     browser = params.get("browser", "").lower().strip() or None

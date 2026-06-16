@@ -78,6 +78,38 @@ def maps_action(parameters: dict | None = None, player=None) -> str:
             return maps_action({"action": "distance", "origin": parts[0].strip(), "destination": parts[1].strip()}, player)
         return 'Usage: "distance from A to B"'
 
+    if action == "timezone" and query:
+        result = _geocode(query)
+        if not result:
+            return f"Could not find: {query}"
+        lat, lon = result["lat"], result["lon"]
+        try:
+            tz_resp = requests.get(
+                "https://timeapi.io/api/TimeZone/coordinate",
+                params={"latitude": lat, "longitude": lon},
+                timeout=_GEO_TIMEOUT,
+            )
+            if tz_resp.status_code != 200:
+                return f"Could not determine timezone for {query}."
+            tz_data = tz_resp.json()
+            tz_name = tz_data.get("timeZone", "?")
+            offset = tz_data.get("standardUtcOffset", "?")
+
+            time_resp = requests.get(
+                "https://timeapi.io/api/Time/current/zone",
+                params={"timeZone": tz_name},
+                timeout=_GEO_TIMEOUT,
+            )
+            if time_resp.status_code == 200:
+                time_data = time_resp.json()
+                local_time = time_data.get("dateTime", time_data.get("currentLocalTime", ""))
+                if local_time:
+                    return f"{query} is in {tz_name} (UTC{offset}). Current time: {local_time}."
+
+            return f"{query} is in {tz_name} (UTC{offset})."
+        except Exception as e:
+            return f"Could not determine timezone for {query}: {e}"
+
     if action == "coords" and query:
         result = _geocode(query)
         if not result:

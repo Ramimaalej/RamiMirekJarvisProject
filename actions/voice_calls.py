@@ -27,8 +27,8 @@ class LiveKitClient:
     def create_room(self, room_name: str) -> dict[str, Any]:
         try:
             from livekit import api
-        except ImportError:
-            raise ImportError("livekit not installed — pip install livekit-api")
+        except ImportError as exc:
+            raise ValueError("LiveKit support is missing — install livekit-api") from exc
 
         self._check_config()
         lkapi = api.LiveKitAPI(
@@ -50,8 +50,8 @@ class LiveKitClient:
     def list_rooms(self) -> list[dict[str, Any]]:
         try:
             from livekit import api
-        except ImportError:
-            raise ImportError("livekit not installed")
+        except ImportError as exc:
+            raise ValueError("LiveKit support is missing — install livekit-api") from exc
 
         self._check_config()
         lkapi = api.LiveKitAPI(
@@ -78,8 +78,8 @@ class LiveKitClient:
     ) -> str:
         try:
             from livekit import api
-        except ImportError:
-            raise ImportError("livekit not installed")
+        except ImportError as exc:
+            raise ValueError("LiveKit support is missing — install livekit-api") from exc
 
         self._check_config()
         at = api.AccessToken(self._api_key, self._secret)
@@ -100,10 +100,8 @@ class LiveKitClient:
     ) -> dict[str, Any]:
         try:
             from livekit.rtc import Room, RoomEvent, AudioSource, AudioFrame
-        except ImportError:
-            raise ImportError(
-                "livekit-rtc not installed — pip install livekit-rtc"
-            )
+        except ImportError as exc:
+            raise ValueError("LiveKit RTC support is missing — install livekit-rtc") from exc
 
         token = self.generate_token(identity=identity, room_name=room_name)
         room = Room()

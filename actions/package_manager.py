@@ -66,10 +66,10 @@ def _detect_manager(preferred: str) -> str:
 
 def _which(cmd: str) -> bool:
     try:
-        subprocess.run(["which", cmd] if platform.system() != "Windows"
-                       else ["where", cmd],
-                       capture_output=True, timeout=5)
-        return True
+        proc = subprocess.run(["which", cmd] if platform.system() != "Windows"
+                              else ["where", cmd],
+                              capture_output=True, timeout=5)
+        return proc.returncode == 0
     except Exception:
         return False
 

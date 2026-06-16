@@ -2,12 +2,14 @@
 import io
 import json
 import re
-import string
+import shlex
 import subprocess
-import sys
+import threading
 import time
-import random
+import traceback
 from pathlib import Path
+
+from core.safe_math import safe_math
 
 from actions.file_controller import open_folder as _open_folder
 
@@ -192,8 +194,7 @@ def _calculate(text: str) -> str:
             result = val * pct / 100
             return f"{pct}% of {val} = {result}"
         # Pure math
-        s_safe = s.replace(" ", "").replace("^", "**")
-        result = eval(s_safe, {"__builtins__": {}}, {})
+        result = safe_math(s)
         return f"{s} = {result}"
     except Exception:
         return text
@@ -269,11 +270,13 @@ def _screenshot(save_path: str | None = None) -> str:
 
 def _run_command(command: str, timeout: int = 60, workdir: str | None = None) -> str:
     """Run an arbitrary shell command."""
+    if command.strip().startswith("history"):
+        return "Command rejected: 'history' is a shell builtin and cannot run as a subprocess. Use your own memory or conversation history instead."
     try:
         cwd = Path(workdir).expanduser().resolve() if workdir else None
+        cmd_list = shlex.split(command)
         result = subprocess.run(
-            command,
-            shell=True,
+            cmd_list,
             capture_output=True,
             timeout=timeout,
             cwd=cwd,

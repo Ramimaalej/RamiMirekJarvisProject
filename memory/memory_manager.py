@@ -1,4 +1,5 @@
 import json
+import time as _time
 from datetime import datetime
 from threading import Lock
 from pathlib import Path
@@ -17,6 +18,11 @@ _lock            = Lock()
 MAX_VALUE_LENGTH = 380
 MEMORY_MAX_CHARS = 2200
 
+# ── In-memory cache to avoid disk reads every turn ──────────────────────
+_MEMORY_CACHE:     dict  = {}
+_MEMORY_CACHE_AT:  float = 0.0
+_MEMORY_CACHE_TTL: float = 2.0
+
 def _empty_memory() -> dict:
     return {
         "identity":      {},
@@ -28,6 +34,10 @@ def _empty_memory() -> dict:
     }
 
 def load_memory() -> dict:
+    global _MEMORY_CACHE_AT, _MEMORY_CACHE
+    now = _time.monotonic()
+    if now - _MEMORY_CACHE_AT < _MEMORY_CACHE_TTL and _MEMORY_CACHE:
+        return _MEMORY_CACHE
     if not MEMORY_PATH.exists():
         return _empty_memory()
     with _lock:
@@ -38,6 +48,9 @@ def load_memory() -> dict:
                 for key in base:
                     if key not in data:
                         data[key] = {}
+                _MEMORY_CACHE.clear()
+                _MEMORY_CACHE.update(data)
+                _MEMORY_CACHE_AT = now
                 return data
             return _empty_memory()
         except Exception as e:
@@ -77,6 +90,9 @@ def save_memory(memory: dict) -> None:
             json.dumps(memory, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+    # Invalidate cache so next load picks up the fresh data
+    global _MEMORY_CACHE_AT
+    _MEMORY_CACHE_AT = 0.0
 
 
 def _truncate_value(val: str) -> str:
