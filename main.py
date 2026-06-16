@@ -2222,10 +2222,11 @@ class JarvisLocal:
                 self.ui.write_log("SYS: Shutdown requested.")
 
                 def _shutdown():
-                    import time, os
+                    import time
                     self.speak("Goodbye.")
                     time.sleep(2.5)
-                    os._exit(0)
+                    from PyQt6.QtWidgets import QApplication
+                    QApplication.instance().quit()
 
                 threading.Thread(target=_shutdown, daemon=True).start()
                 return "Shutting down."

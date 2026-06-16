@@ -714,7 +714,8 @@ class HeadlessJarvis:
                 return "\n".join(lines)
             elif name == "shutdown_jarvis":
                 self.log("Shutdown requested via phone.")
-                threading.Thread(target=lambda: os._exit(0), daemon=True).start()
+                import signal
+                os.kill(os.getpid(), signal.SIGTERM)
                 return "Shutting down."
             else:
                 return f"Unknown tool: {name}"
