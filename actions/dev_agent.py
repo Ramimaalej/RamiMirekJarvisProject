@@ -16,7 +16,7 @@ BASE_DIR         = get_base_dir()
 PROJECTS_DIR     = Path.home() / "Desktop" / "JarvisProjects"
 MAX_FIX_ATTEMPTS = 5
 
-from core.llm_client import call_llm_text as _llm
+from core.llm_client import call_llm_text_smart as _llm
 
 
 def _strip_fences(text: str) -> str:

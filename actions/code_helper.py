@@ -15,7 +15,7 @@ BASE_DIR           = get_base_dir()
 DESKTOP            = Path.home() / "Desktop"
 MAX_BUILD_ATTEMPTS = 3
 
-from core.llm_client import call_llm_text as _llm
+from core.llm_client import call_llm_text_smart as _llm, resolve_llm_url
 
 
 def _clean_code(text: str) -> str:
@@ -396,6 +396,8 @@ def _screen_debug_action(description, file_path, player, speak=None) -> str:
             cfg = _json.loads(cfg_file.read_text(encoding="utf-8"))
         except Exception:
             pass
+        if cfg.get("llm_url_local") or cfg.get("llm_url_remote"):
+            cfg["llm_url"] = resolve_llm_url(cfg)
 
         ollama_url    = cfg.get("llm_url", "http://localhost:11434").rstrip("/")
         vision_model  = cfg.get("vision_model") or cfg.get("llm_model", "llava")

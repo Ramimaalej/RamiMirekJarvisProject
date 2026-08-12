@@ -1,0 +1,1613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS Test Matrix</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-primary: #0a0e17;
+  --bg-secondary: #0f1522;
+  --bg-card: #131b2e;
+  --bg-card-hover: #182240;
+  --text-primary: #d6e0f0;
+  --text-secondary: #7a8aa8;
+  --text-dim: #3d4a66;
+  --amber: #f0b429;
+  --amber-glow: rgba(240, 180, 41, 0.15);
+  --cyan: #22d3ee;
+  --cyan-glow: rgba(34, 211, 238, 0.12);
+  --green: #34d399;
+  --red: #f87171;
+  --purple: #a78bfa;
+  --pink: #f472b6;
+  --orange: #fb923c;
+  --blue: #60a5fa;
+  --border: rgba(240, 180, 41, 0.08);
+  --font-display: 'JetBrains Mono', monospace;
+  --font-body: 'IBM Plex Mono', monospace;
+}
+
+::selection { background: var(--amber); color: var(--bg-primary); }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  line-height: 1.6;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* CRT scanline overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(
+    transparent 50%,
+    rgba(10, 14, 23, 0.15) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 9998;
+  animation: scanlines 8s linear infinite;
+}
+
+@keyframes scanlines {
+  0% { background-position: 0 0; }
+  100% { background-position: 0 4px; }
+}
+
+/* ── Header ── */
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 14, 23, 0.92);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+header h1 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--amber), var(--cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.header-stats span {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--font-display);
+}
+
+.header-stats .count-checked { color: var(--cyan); border-color: rgba(34, 211, 238, 0.2); }
+.header-stats .count-total { border-color: rgba(240, 180, 41, 0.2); }
+
+.search-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 14px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  width: 220px;
+  outline: none;
+  transition: border-color 0.3s;
+}
+.search-box:focus { border-color: var(--amber); }
+.search-box::placeholder { color: var(--text-dim); }
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.header-actions button {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.header-actions button:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: var(--amber-glow);
+}
+
+/* ── Layout ── */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px 32px 80px;
+}
+
+/* ── Category nav ── */
+.category-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 32px;
+  padding: 16px 20px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.category-nav a {
+  text-decoration: none;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.category-nav a:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+/* ── Category Section ── */
+.category {
+  margin-bottom: 40px;
+  opacity: 0;
+  animation: fadeUp 0.6s ease forwards;
+}
+
+.category:nth-child(2) { animation-delay: 0.05s; }
+.category:nth-child(3) { animation-delay: 0.1s; }
+.category:nth-child(4) { animation-delay: 0.15s; }
+.category:nth-child(5) { animation-delay: 0.2s; }
+.category:nth-child(6) { animation-delay: 0.25s; }
+.category:nth-child(7) { animation-delay: 0.3s; }
+.category:nth-child(8) { animation-delay: 0.35s; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.category-header h2 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+
+.category-count {
+  font-size: 11px;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+}
+
+.category-badge {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Questions Grid ── */
+.questions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 6px;
+}
+
+.question-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.question-item:hover {
+  background: var(--bg-card-hover);
+  border-color: rgba(240, 180, 41, 0.12);
+}
+
+.question-item.checked {
+  border-color: rgba(34, 211, 238, 0.2);
+  background: rgba(34, 211, 238, 0.04);
+}
+
+.question-item input[type="checkbox"] {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--text-dim);
+  border-radius: 3px;
+  flex-shrink: 0;
+  margin-top: 3px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.question-item input[type="checkbox"]:checked {
+  background: var(--cyan);
+  border-color: var(--cyan);
+}
+
+.question-item input[type="checkbox"]:checked::after {
+  content: '✓';
+  position: absolute;
+  inset: -1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bg-primary);
+}
+
+.question-text {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.question-item.checked .question-text {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  text-decoration-color: rgba(34, 211, 238, 0.3);
+}
+
+.question-tag {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--font-display);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-top: 2px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-dim);
+}
+
+.no-results {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+/* ── Progress bar ── */
+.progress-container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: 3px;
+  background: var(--bg-secondary);
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--amber), var(--cyan));
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* ── Export Modal ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(8px);
+  z-index: 200;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal h3 {
+  font-family: var(--font-display);
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--amber);
+}
+
+.modal textarea {
+  flex: 1;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 12px;
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  resize: none;
+  min-height: 200px;
+}
+
+.modal textarea:focus { outline: none; border-color: var(--amber); }
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  justify-content: flex-end;
+}
+
+.modal-actions button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  transition: all 0.2s;
+}
+
+.modal-actions button:hover { border-color: var(--amber); color: var(--amber); }
+.modal-actions .btn-primary { background: var(--amber); color: var(--bg-primary); border-color: var(--amber); }
+.modal-actions .btn-primary:hover { background: #d4a028; }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  header { padding: 12px 16px; flex-direction: column; align-items: stretch; }
+  .search-box { width: 100%; }
+  .header-stats { justify-content: center; }
+  .container { padding: 16px; }
+  .questions-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>JARVIS Test Matrix</h1>
+  <div class="header-stats">
+    <span class="count-checked" id="checkedCount">0</span>
+    <span class="count-total" id="totalCount">0</span>
+  </div>
+  <input type="text" class="search-box" id="searchBox" placeholder="filter questions…" oninput="filterQuestions()">
+  <div class="header-actions">
+    <button onclick="clearChecked()">Reset</button>
+    <button onclick="exportChecked()">Export</button>
+  </div>
+</header>
+
+<div class="container" id="app"></div>
+
+<div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <h3>Exported Questions</h3>
+    <textarea id="exportText" readonly></textarea>
+    <div class="modal-actions">
+      <button onclick="copyExport()">Copy</button>
+      <button class="btn-primary" onclick="closeExport()">Done</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  { cat: "System & Computer", tag: "open_app", q: "Open Chrome browser" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch Firefox" },
+  { cat: "System & Computer", tag: "open_app", q: "Open WhatsApp" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch Spotify" },
+  { cat: "System & Computer", tag: "open_app", q: "Open calculator" },
+  { cat: "System & Computer", tag: "open_app", q: "Open VS Code" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch Telegram" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Discord" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Slack" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch Zoom" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Teams" },
+  { cat: "System & Computer", tag: "open_app", q: "Open terminal" },
+  { cat: "System & Computer", tag: "open_app", q: "Open file explorer" },
+  { cat: "System & Computer", tag: "open_app", q: "Open settings" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Notion" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch Steam" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Figma" },
+  { cat: "System & Computer", tag: "open_app", q: "Open TradingView XAUUSD 1m chart" },
+  { cat: "System & Computer", tag: "open_app", q: "Open downloads folder" },
+  { cat: "System & Computer", tag: "open_app", q: "Open documents folder" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Increase volume to 70%" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Mute the sound" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Set brightness to 50%" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Lock my computer" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Take a screenshot" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Restart the computer" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Shut down the PC" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Enable dark mode" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Toggle WiFi on/off" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Check WiFi status" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Check battery status" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Send a desktop notification" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Read clipboard content" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Write to clipboard" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Run a speed test" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Put display to sleep" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Open system settings" },
+  { cat: "System & Computer", tag: "computer_control", q: "Click at coordinates 500, 300" },
+  { cat: "System & Computer", tag: "computer_control", q: "Right-click on screen" },
+  { cat: "System & Computer", tag: "computer_control", q: "Double-click the icon" },
+  { cat: "System & Computer", tag: "computer_control", q: "Press Ctrl+C" },
+  { cat: "System & Computer", tag: "computer_control", q: "Type 'hello world' on the screen" },
+  { cat: "System & Computer", tag: "computer_control", q: "Scroll down" },
+  { cat: "System & Computer", tag: "computer_control", q: "Move mouse to position 100, 200" },
+  { cat: "System & Computer", tag: "computer_control", q: "Focus the browser window" },
+  { cat: "System & Computer", tag: "computer_control", q: "Press Escape key" },
+  { cat: "System & Computer", tag: "computer_control", q: "Wait 5 seconds" },
+  { cat: "System & Computer", tag: "computer_control", q: "List running processes" },
+  { cat: "System & Computer", tag: "computer_control", q: "What apps are currently running?" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'ls -la' in terminal" },
+  { cat: "System & Computer", tag: "run_command", q: "Check disk space with df -h" },
+  { cat: "System & Computer", tag: "run_command", q: "Show system info with uname -a" },
+  { cat: "System & Computer", tag: "run_command", q: "Check memory usage" },
+  { cat: "System & Computer", tag: "run_command", q: "Install a package with pip" },
+  { cat: "System & Computer", tag: "run_command", q: "Run a git status check" },
+  { cat: "System & Computer", tag: "run_command", q: "Execute a shell script" },
+  { cat: "System & Computer", tag: "run_command", q: "Show network connections with netstat" },
+  { cat: "System & Computer", tag: "run_python", q: "Calculate 2+2 using Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Run a Python script to sort a list" },
+  { cat: "System & Computer", tag: "run_python", q: "Analyze data with pandas in Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Test a Python code snippet" },
+  { cat: "System & Computer", tag: "desktop", q: "Change my desktop wallpaper" },
+  { cat: "System & Computer", tag: "desktop", q: "Set wallpaper from a URL" },
+  { cat: "System & Computer", tag: "desktop", q: "Organize my desktop by file type" },
+  { cat: "System & Computer", tag: "desktop", q: "Clean up my desktop" },
+  { cat: "System & Computer", tag: "desktop", q: "List all files on desktop" },
+  { cat: "System & Computer", tag: "desktop", q: "Show desktop stats" },
+  { cat: "System & Computer", tag: "datetime", q: "What time is it?" },
+  { cat: "System & Computer", tag: "datetime", q: "What is today's date?" },
+  { cat: "System & Computer", tag: "datetime", q: "What day of the week is it?" },
+  { cat: "System & Computer", tag: "datetime", q: "Give me the current Unix timestamp" },
+  { cat: "System & Computer", tag: "location", q: "Where am I right now?" },
+  { cat: "System & Computer", tag: "location", q: "What is my current location?" },
+  { cat: "System & Computer", tag: "location", q: "Detect my city" },
+  { cat: "System & Computer", tag: "location", q: "What country am I in?" },
+  { cat: "System & Computer", tag: "package_manager", q: "Install a new package" },
+  { cat: "System & Computer", tag: "package_manager", q: "Uninstall a package" },
+  { cat: "System & Computer", tag: "package_manager", q: "List all installed packages" },
+  { cat: "System & Computer", tag: "package_manager", q: "Update all packages" },
+  { cat: "System & Computer", tag: "package_manager", q: "Detect my OS package manager" },
+  { cat: "System & Computer", tag: "shutdown", q: "Goodbye Jarvis" },
+  { cat: "System & Computer", tag: "shutdown", q: "Shut yourself down" },
+  { cat: "System & Computer", tag: "shutdown", q: "I'm done, see you later" },
+  { cat: "System & Computer", tag: "shutdown", q: "Close the assistant" },
+  { cat: "Files & Storage", tag: "file_controller", q: "List files in the current directory" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Create a new file called notes.txt" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Create a new folder called Projects" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Delete the file old_report.docx" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Move file.txt to the Documents folder" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Copy config.json to backup.json" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Rename draft.txt to final.txt" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Read the content of README.md" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Write 'Hello World' to test.txt" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Find all PDF files on my desktop" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Find my resume file" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Show me the largest files" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Show disk usage" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Compress my folder into a zip archive" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Extract the archive.tar.gz" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Download a file from a URL" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Edit config.json and change a value" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Get info about a specific file" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Organize my desktop by file type" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Convert this image to PNG" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Resize image to 800x600" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Extract text from this PDF" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Compress this video file" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Convert DOCX to PDF" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Filter CSV data by column value" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Sort this CSV by date column" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Extract audio from this video" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Extract a frame from video at 1:30" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Parse this JSON file" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Analyze this code file" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Trim video from 0:30 to 1:00" },
+  { cat: "Files & Storage", tag: "search_files", q: "Search for files named 'budget'" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find all .py files in the project" },
+  { cat: "Files & Storage", tag: "search_files", q: "Search for documents created today" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find large files over 100MB" },
+  { cat: "Files & Storage", tag: "vault", q: "Store a secret password in my vault" },
+  { cat: "Files & Storage", tag: "vault", q: "Get my stored API key" },
+  { cat: "Files & Storage", tag: "vault", q: "List all my stored secrets" },
+  { cat: "Files & Storage", tag: "vault", q: "Delete a stored secret" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search the web for latest AI news" },
+  { cat: "Browser & Web", tag: "web_search", q: "What is the capital of France?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Who won the Nobel Prize in 2024?" },
+  { cat: "Browser & Web", tag: "web_search", q: "What is the bitcoin price right now?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Weather in London today" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search for python tutorials" },
+  { cat: "Browser & Web", tag: "web_search", q: "Compare iPhone and Samsung Galaxy specs" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find the best restaurants in my area" },
+  { cat: "Browser & Web", tag: "web_search", q: "What is the population of Japan?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Who is the current president of the US?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search for cheap flights to Paris" },
+  { cat: "Browser & Web", tag: "web_search", q: "What movies are playing this week?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Look up the definition of 'serendipity'" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find a recipe for chocolate cake" },
+  { cat: "Browser & Web", tag: "web_search", q: "What is the exchange rate USD to EUR?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search for job openings in data science" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find scientific papers on quantum computing" },
+  { cat: "Browser & Web", tag: "web_search", q: "What happened today in history?" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Go to YouTube" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open google.com" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Search 'python tutorials' on YouTube" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Click the sign-in button" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Type 'openai' in the search box" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Scroll down the page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Go back to the previous page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Refresh the current page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open a new tab" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Close the current tab" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Switch to the next tab" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Fill this form with random data" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Auto-fill the registration form" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Get the current page URL" },
+  { cat: "Browser & Web", tag: "browser_control", q: "List all open browsers" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Close the browser" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open TradingView XAUUSD chart" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Search on DuckDuckGo" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open incognito mode" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Log into my email account and check for new messages" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Scrape product prices from Amazon and save to a file" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Fill out a web form and submit it" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Search for hotels in Paris and compare prices" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Book an appointment on the website" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Order food delivery from the website" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Extract data from multiple pages" },
+  { cat: "Communication", tag: "send_message", q: "Send a WhatsApp message to John saying I'll be late" },
+  { cat: "Communication", tag: "send_message", q: "Text mom that dinner is ready via WhatsApp" },
+  { cat: "Communication", tag: "send_message", q: "Send a Telegram message to the group chat" },
+  { cat: "Communication", tag: "send_message", q: "Message Sarah on WhatsApp: 'See you at 8'" },
+  { cat: "Communication", tag: "voice_calls", q: "Call John using LiveKit" },
+  { cat: "Communication", tag: "voice_calls", q: "Make a voice call to Mom" },
+  { cat: "Communication", tag: "voice_calls", q: "Start a voice call with the team" },
+  { cat: "Communication", tag: "federation", q: "Sync this memory across all instances" },
+  { cat: "Communication", tag: "federation", q: "Share this context with other Jarvis instances" },
+  { cat: "Communication", tag: "federation", q: "Distribute this information across the network" },
+  { cat: "Communication", tag: "context_bus", q: "Get the current context from the bus" },
+  { cat: "Communication", tag: "context_bus", q: "Share my current context with another app" },
+  { cat: "Communication", tag: "context_bus", q: "Get all available context data" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Read my unread emails" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Check my Gmail inbox" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Search my emails for 'invoice'" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Find emails from my boss" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Send an email to john@email.com about the project" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Reply to the latest email" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Compose a new email to Sarah" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Search for emails with 'meeting' in subject" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Show me my latest 5 emails" },
+  { cat: "Email & Calendar", tag: "calendar", q: "What's on my calendar today?" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Show my agenda for this week" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Create a new event tomorrow at 3pm" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Schedule a meeting called 'Review' for Friday" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Delete the event with ID abc123" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Create a Google Meet for Monday at 10am" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Schedule a video call with the team" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Add a Google Meet link to the event" },
+  { cat: "Email & Calendar", tag: "drive", q: "Search my Google Drive for Q1 report" },
+  { cat: "Email & Calendar", tag: "drive", q: "Upload a file to Google Drive" },
+  { cat: "Email & Calendar", tag: "drive", q: "Create a new Google Doc called 'Meeting Notes'" },
+  { cat: "Email & Calendar", tag: "drive", q: "Find files shared with me" },
+  { cat: "Email & Calendar", tag: "meet", q: "Create a Google Meet meeting" },
+  { cat: "Email & Calendar", tag: "meet", q: "Schedule a video call for tomorrow at 2pm" },
+  { cat: "Email & Calendar", tag: "meet", q: "Create a meeting called 'Sprint Planning'" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Play lofi music on YouTube" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Search for 'python tutorial' on YouTube" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Summarize this YouTube video" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Get info about this video" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Show trending videos in the US" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Search for meditation music" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Get channel stats for a YouTuber" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Download this video as MP4" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Download audio from this video as MP3" },
+  { cat: "YouTube & Media", tag: "screen", q: "What is on my screen?" },
+  { cat: "YouTube & Media", tag: "screen", q: "What do you see on my screen?" },
+  { cat: "YouTube & Media", tag: "screen", q: "Analyze my screen and tell me what's open" },
+  { cat: "YouTube & Media", tag: "screen", q: "Look at my camera" },
+  { cat: "YouTube & Media", tag: "screen", q: "What's in front of my webcam?" },
+  { cat: "YouTube & Media", tag: "screen", q: "Take a picture from my camera" },
+  { cat: "YouTube & Media", tag: "screen", q: "Explain what you see on screen" },
+  { cat: "YouTube & Media", tag: "screen", q: "Read the content of the active window" },
+  { cat: "YouTube & Media", tag: "screen", q: "What's the current window?" },
+  { cat: "YouTube & Media", tag: "screen", q: "Get the UI elements on screen" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Generate an image of a sunset over mountains" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Create a picture of a dragon robot" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Draw a futuristic city skyline" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Generate an image of a cat wearing a hat" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Create a logo for my startup" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Generate a picture of a spaceship" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Create an image without violence" },
+  { cat: "YouTube & Media", tag: "face_recognition", q: "Detect faces in this image" },
+  { cat: "YouTube & Media", tag: "face_recognition", q: "Analyze the camera feed for faces" },
+  { cat: "YouTube & Media", tag: "face_recognition", q: "How many people are in this picture?" },
+  { cat: "YouTube & Media", tag: "wake_word", q: "Start listening for wake word" },
+  { cat: "YouTube & Media", tag: "wake_word", q: "Stop wake word detection" },
+  { cat: "Finance & Market", tag: "stocks", q: "What is the price of AAPL stock?" },
+  { cat: "Finance & Market", tag: "stocks", q: "Show me TSLA stock price" },
+  { cat: "Finance & Market", tag: "stocks", q: "What is Bitcoin trading at?" },
+  { cat: "Finance & Market", tag: "stocks", q: "Check Ethereum price" },
+  { cat: "Finance & Market", tag: "stocks", q: "How is the stock market doing today?" },
+  { cat: "Finance & Market", tag: "stocks", q: "Get price of MSFT, AAPL, and GOOGL" },
+  { cat: "Finance & Market", tag: "stocks", q: "What is the XAUUSD gold price?" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Show my Plaid account balance" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Get my recent transactions" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Connect to my bank account" },
+  { cat: "Finance & Market", tag: "budget", q: "Add a transaction of $50 for groceries" },
+  { cat: "Finance & Market", tag: "budget", q: "Show my budget summary" },
+  { cat: "Finance & Market", tag: "budget", q: "List all my transactions" },
+  { cat: "Finance & Market", tag: "budget", q: "How much did I spend this month?" },
+  { cat: "Finance & Market", tag: "weather", q: "What is the weather in London?" },
+  { cat: "Finance & Market", tag: "weather", q: "Compare weather in Paris and Tokyo" },
+  { cat: "Finance & Market", tag: "weather", q: "Weather in Sfax vs Tunis" },
+  { cat: "Finance & Market", tag: "weather", q: "Will it rain in New York today?" },
+  { cat: "Finance & Market", tag: "news", q: "What are the latest news headlines?" },
+  { cat: "Finance & Market", tag: "news", q: "Show me tech news" },
+  { cat: "Finance & Market", tag: "news", q: "Any science news today?" },
+  { cat: "Finance & Market", tag: "news", q: "What's happening in the world?" },
+  { cat: "Finance & Market", tag: "news", q: "Show business news headlines" },
+  { cat: "Finance & Market", tag: "news", q: "Get 10 latest headlines" },
+  { cat: "Maps & Travel", tag: "maps", q: "Where is the nearest hospital?" },
+  { cat: "Maps & Travel", tag: "maps", q: "How far is Sfax from Tunis?" },
+  { cat: "Maps & Travel", tag: "maps", q: "What are the coordinates of the Eiffel Tower?" },
+  { cat: "Maps & Travel", tag: "maps", q: "What is the timezone in Tokyo?" },
+  { cat: "Maps & Travel", tag: "maps", q: "Find the address of the White House" },
+  { cat: "Maps & Travel", tag: "maps", q: "Calculate distance between two cities" },
+  { cat: "Maps & Travel", tag: "maps", q: "What time is it in Paris right now?" },
+  { cat: "Maps & Travel", tag: "flights", q: "Find flights from New York to London next week" },
+  { cat: "Maps & Travel", tag: "flights", q: "Search for cheap flights to Paris" },
+  { cat: "Maps & Travel", tag: "flights", q: "Find round-trip flights from Tunis to Dubai" },
+  { cat: "Maps & Travel", tag: "flights", q: "Compare business class flights to Tokyo" },
+  { cat: "Maps & Travel", tag: "flights", q: "Save flight results to a file" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "Remember that my name is John" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "My favorite color is blue" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "I live in New York City" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "Remember that I like Italian food" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "My birthday is January 15th" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "I work as a software engineer" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "Save that my girlfriend's name is Sarah" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "I want to learn guitar in 2025" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "My pet dog is called Max" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "What do you know about me?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "What's my favorite color?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "Do you remember where I live?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "What is my name?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "What are my preferences?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "Search your memory for something about Python" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "Recall what I told you last time" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Save a note to my Obsidian vault" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Search my Obsidian notes for 'project'" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "List all notes in my vault" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Create a knowledge graph of my notes" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Set my vault path to /Documents/Obsidian" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Get all tags from my vault" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Add a relationship node for John" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Connect Sarah as a colleague" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Show my relationship graph" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Who is related to whom?" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Remove a relationship node" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Get the relationship graph summary" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Deploy the relationship graph" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me to call mom in 30 minutes" },
+  { cat: "Productivity", tag: "reminder", q: "Set a reminder for tomorrow at 9am" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me to buy groceries at 5pm" },
+  { cat: "Productivity", tag: "reminder", q: "Set a timer for 12 minutes" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me about the meeting on Friday" },
+  { cat: "Productivity", tag: "reminder", q: "Set a timer for 5 minutes" },
+  { cat: "Productivity", tag: "timer", q: "Schedule a shutdown at 10pm" },
+  { cat: "Productivity", tag: "timer", q: "Schedule restart at 6am" },
+  { cat: "Productivity", tag: "timer", q: "List all scheduled tasks" },
+  { cat: "Productivity", tag: "timer", q: "Cancel the shutdown timer" },
+  { cat: "Productivity", tag: "timer", q: "Schedule a daily reminder to drink water" },
+  { cat: "Productivity", tag: "timer", q: "Schedule a command to run at midnight" },
+  { cat: "Productivity", tag: "tasks", q: "Add a task called 'Finish report'" },
+  { cat: "Productivity", tag: "tasks", q: "Mark the 'Buy groceries' task as complete" },
+  { cat: "Productivity", tag: "tasks", q: "Delete the task 'Clean garage'" },
+  { cat: "Productivity", tag: "tasks", q: "List all my tasks" },
+  { cat: "Productivity", tag: "tasks", q: "Add a task with high priority" },
+  { cat: "Productivity", tag: "goals", q: "Create a goal called 'Learn Python'" },
+  { cat: "Productivity", tag: "goals", q: "List all my goals" },
+  { cat: "Productivity", tag: "goals", q: "Show progress on my fitness goal" },
+  { cat: "Productivity", tag: "goals", q: "Complete step 1 of the project goal" },
+  { cat: "Productivity", tag: "goals", q: "Delete my reading goal" },
+  { cat: "Productivity", tag: "goals", q: "Get a summary of all goals" },
+  { cat: "Productivity", tag: "goals", q: "Update progress on the 'Run marathon' goal to 50%" },
+  { cat: "Productivity", tag: "task_graph", q: "Create a task graph for the project" },
+  { cat: "Productivity", tag: "task_graph", q: "Complete a task node" },
+  { cat: "Productivity", tag: "task_graph", q: "Show available tasks" },
+  { cat: "Productivity", tag: "task_graph", q: "Get the critical path" },
+  { cat: "Productivity", tag: "task_graph", q: "Reset the task graph" },
+  { cat: "Productivity", tag: "task_graph", q: "Get the task graph summary" },
+  { cat: "Development", tag: "code", q: "Write a Python script to sort a list" },
+  { cat: "Development", tag: "code", q: "Create a JavaScript function to validate email" },
+  { cat: "Development", tag: "code", q: "Explain this code to me" },
+  { cat: "Development", tag: "code", q: "Run this Python script" },
+  { cat: "Development", tag: "code", q: "Build a React component for a button" },
+  { cat: "Development", tag: "code", q: "Edit the config file and fix the port number" },
+  { cat: "Development", tag: "code", q: "Write a SQL query to get all users" },
+  { cat: "Development", tag: "code", q: "Auto-generate code for a REST API" },
+  { cat: "Development", tag: "code", q: "Create a bash script to backup files" },
+  { cat: "Development", tag: "code", q: "Write a Python function to fetch stock prices" },
+  { cat: "Development", tag: "code", q: "Build a simple Express.js server" },
+  { cat: "Development", tag: "code", q: "Explain the time complexity of this algorithm" },
+  { cat: "Development", tag: "code", q: "Debug this error message" },
+  { cat: "Development", tag: "code", q: "Create a CSS animation for a loading spinner" },
+  { cat: "Development", tag: "code", q: "Write unit tests for this function" },
+  { cat: "Development", tag: "code", q: "Generate TypeScript interfaces from this JSON" },
+  { cat: "Development", tag: "dev_agent", q: "Build a complete to-do list app in Python" },
+  { cat: "Development", tag: "dev_agent", q: "Create a web scraper that saves data to CSV" },
+  { cat: "Development", tag: "dev_agent", q: "Build a full-stack note-taking application" },
+  { cat: "Development", tag: "dev_agent", q: "Create a chat application with Flask" },
+  { cat: "Development", tag: "dev_agent", q: "Build an API for a weather app" },
+  { cat: "Development", tag: "dev_agent", q: "Generate a complete React dashboard project" },
+  { cat: "Development", tag: "scaffold", q: "Scaffold a new Python project" },
+  { cat: "Development", tag: "scaffold", q: "Create a new Next.js app" },
+  { cat: "Development", tag: "scaffold", q: "Initialize a FastAPI project structure" },
+  { cat: "Development", tag: "scaffold", q: "Create a new React Native project" },
+  { cat: "Development", tag: "scaffold", q: "Set up a Django project skeleton" },
+  { cat: "Development", tag: "scaffold", q: "Initialize a Node.js Express project" },
+  { cat: "Development", tag: "scaffold", q: "Create a Go module project" },
+  { cat: "Development", tag: "scaffold", q: "Set up a Rust project with Cargo" },
+  { cat: "Development", tag: "scaffold", q: "Create a Vue.js project with Vite" },
+  { cat: "Development", tag: "scaffold", q: "Initialize a Spring Boot project" },
+  { cat: "Development", tag: "scaffold", q: "Set up a monorepo with Turborepo" },
+  { cat: "Development", tag: "scaffold", q: "Create a Chrome extension project" },
+  { cat: "Development", tag: "scaffold", q: "Initialize a Flask REST API" },
+  { cat: "Development", tag: "scaffold", q: "Set up a Machine Learning project structure" },
+  { cat: "Development", tag: "scaffold", q: "Create a Tauri desktop app project" },
+  { cat: "Development", tag: "scaffold", q: "Initialize a SvelteKit project" },
+  { cat: "Development", tag: "scaffold", q: "Set up an Astro blog project" },
+  { cat: "Development", tag: "scaffold", q: "Create a Docker Compose project" },
+  { cat: "Development", tag: "scaffold", q: "Initialize a GraphQL API project" },
+  { cat: "Development", tag: "scaffold", q: "Set up a PostgreSQL database project" },
+  { cat: "Development", tag: "github", q: "List my GitHub repositories" },
+  { cat: "Development", tag: "github", q: "Get the latest commit on my repo" },
+  { cat: "Development", tag: "github", q: "Create a new issue on GitHub" },
+  { cat: "Development", tag: "github", q: "List open pull requests" },
+  { cat: "Development", tag: "github", q: "Get my GitHub profile info" },
+  { cat: "Development", tag: "github", q: "Star a repository" },
+  { cat: "Development", tag: "github", q: "Fork the repository" },
+  { cat: "Development", tag: "github", q: "Get repository details" },
+  { cat: "AI & Agents", tag: "agent_task", q: "Research quantum computing and save to a file" },
+  { cat: "AI & Agents", tag: "agent_task", q: "Find all large files on my system and list them" },
+  { cat: "AI & Agents", tag: "agent_task", q: "Compare prices of iPhone and Samsung and save results" },
+  { cat: "AI & Agents", tag: "agent_task", q: "Search for AI news, summarize, and save to notes" },
+  { cat: "AI & Agents", tag: "agent_task", q: "Find and organize all my photos by date" },
+  { cat: "AI & Agents", tag: "agent_task", q: "Research the best laptops and create a comparison table" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "Create an agent to monitor my downloads folder" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "List all running background agents" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "Check status of the download monitor agent" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "Stop the file organizer agent" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "Remove the expired agent" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "Create an agent that checks weather every hour" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "Create a background research agent" },
+  { cat: "AI & Agents", tag: "manage_agents", q: "Start an agent to track stock prices" },
+  { cat: "AI & Agents", tag: "scheduler", q: "Schedule a backup job every day at midnight" },
+  { cat: "AI & Agents", tag: "scheduler", q: "Schedule a command to run every 5 minutes" },
+  { cat: "AI & Agents", tag: "scheduler", q: "List all scheduled jobs" },
+  { cat: "AI & Agents", tag: "scheduler", q: "Remove the backup job" },
+  { cat: "AI & Agents", tag: "scheduler", q: "Schedule a daily report generation at 9am" },
+  { cat: "AI & Agents", tag: "skills", q: "List all installed skills" },
+  { cat: "AI & Agents", tag: "skills", q: "Reload all skills" },
+  { cat: "AI & Agents", tag: "skills", q: "What skills are available?" },
+  { cat: "AI & Agents", tag: "skills", q: "Activate the research agent skill" },
+  { cat: "Games & Fun", tag: "games", q: "Update all my Steam games" },
+  { cat: "Games & Fun", tag: "games", q: "Install a new game on Steam" },
+  { cat: "Games & Fun", tag: "games", q: "List my installed games" },
+  { cat: "Games & Fun", tag: "games", q: "Check download status of current game" },
+  { cat: "Games & Fun", tag: "games", q: "Schedule updates for my games at night" },
+  { cat: "Games & Fun", tag: "games", q: "Update games on Epic Games Store" },
+  { cat: "Games & Fun", tag: "games", q: "Show download progress" },
+  { cat: "Games & Fun", tag: "games", q: "Cancel the scheduled game update" },
+  { cat: "Games & Fun", tag: "calculate", q: "Calculate 15% of 340" },
+  { cat: "Games & Fun", tag: "calculate", q: "What is 561 + 215?" },
+  { cat: "Games & Fun", tag: "calculate", q: "Convert 100 Fahrenheit to Celsius" },
+  { cat: "Games & Fun", tag: "calculate", q: "What is the square root of 144?" },
+  { cat: "Games & Fun", tag: "calculate", q: "Convert 1 GB to MB" },
+  { cat: "Games & Fun", tag: "calculate", q: "What is XXIV in numbers?" },
+  { cat: "Games & Fun", tag: "calculate", q: "Calculate 20% tip on a $45 bill" },
+  { cat: "Games & Fun", tag: "books", q: "Search for books by Stephen King" },
+  { cat: "Games & Fun", tag: "books", q: "Find books about artificial intelligence" },
+  { cat: "Games & Fun", tag: "books", q: "What are the best-selling books right now?" },
+  { cat: "Games & Fun", tag: "books", q: "Get details about 'The Great Gatsby'" },
+  { cat: "Games & Fun", tag: "books", q: "Search for a book by author name" },
+  { cat: "Games & Fun", tag: "jobs", q: "Search for software engineering jobs" },
+  { cat: "Games & Fun", tag: "jobs", q: "Find data science jobs near me" },
+  { cat: "Games & Fun", tag: "jobs", q: "Look for remote developer positions" },
+  { cat: "Games & Fun", tag: "jobs", q: "Search for internships in AI" },
+  { cat: "Skills", tag: "research", q: "Research the history of the Roman Empire" },
+  { cat: "Skills", tag: "research", q: "Investigate the latest breakthroughs in fusion energy" },
+  { cat: "Skills", tag: "research", q: "Deep research on quantum computing applications" },
+  { cat: "Skills", tag: "research", q: "Compare different machine learning frameworks" },
+  { cat: "Skills", tag: "research", q: "Do a competitive analysis of Tesla and BYD" },
+  { cat: "Skills", tag: "research", q: "Create a structured summary of climate change data" },
+  { cat: "Skills", tag: "data_analysis", q: "Analyze this CSV file and give me insights" },
+  { cat: "Skills", tag: "data_analysis", q: "Find patterns in this dataset" },
+  { cat: "Skills", tag: "data_analysis", q: "Create a statistical summary of the data" },
+  { cat: "Skills", tag: "email_handler", q: "Draft a professional email response" },
+  { cat: "Skills", tag: "email_handler", q: "Organize my inbox by priority" },
+  { cat: "Skills", tag: "email_handler", q: "Summarize my email threads" },
+  { cat: "Skills", tag: "web_automator", q: "Automate filling out this web form" },
+  { cat: "Skills", tag: "web_automator", q: "Create a web automation script" },
+  { cat: "Skills", tag: "web_automator", q: "Automate repetitive browser tasks" },
+  { cat: "Skills", tag: "sys_admin", q: "Check my system health" },
+  { cat: "Skills", tag: "sys_admin", q: "Monitor CPU and memory usage" },
+  { cat: "Skills", tag: "sys_admin", q: "Run system diagnostics" },
+  { cat: "Skills", tag: "sys_admin", q: "Check for system updates" },
+  { cat: "Skills", tag: "automation", q: "Create an automation for my daily routine" },
+  { cat: "Skills", tag: "automation", q: "Automate file organization" },
+  { cat: "Skills", tag: "automation", q: "Set up an auto-backup workflow" },
+  { cat: "Skills", tag: "automation", q: "Create a scheduled task to clean temp files" },
+  { cat: "Skills", tag: "automation", q: "Build an automation to rename files by date" },
+  { cat: "Skills", tag: "chart_analysis", q: "Analyze this XAUUSD chart" },
+  { cat: "Skills", tag: "chart_analysis", q: "Do a technical analysis of BTCUSD" },
+  { cat: "Skills", tag: "chart_analysis", q: "What are the support and resistance levels?" },
+  { cat: "Skills", tag: "chart_analysis", q: "Identify chart patterns on this trading view" },
+  { cat: "Skills", tag: "chart_analysis", q: "Analyze the trend for AAPL stock" },
+  { cat: "Skills", tag: "project_creator", q: "Create a new web app project" },
+  { cat: "Skills", tag: "project_creator", q: "Scaffold a machine learning project" },
+  { cat: "Skills", tag: "project_creator", q: "Set up a full-stack project with best practices" },
+  { cat: "General Chat", tag: "greeting", q: "Hello" },
+  { cat: "General Chat", tag: "greeting", q: "Hi Jarvis" },
+  { cat: "General Chat", tag: "greeting", q: "Good morning" },
+  { cat: "General Chat", tag: "greeting", q: "Hey, what's up?" },
+  { cat: "General Chat", tag: "greeting", q: "How are you?" },
+  { cat: "General Chat", tag: "general", q: "Tell me a joke" },
+  { cat: "General Chat", tag: "general", q: "What can you do?" },
+  { cat: "General Chat", tag: "general", q: "Tell me something interesting" },
+  { cat: "General Chat", tag: "general", q: "Give me a fun fact" },
+  { cat: "General Chat", tag: "general", q: "Who created you?" },
+  { cat: "General Chat", tag: "general", q: "What is your name?" },
+  { cat: "General Chat", tag: "general", q: "What's your purpose?" },
+  { cat: "General Chat", tag: "general", q: "Are you Jarvis?" },
+  { cat: "General Chat", tag: "general", q: "Tell me about yourself" },
+  { cat: "General Chat", tag: "general", q: "What is the meaning of life?" },
+  { cat: "Remote & Monitoring", tag: "remote", q: "Start the remote API server" },
+  { cat: "Remote & Monitoring", tag: "remote", q: "Stop the remote control server" },
+  { cat: "Remote & Monitoring", tag: "remote", q: "Enable remote access" },
+  { cat: "Remote & Monitoring", tag: "monitor", q: "List all available monitors" },
+  { cat: "Remote & Monitoring", tag: "monitor", q: "Get monitor summary" },
+  { cat: "Remote & Monitoring", tag: "monitor", q: "Set brightness on the main monitor to 70%" },
+  { cat: "Remote & Monitoring", tag: "monitor", q: "Get the active monitor info" },
+  { cat: "Remote & Monitoring", tag: "network", q: "Scan the network for devices" },
+  { cat: "Remote & Monitoring", tag: "network", q: "Get my local IP address" },
+  { cat: "Remote & Monitoring", tag: "network", q: "Discover services on the network" },
+  { cat: "Remote & Monitoring", tag: "network", q: "List all open ports" },
+  { cat: "Forensics & Security", tag: "forensics", q: "Show file access history" },
+  { cat: "Forensics & Security", tag: "forensics", q: "What processes have been running?" },
+  { cat: "Forensics & Security", tag: "forensics", q: "Show network connection history" },
+  { cat: "Forensics & Security", tag: "forensics", q: "What was installed since yesterday?" },
+  { cat: "Forensics & Security", tag: "forensics", q: "Get a forensics summary" },
+  { cat: "Forensics & Security", tag: "forensics", q: "Track recent system changes" },
+  { cat: "Forensics & Security", tag: "forensics", q: "Show me the system activity log" },
+{ cat: "System & Computer", tag: "open_app", q: "Open the task manager" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch the control panel" },
+  { cat: "System & Computer", tag: "open_app", q: "Open the device manager" },
+  { cat: "System & Computer", tag: "open_app", q: "Open the registry editor" },
+  { cat: "System & Computer", tag: "open_app", q: "Open PowerShell as admin" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch the snipping tool" },
+  { cat: "System & Computer", tag: "open_app", q: "Open the alarm and clock app" },
+  { cat: "System & Computer", tag: "open_app", q: "Open media player" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch the virtual keyboard" },
+  { cat: "System & Computer", tag: "open_app", q: "Open sticky notes" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch nailfold or any medical software" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Kdenlive video editor" },
+  { cat: "System & Computer", tag: "open_app", q: "Open LibreOffice" },
+  { cat: "System & Computer", tag: "open_app", q: "Open OBS Studio" },
+  { cat: "System & Computer", tag: "open_app", q: "Launch VirtualBox" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Docker Desktop" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Postman" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Android Studio" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Blender" },
+  { cat: "System & Computer", tag: "open_app", q: "Open GIMP image editor" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Shotcut video editor" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Inkscape" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Discord in a specific channel" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Slack in my workspace" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Spotify and play my liked songs" },
+  { cat: "System & Computer", tag: "open_app", q: "Open VS Code with my project folder" },
+  { cat: "System & Computer", tag: "open_app", q: "Open Chrome with my saved tabs" },
+  { cat: "System & Computer", tag: "open_app", q: "Open the calculator in scientific mode" },
+  { cat: "System & Computer", tag: "open_app", q: "Open the event viewer" },
+  { cat: "System & Computer", tag: "open_app", q: "Open performance monitor" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Turn on airplane mode" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Turn off airplane mode" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Enable Bluetooth" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Disable Bluetooth" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Set volume to 30 percent" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Increase brightness" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Decrease brightness" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Show battery percentage" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Check remaining battery time" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Switch to dark mode" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Enable night light" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Disable night light" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Connect to WiFi network" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Disconnect from WiFi" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Show available WiFi networks" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Enable hotkeys" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Open display settings" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Open sound settings" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Open privacy settings" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Check available storage space" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Clear temporary files" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Empty the recycle bin" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Eject USB drive safely" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Set a screensaver" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Change the system language" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Update system timezone" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Enable remote desktop" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Check Windows update status" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Run Windows update" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Scan for malware" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Schedule a system restore point" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Check firewall status" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Show system specifications" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Check CPU temperature" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Show fan speed" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Enter sleep mode" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Hibernate the computer" },
+  { cat: "System & Computer", tag: "computer_settings", q: "Restart in safe mode" },
+  { cat: "System & Computer", tag: "computer_control", q: "Left click at current position" },
+  { cat: "System & Computer", tag: "computer_control", q: "Triple click to select paragraph" },
+  { cat: "System & Computer", tag: "computer_control", q: "Drag and drop the file" },
+  { cat: "System & Computer", tag: "computer_control", q: "Hold Shift and click" },
+  { cat: "System & Computer", tag: "computer_control", q: "Select all text on screen" },
+  { cat: "System & Computer", tag: "computer_control", q: "Copy the selected text" },
+  { cat: "System & Computer", tag: "computer_control", q: "Cut the selected item" },
+  { cat: "System & Computer", tag: "computer_control", q: "Paste from clipboard" },
+  { cat: "System & Computer", tag: "computer_control", q: "Undo the last action" },
+  { cat: "System & Computer", tag: "computer_control", q: "Redo the undone action" },
+  { cat: "System & Computer", tag: "computer_control", q: "Minimize all windows" },
+  { cat: "System & Computer", tag: "computer_control", q: "Show the desktop" },
+  { cat: "System & Computer", tag: "computer_control", q: "Switch between open windows" },
+  { cat: "System & Computer", tag: "computer_control", q: "Open task view" },
+  { cat: "System & Computer", tag: "computer_control", q: "Snap window to the left" },
+  { cat: "System & Computer", tag: "computer_control", q: "Snap window to the right" },
+  { cat: "System & Computer", tag: "computer_control", q: "Maximize the active window" },
+  { cat: "System & Computer", tag: "computer_control", q: "Minimize the active window" },
+  { cat: "System & Computer", tag: "computer_control", q: "Close the active window with Alt+F4" },
+  { cat: "System & Computer", tag: "computer_control", q: "Take a screenshot of a region" },
+  { cat: "System & Computer", tag: "computer_control", q: "Record the screen" },
+  { cat: "System & Computer", tag: "computer_control", q: "Stop screen recording" },
+  { cat: "System & Computer", tag: "computer_control", q: "Open the character map" },
+  { cat: "System & Computer", tag: "computer_control", q: "Lock the workstation" },
+  { cat: "System & Computer", tag: "computer_control", q: "Switch user account" },
+  { cat: "System & Computer", tag: "computer_control", q: "Log off current user" },
+  { cat: "System & Computer", tag: "computer_control", q: "Open the run dialog" },
+  { cat: "System & Computer", tag: "computer_control", q: "Open the command palette" },
+  { cat: "System & Computer", tag: "computer_control", q: "Open clipboard history" },
+  { cat: "System & Computer", tag: "computer_control", q: "Open emoji picker" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'top' to show processes" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'df -h' for disk usage" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'du -sh *' for folder sizes" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'free -m' for memory status" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'cat /etc/os-release' for OS info" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'ip addr' for network config" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'ping google.com' to test connectivity" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'traceroute' to diagnose network" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'nslookup' for DNS info" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'crontab -l' to list cron jobs" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'docker ps' for containers" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'journalctl -xe' for system logs" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'lsblk' for block devices" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'who' to see logged in users" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'hostnamectl' for host info" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'fwupdmgr update' for firmware" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'snap list' for installed snaps" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'flatpak list' for flatpak apps" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'systemctl status' for services" },
+  { cat: "System & Computer", tag: "run_command", q: "Run 'ufw status' for firewall rules" },
+  { cat: "System & Computer", tag: "run_python", q: "Calculate factorial of 10 with Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Generate a random password with Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Analyze text sentiment with Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Convert CSV to JSON using Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Generate a Fibonacci sequence" },
+  { cat: "System & Computer", tag: "run_python", q: "Test if a number is prime with Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Plot a sine wave with matplotlib" },
+  { cat: "System & Computer", tag: "run_python", q: "Download an image from a URL" },
+  { cat: "System & Computer", tag: "run_python", q: "Compress a string with gzip in Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Encode text as base64 with Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Check if a website is online with Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Scrape headlines from a news site" },
+  { cat: "System & Computer", tag: "run_python", q: "Generate a QR code in Python" },
+  { cat: "System & Computer", tag: "run_python", q: "Compute MD5 hash of a string" },
+  { cat: "System & Computer", tag: "run_python", q: "Monitor CPU usage every second" },
+  { cat: "System & Computer", tag: "desktop", q: "Set wallpaper to a solid color" },
+  { cat: "System & Computer", tag: "desktop", q: "Set wallpaper to a gradient" },
+  { cat: "System & Computer", tag: "desktop", q: "Shuffle wallpapers every hour" },
+  { cat: "System & Computer", tag: "desktop", q: "Create a new folder on desktop" },
+  { cat: "System & Computer", tag: "desktop", q: "Arrange desktop icons by name" },
+  { cat: "System & Computer", tag: "desktop", q: "Show hidden files on desktop" },
+  { cat: "System & Computer", tag: "desktop", q: "Take a screenshot of desktop" },
+  { cat: "System & Computer", tag: "desktop", q: "Count items on desktop" },
+  { cat: "System & Computer", tag: "desktop", q: "Refresh the desktop" },
+  { cat: "System & Computer", tag: "desktop", q: "Create a desktop shortcut for Chrome" },
+  { cat: "System & Computer", tag: "datetime", q: "Show time in New York" },
+  { cat: "System & Computer", tag: "datetime", q: "What time is it in Tokyo?" },
+  { cat: "System & Computer", tag: "datetime", q: "Show date in ISO format" },
+  { cat: "System & Computer", tag: "datetime", q: "What is the current week number?" },
+  { cat: "System & Computer", tag: "datetime", q: "Is it a leap year?" },
+  { cat: "System & Computer", tag: "datetime", q: "Show time in 24-hour format" },
+  { cat: "System & Computer", tag: "datetime", q: "What day was yesterday?" },
+  { cat: "System & Computer", tag: "datetime", q: "What is tomorrow's date?" },
+  { cat: "System & Computer", tag: "datetime", q: "What is the current epoch time?" },
+  { cat: "System & Computer", tag: "datetime", q: "Get the current timezone offset" },
+  { cat: "System & Computer", tag: "location", q: "What is my IP address location?" },
+  { cat: "System & Computer", tag: "location", q: "Find nearby places" },
+  { cat: "System & Computer", tag: "location", q: "Is it daytime here?" },
+  { cat: "System & Computer", tag: "location", q: "What is the local timezone?" },
+  { cat: "System & Computer", tag: "location", q: "What is my zip code?" },
+  { cat: "System & Computer", tag: "location", q: "Get my current coordinates" },
+  { cat: "System & Computer", tag: "package_manager", q: "Search for a package" },
+  { cat: "System & Computer", tag: "package_manager", q: "Update pip packages" },
+  { cat: "System & Computer", tag: "package_manager", q: "Upgrade npm global packages" },
+  { cat: "System & Computer", tag: "package_manager", q: "Check for outdated packages" },
+  { cat: "System & Computer", tag: "package_manager", q: "Install Rust crate" },
+  { cat: "System & Computer", tag: "package_manager", q: "Install Go module" },
+  { cat: "System & Computer", tag: "package_manager", q: "Update homebrew formulas" },
+  { cat: "System & Computer", tag: "package_manager", q: "Clean up unused packages" },
+  { cat: "System & Computer", tag: "package_manager", q: "Audit packages for vulnerabilities" },
+  { cat: "System & Computer", tag: "package_manager", q: "Show package dependency tree" },
+  { cat: "System & Computer", tag: "shutdown", q: "Exit the application" },
+  { cat: "System & Computer", tag: "shutdown", q: "Goodnight Jarvis" },
+  { cat: "System & Computer", tag: "shutdown", q: "I'm signing off" },
+  { cat: "System & Computer", tag: "shutdown", q: "Turn off the assistant" },
+  { cat: "System & Computer", tag: "shutdown", q: "Restart yourself" },
+  { cat: "System & Computer", tag: "shutdown", q: "See you later" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Open the downloads folder" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Create a subdirectory inside Documents" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Duplicate a file" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Merge two text files" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Split a large file into chunks" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Change file permissions to 755" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Show file extension of each file" },
+  { cat: "Files & Storage", tag: "file_controller", q: "List only directories" },
+  { cat: "Files & Storage", tag: "file_controller", q: "List files by date modified" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Count files by type" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Show file tree structure" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Delete empty directories" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Create a symlink" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Compare two files" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Touch a file to update timestamp" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Find duplicate files" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Batch rename files with pattern" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Recover file from trash" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Lock a file to prevent editing" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Encrypt a file with GPG" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Decrypt a GPG file" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Create a checksum file" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Verify file integrity with checksum" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Batch convert images to WebP" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Show recently opened files" },
+  { cat: "Files & Storage", tag: "file_controller", q: "Export file list to CSV" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Crop an image" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Rotate image 90 degrees" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Merge multiple PDFs" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Split a PDF into pages" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Convert image to grayscale" },
+  { cat: "Files & Storage", tag: "file_processor", q: "OCR this scanned document" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Convert HEIC to JPEG" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Remove EXIF data from image" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Add watermark to image" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Create a thumbnail from video" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Convert audio to MP3" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Normalize audio volume" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Remove background from image" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Upscale image resolution" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Generate a PDF from text" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Combine audio and video files" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Convert markdown to HTML" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Pretty-print this JSON file" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Validate XML against schema" },
+  { cat: "Files & Storage", tag: "file_processor", q: "Minify this JavaScript file" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find files modified in last 24 hours" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find files larger than 1GB" },
+  { cat: "Files & Storage", tag: "search_files", q: "Search for images by resolution" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find files containing a keyword" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find recently downloaded files" },
+  { cat: "Files & Storage", tag: "search_files", q: "Search for config files" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find backup files" },
+  { cat: "Files & Storage", tag: "search_files", q: "Search for files by owner" },
+  { cat: "Files & Storage", tag: "search_files", q: "Find empty files and directories" },
+  { cat: "Files & Storage", tag: "search_files", q: "Search for temporary files to clean" },
+  { cat: "Files & Storage", tag: "vault", q: "Store my credit card info safely" },
+  { cat: "Files & Storage", tag: "vault", q: "Save my WiFi password" },
+  { cat: "Files & Storage", tag: "vault", q: "Generate a strong password and store it" },
+  { cat: "Files & Storage", tag: "vault", q: "Show my stored notes" },
+  { cat: "Files & Storage", tag: "vault", q: "Check if vault is locked" },
+  { cat: "Files & Storage", tag: "vault", q: "Lock my vault" },
+  { cat: "Files & Storage", tag: "vault", q: "Change vault master password" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find the best laptop deals" },
+  { cat: "Browser & Web", tag: "web_search", q: "What is the tallest building in the world?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search for healthy dinner recipes" },
+  { cat: "Browser & Web", tag: "web_search", q: "How to fix a leaky faucet?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find the latest smartphone reviews" },
+  { cat: "Browser & Web", tag: "web_search", q: "Look up the weather forecast" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search for nearby pizza places" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find the meaning of 'ephemeral'" },
+  { cat: "Browser & Web", tag: "web_search", q: "What are the symptoms of flu?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Who invented the telephone?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search for yoga classes near me" },
+  { cat: "Browser & Web", tag: "web_search", q: "What is the best time to post on social media?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find the top rated movies on Netflix" },
+  { cat: "Browser & Web", tag: "web_search", q: "Tell me about the solar system" },
+  { cat: "Browser & Web", tag: "web_search", q: "How does cryptocurrency work?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Search for minimalist desk setups" },
+  { cat: "Browser & Web", tag: "web_search", q: "What is the GDP of Germany?" },
+  { cat: "Browser & Web", tag: "web_search", q: "Find hiking trails near my city" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open GitHub in browser" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open Stack Overflow" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Navigate to Reddit" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open Gmail in browser" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Search for 'weather' on Google" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open the browser bookmarks bar" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open a specific bookmark" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Print the current page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Save page as PDF" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Zoom in the browser page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Zoom out the browser page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Reset browser zoom to 100%" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open browser history" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Clear browser history" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open browser downloads page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open browser extensions page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open browser settings" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Enable reader mode" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Open developer tools" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Inspect element on the page" },
+  { cat: "Browser & Web", tag: "browser_control", q: "View page source" },
+  { cat: "Browser & Web", tag: "browser_control", q: "Find in page" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Auto-fill and submit the contact form" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Download all images from this page" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Extract all links from a webpage" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Save the page to Pocket" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Post a tweet on Twitter" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Add a product to Amazon cart" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Track a package on FedEx" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Register for a conference online" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Apply for a job on LinkedIn" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Check in for my flight online" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Reserve a table at a restaurant" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Order an Uber to my location" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Rent a movie on Amazon Prime" },
+  { cat: "Browser & Web", tag: "browser_use", q: "Schedule a doctor appointment online" },
+  { cat: "Communication", tag: "send_message", q: "Send a message to Alex on Telegram" },
+  { cat: "Communication", tag: "send_message", q: "Send a WhatsApp audio message to Dad" },
+  { cat: "Communication", tag: "send_message", q: "Message my boss on Slack" },
+  { cat: "Communication", tag: "send_message", q: "Send an SMS to 555-1234" },
+  { cat: "Communication", tag: "send_message", q: "Reply to the last WhatsApp message" },
+  { cat: "Communication", tag: "send_message", q: "Broadcast a message to all contacts" },
+  { cat: "Communication", tag: "send_message", q: "Send a group message on Telegram" },
+  { cat: "Communication", tag: "send_message", q: "Send a welcome message to new users" },
+  { cat: "Communication", tag: "voice_calls", q: "Start a video call on Zoom" },
+  { cat: "Communication", tag: "voice_calls", q: "Create a Google Meet link" },
+  { cat: "Communication", tag: "voice_calls", q: "Call Sarah on WhatsApp" },
+  { cat: "Communication", tag: "voice_calls", q: "Start a conference call" },
+  { cat: "Communication", tag: "voice_calls", q: "Join the meeting with ID 123456" },
+  { cat: "Communication", tag: "federation", q: "Push this context to all peers" },
+  { cat: "Communication", tag: "federation", q: "Pull latest context from federated nodes" },
+  { cat: "Communication", tag: "federation", q: "Show federation status" },
+  { cat: "Communication", tag: "federation", q: "Add a remote node to the federation" },
+  { cat: "Communication", tag: "federation", q: "Remove a node from the network" },
+  { cat: "Communication", tag: "context_bus", q: "Subscribe to context changes" },
+  { cat: "Communication", tag: "context_bus", q: "Publish a message to the bus" },
+  { cat: "Communication", tag: "context_bus", q: "Listen for context events" },
+  { cat: "Communication", tag: "context_bus", q: "Clear the context bus queue" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Archive my read emails" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Mark an email as spam" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Forward the last email to my colleague" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Star the important email" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Create a filter for newsletter emails" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Label emails by category" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Bulk delete promotional emails" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Setup an email auto-responder" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Find the attachment in latest email" },
+  { cat: "Email & Calendar", tag: "gmail", q: "Download all attachments from today" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Show events for next week" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Update the meeting time to 4pm" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Cancel tomorrow's event" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Reschedule the meeting to Monday" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Share my calendar with Sarah" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Show free time slots today" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Export my calendar as ICS" },
+  { cat: "Email & Calendar", tag: "calendar", q: "Set a recurring meeting every Tuesday" },
+  { cat: "Email & Calendar", tag: "drive", q: "Create a shared folder in Drive" },
+  { cat: "Email & Calendar", tag: "drive", q: "Share a file with view-only access" },
+  { cat: "Email & Calendar", tag: "drive", q: "Download a file from Drive" },
+  { cat: "Email & Calendar", tag: "drive", q: "Organize Drive files into folders" },
+  { cat: "Email & Calendar", tag: "drive", q: "Empty the Drive trash" },
+  { cat: "Email & Calendar", tag: "drive", q: "Search for spreadsheets in Drive" },
+  { cat: "Email & Calendar", tag: "meet", q: "Join the meeting invite I just received" },
+  { cat: "Email & Calendar", tag: "meet", q: "End the current Google Meet" },
+  { cat: "Email & Calendar", tag: "meet", q: "Schedule a daily standup meeting" },
+  { cat: "Email & Calendar", tag: "meet", q: "Send meeting invite to the team" },
+  { cat: "Email & Calendar", tag: "meet", q: "Record the meeting" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Play 'Bohemian Rhapsody' on YouTube" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Find and play white noise for sleep" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Search for cooking tutorials" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Get video transcript for this video" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Create a YouTube playlist" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Add this video to Watch Later" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Show video comments" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Subscribe to this channel" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Like this video" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Play the next video in playlist" },
+  { cat: "YouTube & Media", tag: "youtube", q: "Search YouTube for ASMR relaxation" },
+  { cat: "YouTube & Media", tag: "screen", q: "Identify the application on screen" },
+  { cat: "YouTube & Media", tag: "screen", q: "Read the notification on screen" },
+  { cat: "YouTube & Media", tag: "screen", q: "Count how many windows are open" },
+  { cat: "YouTube & Media", tag: "screen", q: "Read text from the active window" },
+  { cat: "YouTube & Media", tag: "screen", q: "What buttons are visible on screen?" },
+  { cat: "YouTube & Media", tag: "screen", q: "Find the cursor position on screen" },
+  { cat: "YouTube & Media", tag: "screen", q: "Is there a popup on screen?" },
+  { cat: "YouTube & Media", tag: "screen", q: "Analyze the layout of this webpage" },
+  { cat: "YouTube & Media", tag: "screen", q: "What colors are dominant on screen?" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Generate a fantasy landscape" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Create a pixel art character" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Design a book cover" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Create a poster for a music concert" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Draw a realistic portrait" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Generate a watercolor painting" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Create a 3D render concept" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Design a tattoo idea" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Generate an abstract geometric pattern" },
+  { cat: "YouTube & Media", tag: "image_gen", q: "Create an infographic template" },
+  { cat: "YouTube & Media", tag: "face_recognition", q: "Who is this person in the photo?" },
+  { cat: "YouTube & Media", tag: "face_recognition", q: "Detect emotions in this image" },
+  { cat: "YouTube & Media", tag: "face_recognition", q: "Compare two faces for similarity" },
+  { cat: "YouTube & Media", tag: "face_recognition", q: "Age estimate from face photo" },
+  { cat: "YouTube & Media", tag: "wake_word", q: "Disable wake word detection" },
+  { cat: "YouTube & Media", tag: "wake_word", q: "Change the wake word" },
+  { cat: "YouTube & Media", tag: "wake_word", q: "Test wake word sensitivity" },
+  { cat: "Finance & Market", tag: "stocks", q: "What is the Dow Jones today?" },
+  { cat: "Finance & Market", tag: "stocks", q: "Show S&P 500 index value" },
+  { cat: "Finance & Market", tag: "stocks", q: "What is the NASDAQ composite?" },
+  { cat: "Finance & Market", tag: "stocks", q: "Check the price of Ripple XRP" },
+  { cat: "Finance & Market", tag: "stocks", q: "Compare Apple and Microsoft stocks" },
+  { cat: "Finance & Market", tag: "stocks", q: "Show stock price history for TSLA" },
+  { cat: "Finance & Market", tag: "stocks", q: "What is the market cap of Apple?" },
+  { cat: "Finance & Market", tag: "stocks", q: "Show today's gainers and losers" },
+  { cat: "Finance & Market", tag: "stocks", q: "What is the PE ratio of Google?" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Show my monthly spending trend" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Categorize my last 10 transactions" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Set a monthly budget alert" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Sync with my bank" },
+  { cat: "Finance & Market", tag: "finance_tracker", q: "Export transactions to CSV" },
+  { cat: "Finance & Market", tag: "budget", q: "Show my spending by category" },
+  { cat: "Finance & Market", tag: "budget", q: "Create a new budget category" },
+  { cat: "Finance & Market", tag: "budget", q: "Set a saving goal of $1000" },
+  { cat: "Finance & Market", tag: "budget", q: "How much did I spend on dining?" },
+  { cat: "Finance & Market", tag: "budget", q: "Show budget vs actual comparison" },
+  { cat: "Finance & Market", tag: "budget", q: "Alert me when I exceed budget" },
+  { cat: "Finance & Market", tag: "weather", q: "What is the humidity in Miami?" },
+  { cat: "Finance & Market", tag: "weather", q: "Show weekly weather forecast" },
+  { cat: "Finance & Market", tag: "weather", q: "Is it raining in Seattle?" },
+  { cat: "Finance & Market", tag: "weather", q: "What is the UV index today?" },
+  { cat: "Finance & Market", tag: "weather", q: "Check air quality index" },
+  { cat: "Finance & Market", tag: "weather", q: "Compare temperature in Dubai vs Abu Dhabi" },
+  { cat: "Finance & Market", tag: "weather", q: "Will it snow in Denver tomorrow?" },
+  { cat: "Finance & Market", tag: "news", q: "Get sports news headlines" },
+  { cat: "Finance & Market", tag: "news", q: "Show me entertainment news" },
+  { cat: "Finance & Market", tag: "news", q: "What are the trending topics on Twitter?" },
+  { cat: "Finance & Market", tag: "news", q: "Summarize the top story" },
+  { cat: "Finance & Market", tag: "news", q: "Get news from BBC" },
+  { cat: "Finance & Market", tag: "news", q: "Get cryptocurrency news" },
+  { cat: "Finance & Market", tag: "news", q: "Fetch latest science discoveries" },
+  { cat: "Finance & Market", tag: "news", q: "Show me political news" },
+  { cat: "Finance & Market", tag: "news", q: "Get local news headlines" },
+  { cat: "Maps & Travel", tag: "maps", q: "Find directions from home to work" },
+  { cat: "Maps & Travel", tag: "maps", q: "Show traffic conditions now" },
+  { cat: "Maps & Travel", tag: "maps", q: "Find the nearest gas station" },
+  { cat: "Maps & Travel", tag: "maps", q: "What time does the Eiffel Tower close?" },
+  { cat: "Maps & Travel", tag: "maps", q: "Find restaurants open now" },
+  { cat: "Maps & Travel", tag: "maps", q: "Get travel time by car" },
+  { cat: "Maps & Travel", tag: "maps", q: "Get travel time by public transport" },
+  { cat: "Maps & Travel", tag: "maps", q: "Find bike routes" },
+  { cat: "Maps & Travel", tag: "maps", q: "Save this location to favorites" },
+  { cat: "Maps & Travel", tag: "flights", q: "Find return flights to London" },
+  { cat: "Maps & Travel", tag: "flights", q: "Check flight status for AA123" },
+  { cat: "Maps & Travel", tag: "flights", q: "Find direct flights to Tokyo" },
+  { cat: "Maps & Travel", tag: "flights", q: "Compare flight prices for next month" },
+  { cat: "Maps & Travel", tag: "flights", q: "Book a flight to London" },
+  { cat: "Maps & Travel", tag: "flights", q: "Find hotels in Paris" },
+  { cat: "Maps & Travel", tag: "flights", q: "Search for car rentals in Barcelona" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "Remember my coffee order" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "Note that I hate mushrooms" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "My girlfriend's birthday is June 5th" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "I am allergic to peanuts" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "Save my shoe size as 10" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "I prefer tea over coffee" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "My laptop model is Dell XPS 15" },
+  { cat: "Memory & Knowledge", tag: "save_memory", q: "Remember my gym routine" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "What did I say about my allergies?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "Do you know my laptop model?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "What is my preferred drink?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "When is my girlfriend's birthday?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "Search memory for 'project deadline'" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "What do you know about my hobbies?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "Do you remember my address?" },
+  { cat: "Memory & Knowledge", tag: "search_memory", q: "List everything you know about me" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Open my daily note" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Create a new note from template" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Link two notes together" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Search notes by tag" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Show backlinks for this note" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Export my vault to PDF" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Sync vault with GitHub" },
+  { cat: "Memory & Knowledge", tag: "obsidian", q: "Create a new folder in vault" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Add John as a friend" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Remove relationship node for Tom" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "Find path between two nodes" },
+  { cat: "Memory & Knowledge", tag: "relationship", q: "List my closest relationships" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me to take out the trash tonight" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me to pay bills on the 1st" },
+  { cat: "Productivity", tag: "reminder", q: "Set a reminder for my anniversary" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me to water plants every 3 days" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me to take a break in 1 hour" },
+  { cat: "Productivity", tag: "reminder", q: "Remind me about the dentist next Tuesday" },
+  { cat: "Productivity", tag: "reminder", q: "List all active reminders" },
+  { cat: "Productivity", tag: "reminder", q: "Delete the reminder for trash" },
+  { cat: "Productivity", tag: "timer", q: "Set a countdown timer for pizza" },
+  { cat: "Productivity", tag: "timer", q: "Pomodoro timer for 25 minutes" },
+  { cat: "Productivity", tag: "timer", q: "Show time remaining on timer" },
+  { cat: "Productivity", tag: "timer", q: "Extend the timer by 5 minutes" },
+  { cat: "Productivity", tag: "timer", q: "Reset the timer" },
+  { cat: "Productivity", tag: "timer", q: "Create a recurring timer" },
+  { cat: "Productivity", tag: "tasks", q: "Set due date for the task" },
+  { cat: "Productivity", tag: "tasks", q: "Assign priority to a task" },
+  { cat: "Productivity", tag: "tasks", q: "Move task to 'in progress'" },
+  { cat: "Productivity", tag: "tasks", q: "Search for task by keyword" },
+  { cat: "Productivity", tag: "tasks", q: "Show tasks due today" },
+  { cat: "Productivity", tag: "tasks", q: "Show overdue tasks" },
+  { cat: "Productivity", tag: "tasks", q: "Filter tasks by project" },
+  { cat: "Productivity", tag: "tasks", q: "Backup my task list" },
+  { cat: "Productivity", tag: "goals", q: "Add a milestone to my goal" },
+  { cat: "Productivity", tag: "goals", q: "Set a deadline for my goal" },
+  { cat: "Productivity", tag: "goals", q: "Share my goal with a friend" },
+  { cat: "Productivity", tag: "goals", q: "Archive completed goals" },
+  { cat: "Productivity", tag: "goals", q: "Show goal progress chart" },
+  { cat: "Productivity", tag: "task_graph", q: "Add a dependency between tasks" },
+  { cat: "Productivity", tag: "task_graph", q: "Find the longest path" },
+  { cat: "Productivity", tag: "task_graph", q: "Optimize the task schedule" },
+  { cat: "Productivity", tag: "task_graph", q: "Export the graph as image" },
+  { cat: "Productivity", tag: "task_graph", q: "Highlight critical tasks" },
+  { cat: "Development", tag: "code", q: "Write a regex to validate emails" },
+  { cat: "Development", tag: "code", q: "Create a Dockerfile for a Node.js app" },
+  { cat: "Development", tag: "code", q: "Write a Python decorator for timing" },
+  { cat: "Development", tag: "code", q: "Create a React custom hook" },
+  { cat: "Development", tag: "code", q: "Write an SQL JOIN query" },
+  { cat: "Development", tag: "code", q: "Generate a GraphQL schema" },
+  { cat: "Development", tag: "code", q: "Write a REST API endpoint in Flask" },
+  { cat: "Development", tag: "code", q: "Create a TypeScript type definition" },
+  { cat: "Development", tag: "code", q: "Write a bash script to backup database" },
+  { cat: "Development", tag: "code", q: "Generate a CI/CD pipeline YAML" },
+  { cat: "Development", tag: "code", q: "Write unit tests in Jest" },
+  { cat: "Development", tag: "code", q: "Refactor this function to be async" },
+  { cat: "Development", tag: "code", q: "Add error handling to this code" },
+  { cat: "Development", tag: "code", q: "Optimize this SQL query" },
+  { cat: "Development", tag: "code", q: "Write a Go HTTP server" },
+  { cat: "Development", tag: "code", q: "Create a Rust CLI tool" },
+];
+
+// ── Render ──
+const catColors = {
+  "System & Computer": "#f0b429",
+  "Files & Storage": "#34d399",
+  "Browser & Web": "#22d3ee",
+  "Communication": "#a78bfa",
+  "Email & Calendar": "#60a5fa",
+  "YouTube & Media": "#f472b6",
+  "Finance & Market": "#fb923c",
+  "Maps & Travel": "#34d399",
+  "Memory & Knowledge": "#a78bfa",
+  "Productivity": "#f0b429",
+  "Development": "#60a5fa",
+  "AI & Agents": "#22d3ee",
+  "Games & Fun": "#f472b6",
+  "Skills": "#fb923c",
+  "General Chat": "#7a8aa8",
+  "Remote & Monitoring": "#34d399",
+  "Forensics & Security": "#f87171",
+};
+
+function buildApp() {
+  const cats = {};
+  QUESTIONS.forEach((q, i) => {
+    q.id = i;
+    if (!cats[q.cat]) cats[q.cat] = [];
+    cats[q.cat].push(q);
+  });
+
+  const app = document.getElementById('app');
+  let html = '<div class="category-nav">';
+  const catNames = Object.keys(cats);
+  catNames.forEach(c => {
+    html += `<a href="#cat-${c.replace(/\s+/g,'-')}">${c}</a>`;
+  });
+  html += '</div>';
+
+  catNames.forEach(c => {
+    const items = cats[c];
+    const color = catColors[c] || '#7a8aa8';
+    html += `<div class="category" id="cat-${c.replace(/\s+/g,'-')}">`;
+    html += `<div class="category-header">`;
+    html += `<span class="category-badge" style="background:${color}"></span>`;
+    html += `<h2>${c}</h2>`;
+    html += `<span class="category-count">${items.length}</span>`;
+    html += `</div><div class="questions-grid">`;
+    items.forEach(q => {
+      html += `<label class="question-item" data-id="${q.id}">`;
+      html += `<input type="checkbox" data-id="${q.id}" onchange="updateChecked()">`;
+      html += `<span class="question-text">${q.q}</span>`;
+      html += `<span class="question-tag">${q.tag}</span>`;
+      html += `</label>`;
+    });
+    html += `</div></div>`;
+  });
+
+  app.innerHTML = html;
+  document.getElementById('totalCount').textContent = QUESTIONS.length;
+  loadState();
+  updateChecked();
+}
+
+// ── Persistence (localStorage) ──
+function saveState() {
+  const checked = [];
+  document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+    checked.push(parseInt(cb.dataset.id));
+  });
+  localStorage.setItem('jarvis_test_checked', JSON.stringify(checked));
+}
+
+function loadState() {
+  const saved = localStorage.getItem('jarvis_test_checked');
+  if (!saved) return;
+  const ids = JSON.parse(saved);
+  ids.forEach(id => {
+    const cb = document.querySelector(`input[data-id="${id}"]`);
+    if (cb) cb.checked = true;
+  });
+}
+
+function updateChecked() {
+  const total = QUESTIONS.length;
+  const checked = document.querySelectorAll('input[type="checkbox"]:checked').length;
+  document.getElementById('checkedCount').textContent = checked;
+  document.getElementById('progressBar').style.width = `${(checked / total) * 100}%`;
+  saveState();
+}
+
+function clearChecked() {
+  if (!confirm('Reset all checkboxes?')) return;
+  document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+  updateChecked();
+}
+
+function filterQuestions() {
+  const q = document.getElementById('searchBox').value.toLowerCase().trim();
+  document.querySelectorAll('.question-item').forEach(item => {
+    const text = item.querySelector('.question-text').textContent.toLowerCase();
+    const tag = item.querySelector('.question-tag').textContent.toLowerCase();
+    const cat = item.closest('.category')?.querySelector('h2')?.textContent.toLowerCase() || '';
+    item.style.display = (!q || text.includes(q) || tag.includes(q) || cat.includes(q)) ? '' : 'none';
+  });
+}
+
+function exportChecked() {
+  const checked = [];
+  document.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+    const id = parseInt(cb.dataset.id);
+    const q = QUESTIONS.find(x => x.id === id);
+    if (q) checked.push(`[${q.cat}] ${q.q}`);
+  });
+  const text = checked.length
+    ? `JARVIS Test Results (${checked.length}/${QUESTIONS.length} completed)\n${'='.repeat(50)}\n\n` + checked.join('\n')
+    : 'No questions checked yet.';
+  document.getElementById('exportText').value = text;
+  document.getElementById('exportModal').classList.add('active');
+}
+
+function closeExport() {
+  document.getElementById('exportModal').classList.remove('active');
+}
+
+function copyExport() {
+  const ta = document.getElementById('exportText');
+  ta.select();
+  navigator.clipboard?.writeText(ta.value);
+}
+
+buildApp();
+</script>
+</body>
+</html>

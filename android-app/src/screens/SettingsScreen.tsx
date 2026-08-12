@@ -9,6 +9,7 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
+import { CameraView, useCameraPermissions } from "expo-camera";
 import ConnectionBadge from "../components/ConnectionBadge";
 import { WebSocketService, ConnectionState } from "../services/WebSocketService";
 import { StorageService, AppSettings } from "../services/StorageService";
@@ -27,6 +28,8 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     ttsEnabled: true,
   });
   const [wsState, setWsState] = useState<ConnectionState>("disconnected");
+  const [isScanning, setIsScanning] = useState(false);
+  const [permission, requestPermission] = useCameraPermissions();
 
   useEffect(() => {
     StorageService.getSettings().then(setSettings);
@@ -64,6 +67,71 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       Alert.alert("Disconnected", "Connect to the bridge first.");
     }
   };
+
+  const handleScanPress = async () => {
+    if (!permission || !permission.granted) {
+      const res = await requestPermission();
+      if (!res.granted) {
+        Alert.alert("Permission Required", "Camera permission is needed to scan QR code.");
+        return;
+      }
+    }
+    setIsScanning(true);
+  };
+
+  const handleBarCodeScanned = (data: string) => {
+    let ip = "";
+    let port = "8765";
+    try {
+      if (data.startsWith("ws://")) {
+        const parts = data.replace("ws://", "").split(":");
+        ip = parts[0];
+        if (parts[1]) port = parts[1];
+      } else if (data.includes(":")) {
+        const parts = data.split(":");
+        ip = parts[0];
+        port = parts[1];
+      } else {
+        const parsed = JSON.parse(data);
+        ip = parsed.ip || parsed.pcIp || "";
+        port = parsed.port || parsed.pcPort || "8765";
+      }
+    } catch (e) {
+      ip = data;
+    }
+
+    if (ip) {
+      updateSetting("pcIp", ip);
+      updateSetting("pcPort", port);
+      setIsScanning(false);
+      Alert.alert("Success", `Connected to Jarvis: ${ip}:${port}`);
+      WebSocketService.connect(ip, port);
+    } else {
+      Alert.alert("Error", "Invalid QR code format.");
+    }
+  };
+
+  if (isScanning) {
+    return (
+      <View style={styles.cameraContainer}>
+        <CameraView
+          style={StyleSheet.absoluteFillObject}
+          facing="back"
+          onBarcodeScanned={({ data }) => handleBarCodeScanned(data)}
+        />
+        <View style={styles.scanOverlay}>
+          <Text style={styles.scanTitle}>SCAN JARVIS QR CODE</Text>
+          <View style={styles.scanFrame} />
+          <TouchableOpacity
+            style={styles.cancelScanBtn}
+            onPress={() => setIsScanning(false)}
+          >
+            <Text style={styles.cancelScanText}>CANCEL</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -106,7 +174,12 @@ const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* PC Bridge */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>PC BRIDGE</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <Text style={styles.sectionTitle}>PC BRIDGE</Text>
+          <TouchableOpacity style={styles.scanBtn} onPress={handleScanPress}>
+            <Text style={styles.scanBtnText}>📷 SCAN QR</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.label}>IP Address</Text>
         <TextInput
           style={styles.input}

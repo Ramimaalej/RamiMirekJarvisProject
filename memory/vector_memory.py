@@ -5,6 +5,9 @@ import requests
 from datetime import datetime
 from pathlib import Path
 import sys
+from core.llm_client import resolve_llm_url
+
+_OLLAMA_URL = "http://localhost:11434"
 
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
@@ -24,101 +27,73 @@ _store_mtime: float = 0.0
 def _get_config():
     cfg_path = BASE_DIR / "config" / "api_keys.json"
     try:
-        return json.loads(cfg_path.read_text(encoding="utf-8"))
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     except Exception:
-        return {}
-
-def _get_provider() -> str:
-    cfg = _get_config()
-    raw = cfg.get("llm_provider", "ollama").strip().lower().replace(" ", "_").replace("-", "_")
-    if raw in ("nvidia_nim", "nvidia"):
-        return "nvidia-nim"
-    if raw in ("openrouter", "open_router"):
-        return "openrouter"
-    if raw in ("openai", "lmstudio", "localai", "jan", "llamacpp"):
-        return "openai"
-    return "ollama"
+        cfg = {}
+    if cfg.get("llm_url_local") or cfg.get("llm_url_remote"):
+        cfg["llm_url"] = resolve_llm_url(cfg)
+    return cfg
 
 def _get_embedding_url():
     cfg = _get_config()
-    url = cfg.get("llm_url", "http://localhost:11434").rstrip("/")
-    provider = _get_provider()
     if cfg.get("embed_url"):
         return cfg["embed_url"].rstrip("/")
-    if provider == "ollama":
-        return f"{url}/api/embeddings"
-    if provider == "nvidia-nim":
-        return None
-    if "/v1" in url:
-        return f"{url}/embeddings"
-    return f"{url}/v1/embeddings"
+    # Always prefer local Ollama for embeddings — all-minilm:l6-v2 is tiny (45MB)
+    # and works regardless of which LLM provider is configured.
+    return f"{_OLLAMA_URL}/api/embeddings"
 
 _EMBED_MODEL = "all-minilm:l6-v2"
-# Embedding model for OpenAI-compatible providers — MUST be a dedicated
-# embedding model, NOT a chat model.
-_OPENAI_EMBED_MODELS = {
-    "nvidia-nim": "nvidia/nv-embed-qa-4",
-    "openai":     "text-embedding-ada-002",
-    "openrouter": "openai/text-embedding-3-small",
-}
 
 _embed_cache: dict[str, list[float]] = {}
 _embed_warned: set[str] = set()
 _embeddings_disabled: bool = False
-
-def _get_embed_headers() -> dict:
-    cfg = _get_config()
-    key = cfg.get("llm_api_key", "").strip()
-    if key:
-        return {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-    return {"Content-Type": "application/json"}
+_embed_failures: dict[str, int] = {}
+_embed_lock = threading.Lock()
+_EMBED_MAX_RETRIES = 3
+_EMBED_RETRY_WAIT = 5.0
+_EMBED_DISABLE_AFTER = 5
 
 def _embed(text: str) -> list[float]:
     global _embeddings_disabled
     if _embeddings_disabled:
         return []
 
-    provider = _get_provider()
     cfg = _get_config()
     embed_url = _get_embedding_url()
-    headers = _get_embed_headers()
+    embed_model = cfg.get("embed_model") or _EMBED_MODEL
+    payload = {"model": embed_model, "prompt": text[:1000]}
 
-    if embed_url is None:
-        key = (provider, "none")
-        if key not in _embed_warned:
-            print(f"[VectorMemory] No embedding endpoint available for '{provider}'. Set 'embed_url' and 'embed_model' in config/api_keys.json to enable vector memory.")
-            _embed_warned.add(key)
-        return []
+    failure_key = f"ollama:{embed_url}"
+    with _embed_lock:
+        if _embed_failures.get(failure_key, 0) >= _EMBED_DISABLE_AFTER:
+            if failure_key not in _embed_warned:
+                print(f"[VectorMemory] Embedding disabled after {_EMBED_DISABLE_AFTER} failures.")
+                _embed_warned.add(failure_key)
+            _embeddings_disabled = True
+            return []
 
-    # Allow explicit override in config
-    embed_model = cfg.get("embed_model") or _OPENAI_EMBED_MODELS.get(provider, "text-embedding-ada-002")
-
-    if provider == "ollama":
-        payload = {"model": embed_model, "prompt": text[:1000]}
-    else:
-        payload = {
-            "model": embed_model,
-            "input": text[:1000],
-        }
     try:
-        resp = requests.post(embed_url, json=payload, headers=headers, timeout=3.0)
+        resp = requests.post(embed_url, json=payload, timeout=3.0)
         resp.raise_for_status()
         data = resp.json()
-        if provider == "ollama":
-            return data.get("embedding", [])
-        return data.get("data", [{}])[0].get("embedding", [])
+        with _embed_lock:
+            _embed_failures.pop(failure_key, None)
+        return data.get("embedding", [])
     except requests.exceptions.HTTPError as e:
-        key = (provider, embed_url)
-        if key not in _embed_warned:
-            print(f"[VectorMemory] Embedding API not available ({provider} @ {embed_url}): {e.response.status_code}")
-            print(f"[VectorMemory] Disabling embeddings for this session to prevent response lag.")
-            _embed_warned.add(key)
-        _embeddings_disabled = True
+        with _embed_lock:
+            cnt = _embed_failures.get(failure_key, 0) + 1
+            _embed_failures[failure_key] = cnt
+        if failure_key not in _embed_warned:
+            print(f"[VectorMemory] Embedding API error ({embed_url}): {e.response.status_code} (attempt {cnt}/{_EMBED_DISABLE_AFTER})")
+            _embed_warned.add(failure_key)
         return []
     except Exception as e:
-        print(f"[VectorMemory] Embedding failed ({provider} @ {embed_url}): {e}")
-        print(f"[VectorMemory] Disabling embeddings for this session to prevent response lag.")
-        _embeddings_disabled = True
+        with _embed_lock:
+            cnt = _embed_failures.get(failure_key, 0) + 1
+            _embed_failures[failure_key] = cnt
+        if failure_key not in _embed_warned:
+            print(f"[VectorMemory] Embedding failed ({embed_url}): {e} (attempt {cnt}/{_EMBED_DISABLE_AFTER})")
+            _embed_warned.add(failure_key)
         return []
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:

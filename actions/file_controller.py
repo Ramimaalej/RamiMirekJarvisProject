@@ -17,7 +17,9 @@ _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
 _SAFE_ROOTS: list[Path] = [
     Path.home(),
-    Path("/"),
+    Path.home() / "Desktop",
+    Path.home() / "Downloads",
+    Path.home() / "Documents",
 ]
 
 def _is_safe_path(target: Path) -> bool:

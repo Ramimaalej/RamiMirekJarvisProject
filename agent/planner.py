@@ -7,7 +7,7 @@ import re
 import sys
 from pathlib import Path
 
-from core.llm_client import call_llm_text
+from core.llm_client import call_llm_text_smart as call_llm_text
 
 
 def get_base_dir() -> Path:
@@ -48,7 +48,7 @@ game_updater
   shutdown_when_done: boolean (optional)
 
 browser_control
-  action: "go_to" | "search" | "click" | "type" | "scroll" | "get_text" | "press" | "close" (required)
+  action: "go_to" | "search" | "click" | "type" | "scroll" | "fill_form" | "detect_form" | "auto_fill" | "get_text" | "press" | "close" (required)
   url: string (for go_to)
   query: string (for search)
   text: string (for click/type)

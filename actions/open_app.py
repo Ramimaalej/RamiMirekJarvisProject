@@ -129,6 +129,8 @@ _WEB_APPS: dict[str, str] = {
     "instagram":       "https://instagram.com",
     "tiktok":          "https://tiktok.com",
     "snapchat":        "https://snapchat.com",
+    "shopify":         "https://www.shopify.com",
+    "shopify admin":   "https://admin.shopify.com",
 }
 
 # Words that are context clues, not part of the app name (strip these from input)
@@ -465,6 +467,25 @@ def open_app(
     # Strip context words: 'TradingView with XAUUSD chart' → 'TradingView'
     app_name = _extract_app_name(raw_name)
 
+    # "open terminal in <folder>" → open the terminal already in that folder
+    if "terminal" in raw_name.lower() or "cmd" in raw_name.lower():
+        tm = re.search(r"(?:terminal|cmd|bash)\s+(?:in|at)\s+(.+)$", raw_name)
+        if tm:
+            try:
+                from actions.fcc_runner import find_folder, open_terminal_in
+                folder = find_folder(tm.group(1).strip())
+                if folder is not None:
+                    if open_terminal_in(folder, command=f"cd '{folder}' && exec bash"):
+                        if player:
+                            player.write_log(f"[open_app] terminal in {folder}")
+                        return f"Opened a terminal in {folder}."
+                return (
+                    f"Could not find a folder matching '{tm.group(1).strip()}'. "
+                    "Give the full path like ~/MyProjects/Jarvis."
+                )
+            except Exception as e:
+                print(f"[open_app] terminal-in-folder failed: {e}")
+
     launcher = _OS_LAUNCHERS.get(_SYSTEM)
     if launcher is None:
         return f"Unsupported operating system: {_SYSTEM}"
@@ -534,13 +555,40 @@ def open_app(
 
         # If resolved to a URL, open via Playwright (same session as browser_control)
         if normalized.startswith("http"):
+            # Extract search query from raw_name after the resolved app name
+            import re as _re
+            remaining = raw_name[len(app_name):].strip()
+            while True:
+                stripped = _re.sub(r"^(and|for|in|on|at|the|a|an|to|search|find|look|play|open|of|my)\s+", "", remaining, count=1, flags=_re.IGNORECASE).strip()
+                if stripped == remaining:
+                    break
+                remaining = stripped
+            search_sites = {
+                "youtube.com":  "https://www.youtube.com/results?search_query=",
+                "google.com":   "https://www.google.com/search?q=",
+                "bing.com":     "https://www.bing.com/search?q=",
+                "duckduckgo.com": "https://duckduckgo.com/?q=",
+                "amazon.com":   "https://www.amazon.com/s?k=",
+                "reddit.com":   "https://www.reddit.com/search/?q=",
+                "github.com":   "https://github.com/search?q=",
+                "wikipedia.org":"https://en.wikipedia.org/w/index.php?search=",
+            }
+            final_url = normalized
+            if remaining:
+                for domain, search_url in search_sites.items():
+                    if domain in normalized:
+                        import urllib.parse as _up
+                        final_url = search_url + _up.quote_plus(remaining)
+                        break
             try:
                 from actions.browser_control import browser_control
-                browser_control(parameters={"action": "go_to", "url": normalized})
-                return f"Opened {app_name} in your browser."
+                browser_control(parameters={"action": "go_to", "url": final_url})
+                label = f"{app_name}" + (f" search for '{remaining}'" if remaining else "")
+                return f"Opened {label} in your browser."
             except Exception:
-                if _open_url(normalized):
-                    return f"Opened {app_name} in your browser."
+                if _open_url(final_url):
+                    label = f"{app_name}" + (f" search for '{remaining}'" if remaining else "")
+                    return f"Opened {label} in your browser."
                 return f"Could not open {app_name}."
 
         # Otherwise try to launch as a native app
@@ -549,6 +597,25 @@ def open_app(
         if normalized.lower() != app_name.lower():
             if launcher(app_name):
                 return f"Opened {app_name}."
+
+        # ── Web fallback: try opening as a website ─────────────────────────
+        # Common video/tutorial keywords → YouTube search
+        _VIDEO_KEYWORDS = {"tutorial", "video", "guide", "walkthrough", "how to", "how-to", "lesson", "course", "demo", "match", "game", "stream", "clip", "trailer", "highlights", "episode", "review", "vs", "versus"}
+        words_lower = set(app_name.lower().split())
+        if words_lower & _VIDEO_KEYWORDS:
+            import urllib.parse
+            query = urllib.parse.quote_plus(raw_name)
+            youtube_url = f"https://www.youtube.com/results?search_query={query}"
+            if _open_url(youtube_url):
+                return f"Opened YouTube search for '{raw_name}' in your browser."
+            return f"Could not open YouTube search for '{raw_name}'."
+
+        # Single-word name → try as .com website
+        clean = app_name.strip().lower()
+        if clean and " " not in clean and "." not in clean:
+            for domain in (f"https://www.{clean}.com", f"https://{clean}.com", f"https://{clean}.org"):
+                if _open_url(domain):
+                    return f"Opened {domain} in your browser."
         return (
             f"Could not open '{app_name}'. "
             "It may not be installed or the name may be different."

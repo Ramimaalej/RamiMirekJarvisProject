@@ -2,6 +2,7 @@
 
 import ast
 import math as _math
+import re
 from typing import Any
 
 _ALLOWED_NAMES = {
@@ -11,10 +12,13 @@ _ALLOWED_NAMES = {
 }
 
 _ALLOWED_NODE_TYPES = frozenset({
-    ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant,
+    ast.Expression, ast.BinOp, ast.UnaryOp, ast.Constant, ast.Name,
     ast.Add, ast.Sub, ast.Mult, ast.Div, ast.Pow, ast.FloorDiv,
-    ast.Mod, ast.USub, ast.UAdd,
+    ast.Mod, ast.USub, ast.UAdd, ast.Call, ast.Load,
 })
+
+_IMPLICIT_MUL = re.compile(r"(\d)([a-zA-Z])")
+_IMPLICIT_MUL2 = re.compile(r"([a-zA-Z])(\d)")
 
 
 def safe_math(expression: str, extra_names: dict[str, Any] | None = None) -> float:
@@ -27,8 +31,8 @@ def safe_math(expression: str, extra_names: dict[str, Any] | None = None) -> flo
         expression.replace(" ", "")
         .replace("^", "**")
     )
-    cleaned = __import__("re").sub(r"(\d)x", r"\1*x", cleaned)
-    cleaned = __import__("re").sub(r"x(\d)", r"x*\1", cleaned)
+    cleaned = _IMPLICIT_MUL.sub(r"\1*\2", cleaned)
+    cleaned = _IMPLICIT_MUL2.sub(r"\1*\2", cleaned)
 
     tree = ast.parse(cleaned, mode="eval")
 

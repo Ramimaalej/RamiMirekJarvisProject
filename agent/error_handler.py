@@ -8,7 +8,7 @@ import sys
 from enum import Enum
 from pathlib import Path
 
-from core.llm_client import call_llm_text
+from core.llm_client import call_llm_text_smart as call_llm_text
 
 
 def get_base_dir() -> Path:

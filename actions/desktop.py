@@ -78,23 +78,36 @@ def _build_sandbox() -> dict:
 def _execute_generated_code(code: str, player=None) -> str:
     if not code or code.strip() == "UNSAFE":
         return "This action cannot be performed safely."
+    if not code.strip():
+        return "No code to execute."
 
-    # Kod temizleme
+    # Strip markdown fences
     if code.startswith("```"):
         lines = code.split("\n")
         code  = "\n".join(lines[1:-1]).strip()
 
-    sandbox      = _build_sandbox()
-    output_lines = []
-    sandbox["__builtins__"]["print"] = lambda *a: output_lines.append(" ".join(str(x) for x in a))
-
+    # Write code to a temporary file and run in a subprocess
+    tmp = Path(tempfile.mktemp(suffix=".py"))
     try:
-        exec(compile(code, "<jarvis_desktop>", "exec"), sandbox)
-        return "\n".join(output_lines) if output_lines else "Done."
+        tmp.write_text(code, encoding="utf-8")
+        result = subprocess.run(
+            [sys.executable, str(tmp)],
+            capture_output=True, timeout=30, text=True,
+        )
+        out = result.stdout.strip()
+        err = result.stderr.strip()
+        if result.returncode != 0:
+            return f"Execution error (exit {result.returncode}):\n{err[:500]}"
+        return out if out else "Done."
+    except subprocess.TimeoutExpired:
+        return "Execution timed out after 30s."
     except Exception as e:
-        print(f"[Desktop] Exec error: {e}\nCode:\n{code[:300]}")
         return f"Execution error: {e}"
-
+    finally:
+        try:
+            tmp.unlink()
+        except Exception:
+            pass
 
 def _ask_gemini_for_desktop_action(task: str) -> str:
     from core.llm_client import call_llm_text

@@ -1,0 +1,40 @@
+{
+  "shared": [
+    {
+      "key": "test_key",
+      "value": "test_value",
+      "source": "fedora",
+      "timestamp": "2026-06-13T17:31:13.551800"
+    },
+    {
+      "key": "query_key",
+      "value": "query_value",
+      "source": "fedora",
+      "timestamp": "2026-06-13T17:31:13.554220"
+    },
+    {
+      "key": "test_key",
+      "value": "test_value",
+      "source": "fedora",
+      "timestamp": "2026-06-13T17:45:02.522697"
+    },
+    {
+      "key": "query_key",
+      "value": "query_value",
+      "source": "fedora",
+      "timestamp": "2026-06-13T17:45:02.525717"
+    },
+    {
+      "key": "test_key",
+      "value": "test_value",
+      "source": "fedora",
+      "timestamp": "2026-07-03T21:38:13.600320"
+    },
+    {
+      "key": "query_key",
+      "value": "query_value",
+      "source": "fedora",
+      "timestamp": "2026-07-03T21:38:13.634499"
+    }
+  ]
+}

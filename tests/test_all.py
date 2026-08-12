@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+pytest_plugins = ("pytest_asyncio",)
+
 PROJECT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT))
 
@@ -461,10 +463,10 @@ class TestUiColors:
 def test_every_py_file_parses():
     failed = []
     for f in sorted(PROJECT.rglob("*.py")):
-        if "__pycache__" in str(f):
+        if "__pycache__" in str(f) or ".venv" in str(f):
             continue
         try:
-            ast.parse(f.read_text())
+            ast.parse(f.read_text(encoding="utf-8", errors="surrogateescape"))
         except SyntaxError as e:
             failed.append((f.relative_to(PROJECT), str(e)))
     assert not failed, "\n".join(f"{p}: {e}" for p, e in failed)

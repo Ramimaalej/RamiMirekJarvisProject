@@ -228,12 +228,32 @@ def _comfyui_generate(prompt: str, negative: str = "") -> str | None:
                             img = Image.open(BytesIO(r3.read()))
                             return _save_image(img, "comfy")
             time.sleep(1)
-        except Exception:
+        except Exception as e:
+            logger.warning("ComfyUI poll error: %s", e)
             time.sleep(1)
     return None
 
 
 # ── Public API ────────────────────────────────────────────────────────
+
+
+def _pollinations_generate(prompt: str) -> str | None:
+    """Free image generation via pollinations.ai (no API key needed)."""
+    import urllib.parse
+    import urllib.request
+    try:
+        encoded = urllib.parse.quote(prompt)
+        url = f"https://image.pollinations.ai/prompt/{encoded}"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as r:
+            img = Image.open(BytesIO(r.read()))
+            return _save_image(img, "pollinations")
+    except Exception as e:
+        logger.warning("Pollinations failed: %s", e)
+        return None
 
 
 def generate_image(parameters: dict = None, **kwargs) -> str:
@@ -262,15 +282,20 @@ def generate_image(parameters: dict = None, **kwargs) -> str:
     if not _comfyui_installed():
         try:
             _install_comfyui()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("ComfyUI install error: %s", e)
     try:
         if _start_comfyui():
             path = _comfyui_generate(prompt, negative)
             if path:
                 return f"Image generated via ComfyUI: {path}"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("ComfyUI generate error: %s", e)
+
+    # 5. Free cloud fallback (no API key required)
+    path = _pollinations_generate(prompt)
+    if path:
+        return f"Image generated: {path}"
 
     return (
         "I cannot do that. To generate images:\n"

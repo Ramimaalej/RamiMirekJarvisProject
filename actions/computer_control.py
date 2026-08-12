@@ -1,4 +1,6 @@
 #computer_control.py
+import random
+import string
 import io
 import json
 import re
@@ -11,6 +13,7 @@ import traceback
 from pathlib import Path
 
 from core.safe_math import safe_math
+from core.llm_client import resolve_llm_url
 
 from actions.file_controller import open_folder as _open_folder
 
@@ -40,9 +43,12 @@ _MEMORY_PATH  = _BASE / "memory" / "long_term.json"
 
 def _load_config() -> dict:
     try:
-        return json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        cfg = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return {}
+        cfg = {}
+    if cfg.get("llm_url_local") or cfg.get("llm_url_remote"):
+        cfg["llm_url"] = resolve_llm_url(cfg)
+    return cfg
 
 def _get_os() -> str:
     import platform

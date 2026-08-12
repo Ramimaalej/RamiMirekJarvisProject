@@ -11,6 +11,7 @@ import json
 import sys
 from pathlib import Path
 from typing import Optional, Callable
+from core.llm_client import resolve_llm_url
 
 try:
     import cv2
@@ -52,9 +53,12 @@ _JPEG_Q    = 60
 
 def _load_config() -> dict:
     try:
-        return json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+        cfg = json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
     except Exception:
-        return {}
+        cfg = {}
+    if cfg.get("llm_url_local") or cfg.get("llm_url_remote"):
+        cfg["llm_url"] = resolve_llm_url(cfg)
+    return cfg
 
 
 def _save_config_key(key: str, value) -> None:
@@ -361,7 +365,7 @@ def _call_vision(image_bytes: bytes, mime: str, user_text: str, angle: str = "sc
     is_openai    = provider in ("openai", "nvidia_nim", "openrouter")
 
     # Enrich prompt with UI context when analysing the screen
-    if angle == "screen" and not cfg.get("llm_provider", "").startswith("ollama"):
+    if angle == "screen":
         ui_context = _describe_ui_context()
         if ui_context:
             user_text = f"{user_text}\n\nDesktop context:\n{ui_context}"

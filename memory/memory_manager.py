@@ -83,14 +83,13 @@ def _trim_to_limit(memory: dict) -> dict:
 def save_memory(memory: dict) -> None:
     if not isinstance(memory, dict):
         return
-    memory = _trim_to_limit(memory)
     MEMORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with _lock:
+        memory = _trim_to_limit(memory)
         MEMORY_PATH.write_text(
             json.dumps(memory, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-    # Invalidate cache so next load picks up the fresh data
     global _MEMORY_CACHE_AT
     _MEMORY_CACHE_AT = 0.0
 
@@ -127,9 +126,11 @@ def _recursive_update(target: dict, updates: dict) -> bool:
 def update_memory(memory_update: dict) -> dict:
     if not isinstance(memory_update, dict) or not memory_update:
         return load_memory()
-    memory = load_memory()
+    with _lock:
+        memory = json.loads(MEMORY_PATH.read_text(encoding="utf-8")) if MEMORY_PATH.exists() else _empty_memory()
+        if _recursive_update(memory, memory_update):
+            MEMORY_PATH.write_text(json.dumps(memory, indent=2, ensure_ascii=False), encoding="utf-8")
     if _recursive_update(memory, memory_update):
-        save_memory(memory)
         print(f"[Memory] 💾 Saved: {list(memory_update.keys())}")
     return memory
 

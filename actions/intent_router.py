@@ -124,7 +124,7 @@ _INTENTS: list[dict[str, Any]] = [
         "subsystem": "gmail",
         "patterns": [
             r"^(get|check|show|read|list)\s+(my\s+)?(unread\s+)?(emails?|messages?|inbox|gmail)",
-            r"^(any|do I have)\s+(new\s+)?(emails?|messages?|mail)",
+            r"^(any|do I have)\s+(new\s+|any\s+)?(emails?|messages?|mail)",
             r"unread",
             r"inbox",
         ],
@@ -141,8 +141,28 @@ _INTENTS: list[dict[str, Any]] = [
         ],
         "handler": "gmail_search",
         "params": {},
-        "requires_ai": True,
+        "requires_ai": False,
     },
+
+    # ── Email Reader (IMAP — direct Gmail inbox) ──────────────────────
+    {
+        "name": "read_emails",
+        "subsystem": "email",
+        "patterns": [
+            r"^(read|check|show|get|fetch|list)\s+(my\s+)?(emails|email|inbox|messages|mails|mail)",
+            r"^(what'?s?\s+in\s+my\s+inbox)",
+            r"^(latest|recent|new)\s+(emails|email|messages|mails|mail)",
+            r"^(do\s+I\s+have\s+(any\s+)?(new\s+)?(emails|email|mail|mails|messages))",
+            r"^(what\s+(are\s+)?my\s+(latest|recent|new)\s+(emails|mails|email|messages))",
+            r"^what\s+(are\s+)?my\s+(latest\s+)?(emails|mails|email|messages)",
+            r"^my\s+(latest|recent|new)\s+(emails|mails|email|messages)",
+            r"^show\s+(my\s+)?(latest|recent)?\s*(emails|email|mails|mail|messages)",
+        ],
+        "handler": "read_emails",
+        "params": {"hours": 24, "limit": 10},
+        "requires_ai": False,  # routes directly with defaults
+    },
+
     {
         "name": "gmail_send",
         "subsystem": "gmail",
@@ -152,7 +172,7 @@ _INTENTS: list[dict[str, Any]] = [
         ],
         "handler": "gmail_send",
         "params": {},
-        "requires_ai": True,
+        "requires_ai": False,
     },
 
     # ── Calendar ─────────────────────────────────────────────────────
@@ -162,7 +182,7 @@ _INTENTS: list[dict[str, Any]] = [
         "patterns": [
             r"^(what('?s| is| do I have)\s+on\s+(my\s+)?)?(calendar|schedule|agenda|plan)",
             r"^(show|list|get|check)\s+(my\s+)?(calendar|schedule|agenda|plan)",
-            r"what('?s| is)\s+(today|upcoming)",
+            r"what(\'?s|\s+is)\s+(today|upcoming)(?:\s+on\s+(my\s+)?(calendar|schedule|agenda|plan))?\s*(?:schedule)?$",
             r"what\s+do\s+I\s+have\s+(today|tomorrow)",
             r"am\s+I\s+(free|busy)",
         ],
@@ -197,8 +217,9 @@ _INTENTS: list[dict[str, Any]] = [
         "name": "web_search",
         "subsystem": "browser",
         "patterns": [
-            r"^(search|google|look\s+up|find\s+(out|on\s+the\s+web)|who\s+is)",
-            r"^(what\s+is)\s+(?!my\s+(budget|spending|tasks?|schedule|calendar|agenda))",
+            r"^(search|google|look\s+up|find\s+(out|on\s+the\s+web)|who\s+is|who\s+was|who\s+are|who\s+were)",
+            r"^(what\s+is|what\s+was|what\s+are|what\s+were)\s+(?!my\s+(budget|spending|tasks?|schedule|calendar|agenda))",
+            r"^(when|where|why|how)\s+(is|are|was|were|did|do|does|can|could|would|will)",
             r"^(price|bitcoin)",
             r"\?$",
         ],
@@ -206,13 +227,26 @@ _INTENTS: list[dict[str, Any]] = [
         "params": {},
         "requires_ai": True,
     },
+    {
+        "name": "auto_register",
+        "subsystem": "browser",
+        "patterns": [
+            r"^(register|sign\s*up|create\s+(an?\s+)?account)\s+(me\s+)?(on|for|at)\s+(.+)",
+            r"^(fill\s+(out\s+)?(a\s+)?form|fill\s+this\s+form)\s+(on|for|at)?\s*(.+)",
+            r"^(fill\s+(out\s+)?(a\s+)?form|fill\s+this\s+form)\s*$",
+        ],
+        "handler": "browser_control",
+        "params": {"action": "auto_fill"},
+        "requires_ai": False,
+    },
 
     # ── GitHub ───────────────────────────────────────────────────────
     {
         "name": "github_list_repos",
         "subsystem": "github",
         "patterns": [
-            r"^(list|show|my)\s+(repos|repositories|projects)",
+            r"^(list|show)\s+(my\s+)?(repos|repositories|projects)",
+            r"^my\s+(repos|repositories|projects)",
             r"github\s+(repos|repositories)",
         ],
         "handler": "github",
@@ -230,6 +264,19 @@ _INTENTS: list[dict[str, Any]] = [
         "handler": "github",
         "params": {"action": "list_issues"},
         "requires_ai": False,
+    },
+    {
+        "name": "github_clone",
+        "subsystem": "github",
+        "patterns": [
+            r"^(clone|download|pull)\s+(a\s+)?(github\s+)?(repo|repository|project)",
+            r"^clone\s+",
+            r"^(get|fetch|download)\s+(a\s+)?(github\s+)?(repo|repository)\s+",
+            r"clone\s+(it|that|this|the\s+repo)",
+        ],
+        "handler": "github",
+        "params": {"action": "clone"},
+        "requires_ai": False,  # repo is parsed directly from the command
     },
 
     # ── Obsidian ─────────────────────────────────────────────────────
@@ -263,14 +310,26 @@ _INTENTS: list[dict[str, Any]] = [
         "subsystem": "system",
         "patterns": [
             r"^(volume|brightness)\s+(up|down|mute|set|max|min)",
-            r"(turn\s+(up|down|on|off))\s+(volume|sound|brightness)",
-            r"(increase|decrease)\s+(volume|brightness)",
+            r"(turn\s+(up|down|on|off))\s+(the\s+)?(volume|sound|brightness)",
+            r"(increase|decrease)\s+(the\s+)?(volume|brightness)",
+            r"^set\s+(the\s+)?(volume|brightness)\s+to\s+(\d+)",
             r"^(mute|unmute|lock|shutdown|restart|sleep)",
             r"(screenshot|screen\s+shot)",
             r"(speed\s*test|internet\s+speed|check\s+(my\s+)?(internet|connection|network)\s+(speed|connection))",
         ],
         "handler": "computer_settings",
         "params": {},
+        "requires_ai": False,
+    },
+    {
+        "name": "computer_settings",
+        "subsystem": "system",
+        "patterns": [
+            r"(check|show)\s+(memory|ram|cpu|disk|system)\s+(usage|status|info)",
+            r"^(how\s+much\s+)?(memory|ram)\s+(is\s+)?(used|available|free)",
+        ],
+        "handler": "computer_settings",
+        "params": {"action": "system_info"},
         "requires_ai": False,
     },
     {
@@ -303,12 +362,131 @@ _INTENTS: list[dict[str, Any]] = [
             r"^(what\s+(day|time|date))\s+(is\s+)?(it\s+)?",
             r"^(what'?s\s+the\s+(time|date|day))",
             r"^(current\s+)?(date|time|day|hour|minute)",
-            r"(today'?s\s+)?(date|day)",
+            r"(today'?s?\s+)?(date|day)(?!\w)",
+            r"what(\'?s|\s+is)\s+(the\s+)?date\s+(today|it)",
+            r"what(\'?s|\s+is)\s+(the\s+)?day\s+(today|it)",
+            r"what\s+(is\s+)?today'?s?\s+date",
+            r"what\s+date\s+is\s+(today|it)",
+            r"what\s+day\s+is\s+(today|it)",
+            r"what(\'?s|\s+is)\s+the\s+date\s*$",
+            r"tell\s+(me\s+)?(the\s+)?(date|day|time)",
+            r"what(\'?s|\s+is)\s+(it\s+)?(right\s+)?now",
+            r"what\s+day\s+of\s+the\s+week",
+            r"what\s+(time|day)\s+is\s+it",
         ],
         "handler": "get_datetime",
         "params": {},
+        "requires_ai": False,
+    },
+    # ── Timer / Alarm ────────────────────────────────────────────────
+    { "name": "set_timer",
+        "subsystem": "system",
+        "patterns": [
+            r"^(set|start|create|add)\s+(a\s+|an\s+)?(timer|countdown|alarm)",
+            r"^(timer|alarm)\s+(for|in|of)",
+            r"^remind\s+me\s+in\s+",
+        ],
+        "handler": "set_timer",
+        "params": {},
+        "requires_ai": False,
+    },
+    {
+        "name": "stop_timer",
+        "subsystem": "system",
+        "patterns": [
+            r"^(stop|cancel|delete|remove|clear|dismiss)\s+(a|the)?\s*(timer|alarm|countdown)",
+            r"(timer|alarm)\s+(stop|cancel|off|disable)",
+        ],
+        "handler": "set_timer",
+        "params": {"action": "stop"},
+        "requires_ai": False,
+    },
+    # ── Calculator / Math ──────────────────────────────────────────────
+    {
+        "name": "calculate",
+        "subsystem": "system",
+        "patterns": [
+            r"^(calculate|compute|eval|solve|what\s+is|what'?s)\s+",
+            r"^what\s+\d+",
+            r"^(\d+[\s]*[+\-*/])",
+        ],
+        "handler": "calculate",
+        "params": {},
+        "requires_ai": False,
+    },
+    # ── Random Number ─────────────────────────────────────────────────
+    {
+        "name": "random_number",
+        "subsystem": "system",
+        "patterns": [
+            r"^(generate|pick|get|give|create|roll)\s+(a?\s*)?(random\s+)?(number|integer|digit)",
+            r"^(random\s+number|random\s+integer)",
+            r"(roll|flip)\s+(a\s+)?(dice|coin|die)",
+        ],
+        "handler": "random_number",
+        "params": {},
+        "requires_ai": False,
+    },
+    {
+        "name": "system_info",
+        "subsystem": "system",
+        "patterns": [
+            r"^what\s+(is\s+)?(my\s+)?(os|operating\s+system|platform|system)",
+            r"^(os|operating\s+system|platform|system)\s+(info|information|name|type)",
+            r"(tell|show)\s+(me\s+)?(my\s+)?(os|operating\s+system)",
+            r"^what\s+(computer|machine|pc|device|system)\s+(am\s+)?I\s+(using|on|running)",
+            r"(what|cpu|processor)\s+(cpu|processor|chip)",
+            r"(show|what|tell)\s+(me\s+)?(my\s+)?(hostname|computer\s+name|device\s+name)",
+            r"(how\s+much|what)\s+(ram|memory)",
+        ],
+        "handler": "system_info",
+        "params": {},
+        "requires_ai": False,
+    },
+    # ── Unit Converter ────────────────────────────────────────────────
+    {
+        "name": "convert_units",
+        "subsystem": "system",
+        "patterns": [
+            r"\d+\s*(km|mi|miles|kilometers|kg|lb|lbs|pounds|mph|kmh|celsius|fahrenheit|f|c|gal|l|liter|inch|feet|cm|mm)\s+(to|in|as)\s+",
+            r"(convert|change)\s+.*(km|mi|miles|kg|lb|lbs|fahrenheit|celsius|inch|feet)\s+(to|into|in)\s+",
+            r"(how\s+many|how\s+much)\s+(is|are)\s+.*(km|mi|kg|lb|f|c|inch|feet|gal|l)\s+",
+            r"\d+\s*(degrees?\s*)?(celsius|fahrenheit|centigrade|kelvin)\s+(to|in|as)\s+",
+            r"(how\s+many|how\s+much)\s+(km|mi|miles|kg|lb|f|c|celsius|fahrenheit)\s+(is|are)\s+.*(km|mi|miles|kg|lb|f|c)",
+        ],
+        "handler": "convert_units",
+        "params": {},
+        "requires_ai": False,
+    },
+    # ── File Converter ──────────────────────────────────────────────────
+    {
+        "name": "convert_file",
+        "subsystem": "system",
+        "patterns": [
+            r"^(convert|change|transform)\s+(this\s+)?(file\s+)?(.+?)\s+(to|into)\s+",
+            r"^(ocr|extract\s+text)\s+(from\s+)?(this\s+)?(image|picture|photo|screenshot)",
+            r"^(turn|make)\s+(this\s+)?(image|picture|photo|pdf|doc|file).+(to|into)\s+",
+        ],
+        "handler": "convert_file",
+        "params": {},
         "requires_ai": True,
     },
+    # ── File System Queries ──────────────────────────────────────────
+    {
+        "name": "filesystem_query",
+        "subsystem": "system",
+        "patterns": [
+            r"(largest|biggest|huge|size)\s+(files|folders|directories)",
+            r"(disk|drive|storage)\s+(usage|space|size|free|available)",
+            r"top\s+\d+\s+(largest|biggest)\s+(files|folders)",
+            r"how\s+(much|many)\s+(space|storage|room|gb)\s+(left|free|available)",
+            r"what['']?s?\s+(using|taking)\s+(up\s+)?(all\s+)?(the\s+)?(space|storage|disk)",
+        ],
+        "handler": "filesystem_query",
+        "params": {},
+        "requires_ai": False,
+    },
+    # ── Maps / Location ───────────────────────────────────────────────
     {
         "name": "maps",
         "subsystem": "system",
@@ -331,6 +509,9 @@ _INTENTS: list[dict[str, Any]] = [
             r"(what'?s|what\s+is)\s+(.+)\s+(stock|price|share|ticker|trading\s+at)",
             r"how\s+much\s+(?!.*(budget|spend|expense|transaction|finance))(.+)\s+(stock|price|share|cost)",
             r"how\s+(much)\s+(is|does|do)\s+(.+)",
+            r"(price|value|rate|worth)\s+(of\s+)?(bitcoin|btc|ethereum|eth|solana|sol|xrp|ripple|cardano|ada|dogecoin|doge)",
+            r"(bitcoin|btc|ethereum|eth|solana|sol|xrp|ripple|cardano|ada|dogecoin|doge)\s+(price|value|rate|worth)",
+            r"^what('?s|\s+is)\s+(the\s+)?(price|value|rate)\s+(of\s+)?(bitcoin|btc|ethereum|eth|crypto)",
         ],
         "handler": "stock_price",
         "params": {},
@@ -343,6 +524,11 @@ _INTENTS: list[dict[str, Any]] = [
             r"^(news|headlines|latest\s+news|what'?s\s+happening)",
             r"^(tech\s+news|world\s+news|science\s+news|business\s+news)",
             r"(get|fetch|show|read)\s+(me\s+)?(the\s+)?news",
+            r"\w+\s+news$",          # "tunisia news", "tech news", "world news" at end
+            r"\w+\s+news\s+",        # "tunisia news today" — news in middle
+            r"(latest|breaking|top)\s+\w*\s*news",  # "latest tunisia news"
+            r"^what(\'?s| is| are)\s+(the\s+)?(latest\s+|breaking\s+|top\s+)?(news|headlines)",  # "what's the news", "what are the latest news"
+            r"^what\s+.*\bnews\b",  # "what tunisia news", "what is going on in news"
         ],
         "handler": "news",
         "params": {},
@@ -350,6 +536,7 @@ _INTENTS: list[dict[str, Any]] = [
     },
     {
         "name": "books",
+        "subsystem": "system",
         "patterns": [
             r"who\s+wrote\s+",
             r"book\s+(by|about|called|titled|named)",
@@ -391,12 +578,12 @@ _INTENTS: list[dict[str, Any]] = [
         "patterns": [
             r"^(play|search)\s+(a\s+)?(video|youtube)",
             r"play\s+.*\s+on\s+youtube",
-            r"open\s+.+\s+(in|on)\s+youtube",      # "open X in/on youtube" (not bare "open youtube")
+            r"open\s+.+\s+(in|on)\s+(youtube|yt)",
             r"youtube\s+(search|find)\s+(.+)",
             r"search\s+youtube\s+for\s+(.+)",
-            r"channel\s+(stats?|info|details?)\s+(of\s+)?(.+)",
-            r"(subscriber|subscribers?|views?|videos?|stats?)\s+(for\s+)?(.+)",
-            r"download\s+(a\s+)?(youtube\s+)?video(.+)",
+            r"\bchannel\b\s+\b(stats?|info|details?)\b\s+\b(of\s+)?(.+)",
+            r"\b(subscriber|subscribers?|views?|videos?)\b\s+\b(for\s+)?(.+)",
+            r"\bdownload\b\s+(a\s+)?(youtube\s+)?video(.+)",
             r"(youtube\s+)?video\s+download(.+)",
         ],
         "handler": "youtube_video",
@@ -616,7 +803,10 @@ _INTENTS: list[dict[str, Any]] = [
         "subsystem": "forensics",
         "patterns": [
             r"^(show|list|what\s+are)\s+(running\s+)?(processes?|apps?|programs?)",
+            r"what\s+apps?\s+are\s+(currently\s+)?(running|open)",
+            r"what\s+programs?\s+are\s+(currently\s+)?(running|open)",
             r"what'?s?\s+(running|using\s+cpu|using\s+memory)",
+            r"(running|active)\s+(processes?|apps?|programs?)",
             r"(top|heavy)\s+(processes?|tasks?)",
         ],
         "handler": "forensics",
@@ -707,6 +897,21 @@ _INTENTS: list[dict[str, Any]] = [
         "requires_ai": True,
     },
 
+    # ── Shutdown / Goodbye ───────────────────────────────────────────
+    {
+        "name": "shutdown_jarvis",
+        "subsystem": "system",
+        "patterns": [
+            r"^(shut\s*(down|off)|goodbye|bye|exit|quit|stop\s+(yourself|jarvis|it|now))",
+            r"(shut\s*(down|off)|exit|quit)\s+(jarvis|the\s+assistant)",
+            r"(go\s+(to\s+)?)?(sleep|offline)",
+            r"shut\s+(yourself|it)\s+down",
+        ],
+        "handler": "shutdown_jarvis",
+        "params": {},
+        "requires_ai": False,
+    },
+
     # ── Hermes Agent (complex multi-step tasks) ──────────────────────
     {
         "name": "hermes_task",
@@ -720,6 +925,296 @@ _INTENTS: list[dict[str, Any]] = [
             r"^(debug|troubleshoot|fix)\s+(this\s+)?(complex|complicated|multi)",
         ],
         "handler": "agent_task",
+        "params": {},
+        "requires_ai": False,
+    },
+
+    # ── RealTime Tutor (Gemini 2.0 Flash voice/video) ────────────────
+    {
+        "name": "realtime_tutor",
+        "subsystem": "tutor",
+        "patterns": [
+            r"^(start|open|launch)\s+(the\s+)?(gemini\s+)?(realtutor|tutor)",
+            r"^(stop|close|exit)\s+(the\s+)?(gemini\s+)?(realtutor|tutor)",
+            r"^(realtutor|tutor)\s+(mode|on|off)",
+            r"^(gemini\s+)?(real\s+)?(realtime\s+)?tutor",
+            r"^open\s+(the\s+)?(gemini\s+)?realtutor",
+        ],
+        "handler": "realtime_tutor",
+        "params": {},
+        "requires_ai": False,
+    },
+
+    # ── Habit Tracker ────────────────────────────────────────────────
+    {
+        "name": "habit_tracker",
+        "subsystem": "productivity",
+        "patterns": [
+            r"^(habit|habits|tracker)",
+            r"^(my|check|show|list)\s+(habit|habits|progress)",
+            r"^(track|log|record)\s+(a\s+)?(habit|progress)",
+            r"^what['']?s?\s+my\s+progress",
+            r"^(mark|set)\s+(habit|task)\s+(as\s+)?(done|complete|completed)",
+            r"^(create|add|new)\s+(a\s+)?(habit|tracker)",
+        ],
+        "handler": "habit_tracker",
+        "params": {},
+        "requires_ai": True,  # LLM extracts action/name/periodicity
+    },
+
+    # ── Flight Finder ──────────────────────────────────────────────────
+    {
+        "name": "find_flights",
+        "subsystem": "travel",
+        "patterns": [
+            r"^(find|search|book|look\s+for|show)\s+(flights?|trips?|airfare|plane\s+tickets)",
+            r"(flights?|fly|flying)\s+(to|from|between)",
+            r"^(how\s+much|what'?s\s+the\s+price)\s+(to\s+)?(fly|flight)\s+(to|from)",
+        ],
+        "handler": "flight_finder",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Package Manager (install/uninstall/update) ─────────────────────
+    {
+        "name": "package_install",
+        "subsystem": "packages",
+        "patterns": [
+            r"^(install|download|get)\s+(a\s+)?(package|app|program|software|tool|application)",
+            r"^(install|download)\s+",
+        ],
+        "handler": "package_manager",
+        "params": {},
+        "requires_ai": True,
+    },
+    {
+        "name": "package_uninstall",
+        "subsystem": "packages",
+        "patterns": [
+            r"^(uninstall|remove|delete|get\s+rid\s+of)\s+(a\s+)?(package|app|program|software|tool)",
+            r"^(uninstall|remove)\s+",
+        ],
+        "handler": "package_manager",
+        "params": {},
+        "requires_ai": True,
+    },
+    {
+        "name": "package_update",
+        "subsystem": "packages",
+        "patterns": [
+            r"^(update|upgrade)\s+(all\s+)?(packages?|apps?|software|system)",
+            r"^(check|list)\s+(for\s+)?(updates?|upgrades?)",
+            r"(update|upgrade)\s+(everything|all|system)",
+        ],
+        "handler": "package_manager",
+        "params": {"action": "update_all"},
+        "requires_ai": False,
+    },
+    # ── Game Updater ──────────────────────────────────────────────────
+    {
+        "name": "game_update",
+        "subsystem": "games",
+        "patterns": [
+            r"^(update|check|list)\s+(my\s+)?(games?|steam|epic)",
+            r"^(install|download)\s+(a\s+)?(game|steam|epic)",
+        ],
+        "handler": "game_updater",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Jobs / Job Search ────────────────────────────────────────────
+    {
+        "name": "job_search",
+        "subsystem": "career",
+        "patterns": [
+            r"^(find|search|look\s+for)\s+(a\s+)?(job|work|position|role|career|employment)",
+            r"^(jobs?|careers?|vacancies?)\s+(in|near|at|for)",
+            r"^(what|show)\s+(jobs?|positions?|roles?|vacancies?)",
+            r"^(hiring|recruiting)\s+(for\s+)?",
+        ],
+        "handler": "job_search",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Security Vault ────────────────────────────────────────────────
+    {
+        "name": "vault_save",
+        "subsystem": "security",
+        "patterns": [
+            r"^(save|store|remember|keep)\s+(my\s+)?(password|secret|key|credential|token)",
+            r"^(add|create|save)\s+(a\s+)?(secret|password|credential)",
+        ],
+        "handler": "vault",
+        "params": {},
+        "requires_ai": True,
+    },
+    {
+        "name": "vault_get",
+        "subsystem": "security",
+        "patterns": [
+            r"^(get|show|retrieve|what'?s?\s+my)\s+(password|secret|key|credential|token)",
+            r"^(what\s+is|what'?s?)\s+(my\s+)?(password|secret)\s+(for|of)",
+        ],
+        "handler": "vault",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Computer Control (keyboard/mouse) ─────────────────────────────
+    {
+        "name": "computer_type",
+        "subsystem": "system",
+        "patterns": [
+            r"^(type|write|enter)\s+\w+\s+(on\s+)?(the\s+)?(screen|page|field|box)",
+            r"^type\s+",
+        ],
+        "handler": "computer_control",
+        "params": {},
+        "requires_ai": True,
+    },
+    {
+        "name": "computer_click",
+        "subsystem": "system",
+        "patterns": [
+            r"^(click|tap|press|double.?click)\s+(on\s+)?",
+            r"^(scroll|move)\s+(mouse|cursor|pointer)",
+        ],
+        "handler": "computer_control",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Run Shell Command ────────────────────────────────────────────
+    {
+        "name": "run_command",
+        "subsystem": "system",
+        "patterns": [
+            r"^(run|execute)\s+(a\s+)?(shell|terminal|command|script|cmd)",
+            r"^(open|launch)\s+terminal\s+(and\s+)?(run|execute|type)",
+        ],
+        "handler": "run_command",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Run Python Code ─────────────────────────────────────────────
+    {
+        "name": "run_python",
+        "subsystem": "system",
+        "patterns": [
+            r"^(run|execute)\s+(python|script)\s+(code|script|file)",
+            r"^python\s+",
+        ],
+        "handler": "run_python",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Free Claude Code (fcc-server + fcc-claude in a folder) ───────
+    {
+        "name": "run_fcc",
+        "subsystem": "system",
+        "patterns": [
+            r"^(run|start|launch|open)\s+(free\s+claude\s+code|fcc)",
+            r"^(free\s+claude\s+code|fcc)\s+(in|for|at)\s+",
+            r"^(run|start)\s+(free\s+)?claude\s+(code\s+)?(in|for|at)\s+",
+            r"^(run|start|launch)\s+fcc",
+        ],
+        "handler": "run_fcc",
+        "params": {},
+        "requires_ai": False,
+    },
+    # ── Daily Dashboard (open all daily software at once) ────────────
+    {
+        "name": "open_dashboard",
+        "subsystem": "system",
+        "patterns": [
+            r"^(open|launch|start|show)\s+(my\s+)?dashboard",
+            r"^(open|launch|start|run)\s+(?=(?:all|every|my|daily)\s+)(?:all|every|my|daily)?\s*(?:my\s+)?(?:daily\s+)?(?:apps?|software|programs?|applications?)\s*(?:now|please|at\s+once)?$",
+            r"dashboard\s+(time|mode|on|now)",
+        ],
+        "handler": "open_dashboard",
+        "params": {},
+        "requires_ai": False,
+    },
+    {
+        "name": "add_dashboard",
+        "subsystem": "system",
+        "patterns": [
+            r"^(add|put|include)\s+.+\s+to\s+(my\s+)?dashboard",
+            r"^(add|set)\s+(my\s+)?(daily\s+)?(apps?|software|programs?)\s+",
+            r"^my\s+(daily\s+)?(software|apps?|programs?)\s+(is|are)\s+",
+        ],
+        "handler": "add_dashboard",
+        "params": {},
+        "requires_ai": False,  # app list is parsed directly
+    },
+    {
+        "name": "remove_dashboard",
+        "subsystem": "system",
+        "patterns": [
+            r"^(remove|delete|take\s+off|drop)\s+.+\s+(from\s+)?(my\s+)?dashboard",
+            r"^(remove|delete)\s+(from\s+)?(my\s+)?(daily\s+)?(apps?|software|programs?)\s+",
+        ],
+        "handler": "remove_dashboard",
+        "params": {},
+        "requires_ai": False,  # app list is parsed directly
+    },
+    {
+        "name": "list_dashboard",
+        "subsystem": "system",
+        "patterns": [
+            r"^(what'?s?|what\s+is|what\s+are|show|list)\s+(on\s+|in\s+)?(my\s+)?dashboard\??$",
+            r"^what\s+(apps?|software)\s+(are|is)\s+(on\s+)?(my\s+)?dashboard",
+        ],
+        "handler": "list_dashboard",
+        "params": {},
+        "requires_ai": False,
+    },
+    # ── Network Scan ─────────────────────────────────────────────────
+    {
+        "name": "network_scan",
+        "subsystem": "network",
+        "patterns": [
+            r"^(scan|discover|list|find)\s+(my\s+)?(network|devices?|hosts?|machines?)",
+            r"^(who'?s?\s+on|what'?s?\s+on)\s+(my\s+)?(network|wifi|lan)",
+            r"^(check|show)\s+(network|wifi)\s+(devices?|clients?|connections?)",
+        ],
+        "handler": "network_scan",
+        "params": {},
+        "requires_ai": False,
+    },
+    # ── Task Manager (add/list/delete) ───────────────────────────────
+    {
+        "name": "task_add",
+        "subsystem": "tasks",
+        "patterns": [
+            r"^(add|create|new|make)\s+(a\s+)?(task|todo|thing|item|reminder)",
+            r"\b(at|by|before|on|in)\b\s+.*\b(do|add|create|make|schedule|remind)\s+",
+        ],
+        "handler": "tasks",
+        "params": {"action": "add"},
+        "requires_ai": False,
+    },
+    {
+        "name": "task_delete",
+        "subsystem": "tasks",
+        "patterns": [
+            r"^(delete|remove|complete|finish|done)\s+(a\s+)?(task|todo|item)",
+            r"^(mark|set)\s+(task|todo|item)\s+(as\s+)?(done|complete|completed|finished)",
+        ],
+        "handler": "tasks",
+        "params": {},
+        "requires_ai": True,
+    },
+    # ── Todo Display (graphical table) ───────────────────────────────
+    {
+        "name": "todo_display",
+        "subsystem": "tasks",
+        "patterns": [
+            r"^(show|open|display|view|get)\s+(my\s+)?(todo|tasks?|list|to-do)",
+            r"^(todo|to-do|tasks?)\s+(list|panel|view|table)",
+            r"^(what'?s?\s+on|what\s+do\s+I\s+have)\s+(my\s+)?(todo|list)",
+            r"^list\s+(all\s+)?(my\s+)?(tasks?|todos?)",
+            r"^(what|show)\s+(?:are\s+)?(?:my\s+)?(?:tasks?|todos?|to-do)",
+        ],
+        "handler": "todo_display",
         "params": {},
         "requires_ai": False,
     },
@@ -766,12 +1261,14 @@ class IntentRouter:
         Returns IntentRouterResult — check .matched before using.
         If no match, .requires_ai is True (fall back to LLM).
         """
-        t = text.lower().strip()
+        t_lower = text.lower().strip()
+        # Strip wake-word prefix so "jarvis open map" → "open map"
+        t_lower = re.sub(r"^(hey\s+)?jarvis[\s,:-]+", "", t_lower).strip()
         start = time.time()
 
         # First pass: check capability registry patterns
         try:
-            cap_matches = find_matches(t)
+            cap_matches = find_matches(t_lower)
             if cap_matches:
                 cap = cap_matches[0]
                 name = cap["name"]
@@ -800,21 +1297,55 @@ class IntentRouter:
         for intent in self._intents:
             for pattern in intent["patterns"]:
                 try:
-                    m = re.search(pattern, t)
+                    m = re.search(pattern, t_lower, re.IGNORECASE)
                     if m:
-                        score = len(m.group()) / max(len(t), 1)
-                        if intent["name"] == "open_app" and score < 0.3:
-                            continue
+                        score = len(m.group()) / max(len(t_lower), 1)
                         if score > best_score:
                             best_score = score
                             best_match = intent
-                            best_params = self._extract_params(t, intent, m)
+                            best_params = self._extract_params(text, intent, m)
+                        # open_app — bump only for simple app launches;
+                        # compound requests (and/or/then/register/etc.) go to the LLM.
+                        if intent["name"] == "open_app" and score < 0.5:
+                            app = text[m.end():].strip().rstrip("!?., ")
+                            if app:
+                                _compound = any(
+                                    kw in app.lower()
+                                    for kw in [
+                                        " and ", " or ", " then ", " also ",
+                                        " to ", " in it", " in the", " for me",
+                                        " register", " signup", " sign up",
+                                        " create ", " login", " log in",
+                                         " make ", " open ",
+                                ])
+                                if not _compound:
+                                    best_score = max(best_score, 0.5)
+                                    if best_score == 0.5:
+                                        best_match = intent
                 except re.error:
                     continue
 
         elapsed = (time.time() - start) * 1000
 
         if best_match and best_score > 0.2:
+            requires_ai = best_match.get("requires_ai", True)
+            # Compound open_app requests (e.g. "open chrome and register...")
+            # must go to the LLM even if score is above threshold.
+            if not requires_ai and best_match["name"] == "open_app":
+                _app_name = best_params.get("app_name", "")
+                _compound = any(
+                    kw in _app_name.lower()
+                    for kw in [
+                        " and ", " or ", " then ", " also ",
+                        " to ", " in it", " in the", " for me",
+                        " register", " signup", " sign up",
+                        " create ", " login", " log in",
+                        " make ", " open ",
+                    ]
+                )
+                if _compound:
+                    requires_ai = True
+
             logger.debug(
                 "IntentRouter: '%s' -> %s (%.1fms, conf=%.2f)",
                 text, best_match["name"], elapsed, best_score,
@@ -825,7 +1356,7 @@ class IntentRouter:
                 subsystem=best_match["subsystem"],
                 handler_name=best_match["handler"],
                 handler_params={**best_match.get("params", {}), **best_params},
-                requires_ai=best_match.get("requires_ai", True),
+                requires_ai=requires_ai,
                 confidence=best_score,
             )
 
@@ -846,6 +1377,19 @@ class IntentRouter:
             app = text[match.end():].strip().rstrip("!?., ")
             if app:
                 params["app_name"] = app
+
+        elif intent["name"] == "auto_register":
+            site = ""
+            if match.re.groups > 0:
+                g = match.group(match.re.groups)
+                if g and g not in ("on", "for", "at", "a", "an", "the", "out", "form"):
+                    site = g.strip().rstrip("!?., ")
+            if not site:
+                site = text[match.end():].strip().rstrip("!?., ")
+            if site and site.lower() in ("on", "for", "at", "a", "an", "the", "out", "form"):
+                site = ""
+            params["url"] = site
+            params["action"] = "auto_fill"
 
         elif intent["name"] == "web_search":
             query = text[match.end():].strip().rstrip("!?., ")
@@ -874,15 +1418,21 @@ class IntentRouter:
             # Try capture groups first ("search youtube for X" has X in group(1))
             if match.re.groups > 0:
                 g = match.group(match.re.groups)
-                if g and g not in ("in", "on", "the"):
+                if g and g not in ("in", "on", "the", "youtube", "yt"):
                     query = g.strip()
             if not query:
                 query = text[match.end():].strip().rstrip("!?., ")
-            # "open/play/search X in/on youtube" → extract X
+            # "open/play/search X in/on youtube/yt" → extract X from before the preposition
             if not query:
-                in_match = re.search(r"\s+(?:in|on)\s+youtube\s*$", text)
+                in_match = re.search(r"\s+(?:in|on)\s+(?:youtube|yt)\s*$", text, re.IGNORECASE)
                 if in_match:
                     query = text[:in_match.start()].strip()
+            # "open/play/search X in/on youtube/yt" — also try extracting from the text before match end
+            if not query and match.group().strip():
+                before = text[:match.start()] + text[match.end():]
+                in_match2 = re.search(r"\s+(?:in|on)\s+(?:youtube|yt)\s*$", before, re.IGNORECASE)
+                if in_match2:
+                    query = before[:in_match2.start()].strip()
             if query:
                 for prefix in ["play ", "search ", "open ", "a ", "an ", "the "]:
                     if query.lower().startswith(prefix):
@@ -924,6 +1474,17 @@ class IntentRouter:
                 days_match = re.search(r"(\d+)\s+days?", text)
                 params["days"] = int(days_match.group(1)) if days_match else 7
 
+        elif intent["name"] == "get_datetime":
+            text_lower = text.lower()
+            if re.search(r"\bdate\b", text_lower):
+                params["format"] = "date"
+            elif re.search(r"day\s+of\s+the\s+week", text_lower):
+                params["format"] = "day"
+            elif re.search(r"\bday\b", text_lower) and not re.search(r"(time|hour|minute|clock)", text_lower):
+                params["format"] = "day"
+            elif re.search(r"(time|hour|minute|clock)", text_lower) and not re.search(r"\b(date|day)\b", text_lower):
+                params["format"] = "time"
+
         elif intent["name"] == "budget":
             if re.search(r"(this\s+month|monthly|this month)", text):
                 params["period"] = "month"
@@ -933,6 +1494,17 @@ class IntentRouter:
         elif intent["name"] == "github_list_issues":
             if re.search(r"(PRs?|pull\s+requests)", text):
                 params["action"] = "list_prs"
+
+        elif intent["name"] == "github_clone":
+            m = re.search(r"\b(?:clone|download|pull)\s+(?:a\s+)?(?:github\s+)?(?:repo|repository|project)?\s*(.+)$", text)
+            if m:
+                repo = m.group(1).strip().strip("!?., '\"")
+                repo = repo.split()[-1] if repo and " " in repo else repo
+                if repo and repo.lower() not in (
+                    "github", "repo", "repository", "project", "a", "an", "the",
+                    "it", "that", "this", "me", "now", "please",
+                ):
+                    params["repo"] = repo
 
         elif intent["name"] == "computer_settings":
             if "volume" in text or "sound" in text:
@@ -973,6 +1545,238 @@ class IntentRouter:
                 params["action"] = "screenshot"
             elif re.search(r"speed\s*test|internet\s+speed|network\s+speed|connection\s+speed", text):
                 params["action"] = "speedtest"
+
+        elif intent["name"] == "realtime_tutor":
+            if re.search(r"^(start|open|launch)", text):
+                params["action"] = "start"
+            elif re.search(r"^(stop|close|exit)", text):
+                params["action"] = "stop"
+            else:
+                params["action"] = "start"
+
+        elif intent["name"] == "calculate":
+            m = re.search(r"(-?\d+\.?\d*\s*[+\-*/]\s*-?\d+\.?\d*)", text)
+            if m:
+                params["expression"] = m.group(1).strip()
+            if not params.get("expression"):
+                m = re.search(r"(\d+)\s*([+\-*/])\s*(\d+)", text)
+                if m:
+                    params["expression"] = f"{m.group(1)}{m.group(2)}{m.group(3)}"
+            if not params.get("expression"):
+                m = re.search(r"(\d+\s*[\+\-\*/])+\s*\d+", text)
+                if m:
+                    params["expression"] = m.group(0).strip()
+
+        elif intent["name"] == "stock_price":
+            crypto_map = {
+                "bitcoin": "BTC-USD", "btc": "BTC-USD",
+                "ethereum": "ETH-USD", "eth": "ETH-USD",
+                "solana": "SOL-USD", "sol": "SOL-USD",
+                "ripple": "XRP-USD", "xrp": "XRP-USD",
+                "cardano": "ADA-USD", "ada": "ADA-USD",
+                "dogecoin": "DOGE-USD", "doge": "DOGE-USD",
+                "polkadot": "DOT-USD", "dot": "DOT-USD",
+                "litecoin": "LTC-USD", "ltc": "LTC-USD",
+                "chainlink": "LINK-USD", "link": "LINK-USD",
+                "avalanche": "AVAX-USD", "avax": "AVAX-USD",
+            }
+            for name, symbol in crypto_map.items():
+                if name in text.lower():
+                    params["symbols"] = symbol
+                    break
+            if not params.get("symbols"):
+                m = re.search(r"(?:stock|price|ticker)\s+(?:of\s+)?(\w+)", text, re.IGNORECASE)
+                if m:
+                    params["symbols"] = m.group(1).upper()
+            if not params.get("symbols"):
+                m = re.search(r"(\w{1,5})\s+(?:stock|price|share|ticker)", text, re.IGNORECASE)
+                if m:
+                    params["symbols"] = m.group(1).upper()
+
+        elif intent["name"] == "set_timer":
+            m = re.search(r"(\d+)\s*(min|minute|minutes|sec|second|seconds|hour|hours)", text)
+            if m:
+                val = int(m.group(1))
+                unit = m.group(2).lower()
+                if unit.startswith("sec"):
+                    params["minutes"] = max(1, val / 60)
+                elif unit.startswith("hour"):
+                    params["minutes"] = val * 60
+                else:
+                    params["minutes"] = val
+            if re.search(r"remind\s+me\s+in", text):
+                params["mode"] = "timer"
+                msg_match = re.search(r"(?:to|about|that|of)\s+(.+)$", text)
+                if msg_match:
+                    params["message"] = msg_match.group(1).strip()
+            if not params.get("minutes"):
+                params["minutes"] = 10
+
+        elif intent["name"] == "convert_file":
+            params["mode"] = "auto"
+            m = re.search(r"(convert|change|transform|turn)\s+(this\s+)?(.+?)\s+(?:to|into)\s+(.+)", text)
+            if m:
+                params["source_description"] = m.group(3).strip()
+                params["target_format"] = m.group(4).strip()
+            else:
+                m = re.search(r"(convert|change)\s+file\s+(.+?)\s+(?:to|into)\s+(.+)", text)
+                if m:
+                    params["source_path"] = m.group(2).strip()
+                    params["target_format"] = m.group(3).strip()
+
+        elif intent["name"] == "random_number":
+            lo, hi = 1, 100
+            m = re.search(r"(?:between|from)\s+(\d+)\s+(?:and|to)\s+(\d+)", text)
+            if m:
+                lo, hi = int(m.group(1)), int(m.group(2))
+            else:
+                m = re.search(r"(?:1[\s-]?to[\s-]?)?(\d+)", text)
+                if m and "between" not in text:
+                    hi = int(m.group(1))
+            params.update({"min": lo, "max": hi})
+            if re.search(r"(roll|dice)", text):
+                params["mode"] = "dice"
+            elif re.search(r"(coin|flip)", text):
+                params["mode"] = "coin"
+
+        elif intent["name"] == "system_info":
+            if re.search(r"(os|operating\s+system)", text):
+                params["query"] = "os"
+            elif re.search(r"(cpu|processor|core)", text):
+                params["query"] = "cpu"
+            elif re.search(r"(ram|memory|gb)", text):
+                params["query"] = "ram"
+            elif re.search(r"(hostname|name)", text):
+                params["query"] = "hostname"
+            else:
+                params["query"] = "all"
+
+        elif intent["name"] == "convert_units":
+            m = re.search(r"(\d+\.?\d*)\s*(km|mi|miles|kilometers?|kg|lb|lbs?|pounds?|mph|kmh|kph|celsius|fahrenheit|f|c|gal|l|liter|inch|inches|feet|foot|cm|mm|g|oz|ounce)", text)
+            if m:
+                params["value"] = float(m.group(1))
+                params["from"] = m.group(2)
+                rest = text[m.end():].lower()
+                for target in ["km", "mi", "miles", "kg", "lb", "lbs", "f", "c", "celsius", "fahrenheit", "kmh", "mph", "kph", "gal", "l", "liter", "inch", "cm", "mm", "feet", "g", "oz", "pounds"]:
+                    if target in rest:
+                        params["to"] = target
+                        break
+                if not params.get("to"):
+                    if re.search(r"how\s+(many|much)", text):
+                        if params.get("from") in ("mi", "miles"):
+                            params["to"] = "km"
+                        elif params.get("from") in ("km", "kilometers"):
+                            params["to"] = "mi"
+                        elif params.get("from") in ("f", "fahrenheit"):
+                            params["to"] = "c"
+                        elif params.get("from") in ("c", "celsius"):
+                            params["to"] = "f"
+                        elif params.get("from") in ("lb", "lbs"):
+                            params["to"] = "kg"
+                        elif params.get("from") in ("kg"):
+                            params["to"] = "lb"
+
+        elif intent["name"] == "filesystem_query":
+            m = re.search(r"top\s+(\d+)", text)
+            params["count"] = int(m.group(1)) if m else 10
+            if re.search(r"(disk|drive|storage|usage|space|free|available)", text):
+                params["action"] = "disk_usage"
+            elif re.search(r"(largest|biggest|size)", text):
+                params["action"] = "largest"
+            for p in ["home", "downloads?", "documents?", "desktop", "pictures?", "music", "videos?"]:
+                if re.search(p, text):
+                    params["path"] = p.rstrip("?")
+                    break
+
+        elif intent["name"] == "news":
+            # Extract topic: "tunisia news" → topic=tunisia, "tech news" → topic=tech
+            m = re.search(r"(\w+)\s+news\b", text)
+            if m:
+                topic = m.group(1).lower()
+                if topic not in ("latest", "breaking", "top", "the", "get", "show", "read", "fetch", "news", "headlines", "today", "this", "what", "is", "my"):
+                    params["topic"] = topic
+
+        elif intent["name"] == "task_add":
+            from actions.todo_display import parse_task_text
+            parsed = parse_task_text(text)
+            params["title"] = parsed["title"]
+            if parsed["due"]:
+                params["due"] = parsed["due"]
+            if parsed["priority"] != "normal":
+                params["priority"] = parsed["priority"]
+
+        elif intent["name"] == "run_fcc":
+            # "run free claude code in <folder>" → folder=<folder>
+            m = re.search(r"\b(?:in|for|at)\s+(.+?)\s*$", text)
+            if m:
+                folder = m.group(1).strip().strip("!?., ")
+                # Tolerate "the X folder" / "folder called X"
+                folder = re.sub(r"^(the|my|this|a|an)\s+", "", folder)
+                folder = re.sub(r"\s+(folder|directory|dir|project)\s*$", "", folder)
+                if folder and folder.lower() not in (
+                    "free claude code", "fcc", "claude code", "claude",
+                ):
+                    params["folder"] = folder
+
+        elif intent["name"] == "add_dashboard":
+            # Try to parse the app list directly so the common case routes
+            # without the LLM.
+            m = (
+                re.search(r"\b(?:add|put|include)\s+(.+?)\s+to\s+(?:my\s+)?dashboard\b", text)      # "add X to my dashboard"
+                or re.search(r"(?:my\s+)?(?:daily\s+)?(?:software|apps?|programs?)\s+(?:is|are)\s+(.+)$", text)  # "my daily software is X"
+                or re.search(r"\b(?:add|set)\s+(?:my\s+)?(?:daily\s+)?(?:software|apps?|programs?)\s+(.+)$", text)  # "add my daily software X"
+            )
+            if m:
+                raw = m.group(1).strip().strip("!?., ")
+                parts = [
+                    p.strip().strip("'\"")
+                    for p in re.split(r",|\s+and\s+|\s*&\s*|\s+", raw)
+                    if p.strip() and p.strip().lower() not in ("and", "or", "&")
+                ]
+                if parts:
+                    params["apps"] = parts
+
+        elif intent["name"] == "remove_dashboard":
+            m = (
+                re.search(r"\b(?:remove|delete|take\s+off|drop)\s+(.+?)\s+(?:from|off)\s+(?:my\s+)?dashboard\b", text)  # "remove X from my dashboard"
+                or re.search(r"\b(?:remove|delete)\s+(?:from\s+)?(?:my\s+)?(?:daily\s+)?(?:software|apps?|programs?)\s+(.+)$", text)  # "remove from my daily apps X"
+            )
+            if m:
+                raw = m.group(1).strip().strip("!?., ")
+                parts = [
+                    p.strip().strip("'\"")
+                    for p in re.split(r",|\s+and\s+|\s*&\s*|\s+", raw)
+                    if p.strip() and p.strip().lower() not in ("and", "or", "&")
+                ]
+                if parts:
+                    params["apps"] = parts
+
+        elif intent["name"] == "gmail_send":
+            m = re.search(r"to\s+([\w.@+-]+)", text)
+            if m:
+                params["to"] = m.group(1)
+                after = text[m.end():].strip()
+                if after:
+                    if re.search(r"\bsubject\b|\bsubj\b", after, re.IGNORECASE):
+                        m_subj = re.search(r"(?:subject|subj)\s+([^,;]+?)(?:\s*(?:body|desc|description|bdoy|and)\s+|$)", after, re.IGNORECASE)
+                        if m_subj:
+                            params["subject"] = m_subj.group(1).strip()
+                            m_body = re.search(r"(?:body|desc|description|bdoy)\s+(.+)", after, re.IGNORECASE)
+                            if m_body:
+                                params["body"] = m_body.group(1).strip()
+                        else:
+                            params["body"] = after
+                    elif re.search(r"\band\b|\bdesc\b|\bdescription\b|\bbody\b|\bbdoy\b", after, re.IGNORECASE):
+                        m_subj = re.search(r"^(.+?)\s+(?:and|desc|description|body|bdoy)\s+(.+)", after, re.IGNORECASE)
+                        if m_subj:
+                            params["subject"] = m_subj.group(1).strip()
+                            params["body"] = m_subj.group(2).strip()
+                        else:
+                            params["body"] = after
+                    else:
+                        params["body"] = after
+            if not params.get("subject"):
+                params["subject"] = params.get("body", "")[:50] or "No subject"
 
         return params
 

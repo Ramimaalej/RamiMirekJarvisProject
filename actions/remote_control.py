@@ -1,9 +1,14 @@
 import json
 import logging
+import os
 import threading
 from typing import Any
 
 logger = logging.getLogger("remote_control")
+
+# Security config — override via environment variables
+_ALLOWED_ORIGINS = os.environ.get("JARVIS_REMOTE_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+_API_KEY = os.environ.get("JARVIS_REMOTE_KEY", "")  # empty = no auth
 
 _httpd = None
 _thread = None
@@ -22,14 +27,20 @@ def _make_app():
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=_ALLOWED_ORIGINS,
+        allow_credentials=bool(_API_KEY or len(_ALLOWED_ORIGINS) > 0),
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
+    from fastapi import Depends, HTTPException, Header
+
+    async def _verify_key(x_api_key: str = Header(default="")) -> None:
+        if _API_KEY and x_api_key != _API_KEY:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+
     @app.get("/status")
-    def get_status():
+    def get_status(_auth: None = Depends(_verify_key)):
         from actions.context_bus import get_bus
         ctx = get_bus().get_all()
         return {
@@ -39,12 +50,12 @@ def _make_app():
         }
 
     @app.get("/api/context")
-    def api_context():
+    def api_context(_auth: None = Depends(_verify_key)):
         from actions.context_bus import get_bus
         return get_bus().get_all()
 
     @app.post("/api/command")
-    async def execute_command(body: dict):
+    async def execute_command(body: dict, _auth: None = Depends(_verify_key)):
         command = body.get("command", "")
         args = body.get("args", {})
         if not command:
@@ -53,7 +64,7 @@ def _make_app():
         return {"result": result}
 
     @app.get("/api/capabilities")
-    def list_caps():
+    def list_caps(_auth: None = Depends(_verify_key)):
         try:
             from actions.capability_registry import list_capabilities
             return {"capabilities": list_capabilities()}
@@ -61,7 +72,7 @@ def _make_app():
             return {"error": str(e)}
 
     @app.get("/api/goals")
-    def api_goals():
+    def api_goals(_auth: None = Depends(_verify_key)):
         try:
             from actions.goal_engine import list_goals
             return {"goals": list_goals()}
@@ -69,7 +80,7 @@ def _make_app():
             return {"error": str(e)}
 
     @app.get("/api/monitors")
-    def api_monitors():
+    def api_monitors(_auth: None = Depends(_verify_key)):
         try:
             from actions.monitor_manager import get_monitors
             return {"monitors": get_monitors()}
@@ -77,7 +88,10 @@ def _make_app():
             return {"error": str(e)}
 
     @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
+    async def websocket_endpoint(websocket: WebSocket, x_api_key: str = Header(default="")):
+        if _API_KEY and x_api_key != _API_KEY:
+            await websocket.close(code=4001)
+            return
         await websocket.accept()
         bus = None
         try:

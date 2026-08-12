@@ -7,8 +7,6 @@ from typing import Callable
 import sys
 import re
 
-from core.workflows import schedule_flow
-
 def get_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
@@ -30,6 +28,8 @@ class Scheduler:
     def start(self):
         if self._running:
             return
+        from core.workflows import schedule_flow
+        self._execute = schedule_flow(name="Scheduled Job")(self._execute_raw)
         self._running = True
         self._load_jobs()
         self._thread = threading.Thread(target=self._loop, daemon=True)
@@ -43,6 +43,11 @@ class Scheduler:
         import uuid
         job_id = str(uuid.uuid4())[:8]
         with self._lock:
+            try:
+                next_run = self._parse_schedule(schedule)
+            except Exception as e:
+                print(f"[Scheduler] Invalid schedule '{schedule}': {e}")
+                return ""
             job = {
                 "id": job_id,
                 "name": name,
@@ -51,7 +56,7 @@ class Scheduler:
                 "type": job_type,
                 "enabled": True,
                 "last_run": None,
-                "next_run": self._parse_schedule(schedule),
+                "next_run": next_run,
                 "run_count": 0,
             }
             self._jobs.append(job)
@@ -132,8 +137,7 @@ class Scheduler:
                 self._execute(job)
             time.sleep(5)
 
-    @schedule_flow(name="Scheduled Job")
-    def _execute(self, job: dict):
+    def _execute_raw(self, job: dict):
         print(f"[Scheduler] Running: {job['name']}")
         try:
             if self._on_execute:

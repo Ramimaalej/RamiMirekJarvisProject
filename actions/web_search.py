@@ -48,7 +48,7 @@ def _format_ddg(query: str, results: list[dict]) -> str:
 
 def _llm_summarize(query: str, raw_results: str) -> str:
     try:
-        from core.llm_client import call_llm_text
+        from core.llm_client import call_llm_text_smart
         system = (
             "You are JARVIS. Summarize web search results clearly and concisely. "
             "Answer the user's query directly. Be factual. Address user as 'sir'."
@@ -58,7 +58,7 @@ def _llm_summarize(query: str, raw_results: str) -> str:
             f"Web search results:\n{raw_results[:4000]}\n\n"
             "Answer the question based on these results:"
         )
-        return call_llm_text(prompt, system=system)
+        return call_llm_text_smart(prompt, system=system)
     except Exception:
         return raw_results
 

@@ -64,6 +64,7 @@ from actions.computer_control import computer_control
 from actions.game_updater import game_updater
 from actions.get_location import get_location
 from actions.file_processor import file_processor
+from actions.flight_finder import flight_finder
 from core.scheduler import get_scheduler
 from core.safe_math import safe_math
 from agent.agent_manager import get_agent_manager

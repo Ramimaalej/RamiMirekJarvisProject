@@ -5,10 +5,6 @@ import logging
 import time
 from typing import Any, Callable
 
-from prefect import flow, task
-from prefect.logging import get_run_logger
-from prefect.task_runners import ConcurrentTaskRunner
-
 logger = logging.getLogger("workflows")
 
 DEFAULT_RETRIES = 2
@@ -25,6 +21,8 @@ def tool_task(
     name: str | None = None,
 ):
     """Decorator that wraps a tool function as a Prefect task with retry + timeout."""
+    from prefect import task
+    from prefect.logging import get_run_logger
     def decorator(func: Callable) -> Callable:
         @task(
             name=name or func.__name__,
@@ -55,6 +53,9 @@ def agent_flow(
     timeout_seconds: int = 600,
 ):
     """Decorator that wraps an agent execution as a Prefect flow."""
+    from prefect import flow
+    from prefect.logging import get_run_logger
+    from prefect.task_runners import ConcurrentTaskRunner
     def decorator(func: Callable) -> Callable:
         @flow(
             name=name or func.__name__,
@@ -84,6 +85,8 @@ def step_task(
     timeout_seconds: int = 180,
 ):
     """Decorator for individual agent execution steps with retry policy."""
+    from prefect import task
+    from prefect.logging import get_run_logger
     def decorator(func: Callable) -> Callable:
         @task(
             name=func.__name__,
@@ -120,6 +123,8 @@ def schedule_flow(
     timeout_seconds: int = 300,
 ):
     """Decorator for scheduled job execution flows."""
+    from prefect import flow
+    from prefect.logging import get_run_logger
     def decorator(func: Callable) -> Callable:
         @flow(
             name=name or func.__name__,

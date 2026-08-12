@@ -201,3 +201,132 @@ def _get_client(token: str | None = None) -> GitHubClient:
     if _client_cache is None:
         _client_cache = GitHubClient(token=token)
     return _client_cache
+
+
+# ── Clone & run (plain git — no API token needed for public repos) ───────
+
+DEFAULT_CLONE_DIR = Path.home() / "MyProjects"
+
+
+def clone_repo(repo: str, dest_dir: str | None = None, player=None) -> str:
+    """Clone a GitHub repo into ~/MyProjects and return the local path.
+
+    ``repo`` accepts a full URL (https://…, git@…:…) or ``owner/repo``.
+    """
+    import subprocess
+    import shutil
+
+    if not shutil.which("git"):
+        return "git is not installed — install git first."
+
+    repo = repo.strip().strip("'\"").rstrip("/")
+    if not repo:
+        return "Give me a repo, like 'clone https://github.com/user/repo' or 'user/repo'."
+
+    # Normalise shorthand → https URL
+    url = repo
+    if repo.startswith(("git@", "ssh://")):
+        # git@github.com:user/repo.git → user/repo
+        name = repo.rstrip("/").split(":")[-1]
+    else:
+        name = Path(repo).name
+    if not repo.startswith(("http://", "https://", "git@", "ssh://")):
+        if "/" not in repo or repo.count("/") != 1:
+            return f"'{repo}' does not look like a GitHub repo. Try 'owner/repo' or a full URL."
+        url = f"https://github.com/{repo}.git"
+        name = repo.split("/")[-1]
+    if name.endswith(".git"):
+        name = name[:-4]
+
+    dest = (Path(dest_dir).expanduser() if dest_dir else DEFAULT_CLONE_DIR) / name
+    if dest.exists():
+        return f"Repo already exists at {dest}."
+
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        r = subprocess.run(
+            ["git", "clone", "--depth", "1", url, str(dest)],
+            capture_output=True, text=True, timeout=300,
+        )
+        if r.returncode != 0:
+            err = (r.stderr or r.stdout or "").strip().splitlines()
+            return f"Clone failed: {err[-1] if err else 'unknown error'}"
+    except subprocess.TimeoutExpired:
+        return "Clone timed out after 5 minutes."
+    except Exception as e:
+        return f"Clone failed: {e}"
+
+    if player is not None:
+        try:
+            player.write_log(f"[github] cloned {name} → {dest}")
+        except Exception:
+            pass
+    return str(dest)
+
+
+def detect_run_command(folder: Path) -> str:
+    """Figure out how to run a freshly cloned project. Returns a shell command."""
+    if not folder.is_dir():
+        return ""
+
+    if (folder / "package.json").exists():
+        scripts = ""
+        try:
+            import json as _json
+            data = _json.loads((folder / "package.json").read_text(encoding="utf-8"))
+            scripts = (data.get("scripts") or {}).get("dev") or (data.get("scripts") or {}).get("start", "")
+        except Exception:
+            scripts = ""
+        if scripts:
+            return "npm install && npm run dev"
+        return "npm install && npm start"
+
+    for f in ("requirements.txt", "pyproject.toml", "setup.py", "Pipfile"):
+        if (folder / f).exists():
+            for entry in ("main.py", "app.py", "run.py", "manage.py", "server.py", "wsgi.py"):
+                if (folder / entry).exists():
+                    return f"pip install -r requirements.txt && python {entry}"
+            if (folder / "streamlit_app.py").exists():
+                return "pip install -r requirements.txt && streamlit run streamlit_app.py"
+            return "pip install -r requirements.txt && python main.py"
+
+    if (folder / "docker-compose.yml").exists() or (folder / "docker-compose.yaml").exists():
+        return "docker compose up"
+
+    if (folder / "Makefile").exists():
+        return "make run"
+
+    if (folder / "go.mod").exists():
+        return "go run ."
+
+    if (folder / "Cargo.toml").exists():
+        return "cargo run"
+
+    return ""
+
+
+def clone_and_run(repo: str, dest_dir: str | None = None, player=None) -> str:
+    """Clone a repo, then open a terminal in it running the detected start command."""
+    path_str = clone_repo(repo, dest_dir=dest_dir, player=player)
+    # If the repo already exists, still open it — no need to re-clone.
+    if path_str.startswith("Repo already exists"):
+        existing = path_str.split(" at ", 1)[-1].rstrip(".")
+        path_str = existing if Path(existing).is_dir() else path_str
+    if path_str.startswith(("Clone failed", "git is not installed", "Give me", "'",
+                            "Clone timed out")) or not Path(path_str).is_dir():
+        return path_str
+
+    folder = Path(path_str)
+    try:
+        from actions.fcc_runner import open_terminal_in
+        run_cmd = detect_run_command(folder)
+        command = run_cmd if run_cmd else "exec bash"
+        if open_terminal_in(folder, command=command):
+            if run_cmd:
+                return f"Cloned {folder.name} to {folder} and started a terminal running '{run_cmd}'."
+            return f"Cloned {folder.name} to {folder} and opened it in a terminal."
+        return f"Cloned {folder.name} to {folder} (could not open a terminal)."
+    except Exception as e:
+        logger.warning("clone_and_run terminal open failed: %s", e)
+        return f"Cloned {folder.name} to {folder}."
+

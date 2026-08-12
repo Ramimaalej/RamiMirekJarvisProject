@@ -100,7 +100,8 @@ def _active_window() -> str:
         from actions.screen_reader import get_active_window_info
         info = get_active_window_info()
         return f"{info.get('title', '?')} ({info.get('app', '?')})"
-    except Exception:
+    except Exception as e:
+        logger.warning("Active window detection failed: %s", e)
         return "unknown"
 
 
@@ -124,7 +125,8 @@ def screen_explain(parameters: dict = None, **kwargs) -> str:
     try:
         img_bytes = _screenshot()
     except Exception as e:
-        return f"I cannot do that."
+        logger.error("Screenshot failed: %s", e)
+        return f"I cannot take a screenshot right now."
 
     img_info = _analyze_image(img_bytes)
     window = _active_window()

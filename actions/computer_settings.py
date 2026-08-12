@@ -362,17 +362,22 @@ def type_text(text: str, press_enter_after: bool = False):
         time.sleep(0.1)
         pyautogui.press("enter")
 
-def take_screenshot():
+def take_screenshot() -> str:
+    dest = Path.home() / "Desktop" / f"jarvis_screenshot_{int(time.time())}.png"
     if _OS == "Windows":
         pyautogui.hotkey("win", "shift", "s")
+        return "Screenshot copied to clipboard (Windows snipping tool)"
     elif _OS == "Darwin":
         pyautogui.hotkey("command", "shift", "3")
+        return f"Screenshot saved to Desktop"
     else:
-        for cmd in [["scrot"], ["gnome-screenshot"], ["import", "-window", "root", "screenshot.png"]]:
+        for cmd in [["scrot", str(dest)], ["gnome-screenshot", "-f", str(dest)],
+                    ["import", "-window", "root", str(dest)]]:
             if subprocess.run(["which", cmd[0]], capture_output=True).returncode == 0:
                 subprocess.Popen(cmd)
-                return
+                return f"Screenshot saved: {dest}"
         pyautogui.hotkey("ctrl", "print_screen")
+        return "Screenshot key sent (Ctrl+PrintScreen)"
 
 def lock_screen():
     if _OS == "Windows":
@@ -551,6 +556,22 @@ def clipboard_write(text: str) -> str:
         pyperclip.copy(text)
         return f"Copied to clipboard: {text[:80]}"
     return "pyperclip not available for clipboard write"
+
+
+def system_info() -> str:
+    """Get CPU, memory, and disk usage."""
+    try:
+        import psutil
+        cpu = psutil.cpu_percent(interval=0.3)
+        mem = psutil.virtual_memory()
+        disk = psutil.disk_usage('/')
+        return (
+            f"CPU: {cpu}% | "
+            f"RAM: {mem.percent}% ({mem.used // (1024**3)}GB / {mem.total // (1024**3)}GB) | "
+            f"Disk: {disk.percent}% ({disk.used // (1024**3)}GB / {disk.total // (1024**3)}GB)"
+        )
+    except Exception as e:
+        return f"System info unavailable: {e}"
 
 
 def battery_status() -> str:
@@ -1033,6 +1054,10 @@ def computer_settings(
     if action == "mute" and desc_lower.startswith("mute the microphone"):
         action = "jarvis_mic"
 
+    # Map intent-routed volume/sound actions (action=volume, description=volume_set/up/down/mute)
+    if action in ("volume", "sound") and description in ("volume_set", "volume_up", "volume_down", "volume_mute"):
+        action = description
+
     print(f"[Settings] Action: {action}  Value: {value}  OS: {_OS}")
     if player:
         player.write_log(f"[Settings] {action}")
@@ -1045,6 +1070,8 @@ def computer_settings(
                 f"Please confirm by calling again with confirmed=yes."
             )
 
+    if action in ("volume", "sound") and description == "volume_set":
+        action = "volume_set"
     if action == "volume_set":
         try:
             volume_set(int(value or 50))
@@ -1110,6 +1137,9 @@ def computer_settings(
         clipboard_write(text)
         return f"Copied: {text[:80]}"
 
+    if action in ("system_info", "memory_usage", "system_status"):
+        return system_info()
+
     if action == "battery_status":
         return battery_status()
 
@@ -1142,9 +1172,11 @@ def computer_settings(
 
     try:
         if action in ("volume_up", "volume_down") and value is not None:
-            func(int(value))
+            result = func(int(value))
         else:
-            func()
+            result = func()
+        if result and isinstance(result, str):
+            return result
         return f"Done: {action}."
     except Exception as e:
         print(f"[Settings] Action failed ({action}): {e}")

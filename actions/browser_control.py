@@ -390,6 +390,132 @@ def _detect_default_browser() -> str:
     return "chrome"
 
 
+# ── Form-filling helpers ─────────────────────────────────────────────────────
+
+import random as _random
+import string as _string
+
+_FIELD_KEYWORDS: dict[str, str] = {
+    "first.?name|fname|given.?name": "first_name",
+    "last.?name|lname|surname|family.?name": "last_name",
+    "full.?name|your.?name|enter.?name": "full_name",
+    "email|e.?mail|mail": "email",
+    "username|user.?name|login|nick|nickname": "username",
+    "password|pass|pwd|secret": "password",
+    "phone|mobile|tel|phone.?number|cell|telephone": "phone",
+    "address|addr|street": "address",
+    "city|town": "city",
+    "zip|postal|post.?code|zip.?code": "zip",
+    "birth|birthday|dob|date.?of.?birth": "birthday",
+    "company|organization|org|business": "company",
+    "website|url|site|homepage": "website",
+    "confirm.?password|confirm.?pass|pass.?again": "confirm_password",
+}
+
+
+def _infer_field_type(name_lower: str) -> str | None:
+    for pattern, field_type in _FIELD_KEYWORDS.items():
+        if re.search(pattern, name_lower):
+            return field_type
+    return None
+
+
+def _generate_field_value(name_lower: str, html_type: str, tag: str) -> str | None:
+    if tag == "select":
+        return "1"
+    if html_type in ("email",):
+        names = ["alex", "jordan", "casey", "morgan", "riley", "taylor", "sam", "jamie"]
+        domains = ["gmail.com", "outlook.com", "yahoo.com", "proton.me"]
+        return f"{_random.choice(names)}.{_random.choice(names)}{_random.randint(10,999)}@{_random.choice(domains)}"
+    if html_type in ("tel", "phone"):
+        return f"+1{_random.randint(200,999)}{_random.randint(100,999)}{_random.randint(1000,9999)}"
+    if html_type in ("url", "website"):
+        return f"https://example.com/{_random.choice(names)}"
+    if html_type == "password":
+        return "Pass" + _random.choice(_string.ascii_uppercase) + str(_random.randint(1000,9999)) + "!@#"
+    if html_type == "number":
+        return str(_random.randint(1, 999))
+    if html_type in ("date", "datetime", "datetime-local"):
+        return f"2025-0{_random.randint(1,9)}-{_random.randint(10,28)}"
+
+    field_type = _infer_field_type(name_lower)
+    if field_type == "first_name":
+        return _random.choice(["Alex","Jordan","Casey","Morgan","Riley","Taylor","Sam","Jamie","Quinn","Avery"])
+    if field_type == "last_name":
+        return _random.choice(["Smith","Johnson","Williams","Brown","Jones","Garcia","Miller","Davis","Martinez"])
+    if field_type == "full_name":
+        return f"{_random.choice(['Alex','Jordan','Casey'])} {_random.choice(['Smith','Johnson','Williams'])}"
+    if field_type == "email":
+        return f"{_random.choice(['alex','jordan','casey'])}.{_random.choice(['smith','johnson'])}{_random.randint(10,999)}@{_random.choice(['gmail.com','outlook.com'])}"
+    if field_type == "username":
+        return f"{_random.choice(['alex','jordan','casey'])}{_random.randint(10,999)}"
+    if field_type == "password":
+        return "Pass" + _random.choice(_string.ascii_uppercase) + str(_random.randint(1000,9999)) + "!@#"
+    if field_type == "phone":
+        return f"+1{_random.randint(200,999)}{_random.randint(100,999)}{_random.randint(1000,9999)}"
+    if field_type == "address":
+        return f"{_random.randint(100,9999)} {_random.choice(['Main','Oak','Elm','Maple','Cedar'])} St"
+    if field_type == "city":
+        return _random.choice(["New York","Los Angeles","Chicago","Houston","Phoenix","San Francisco"])
+    if field_type == "zip":
+        return f"{_random.randint(10000,99999)}"
+    if field_type == "birthday":
+        return f"{_random.randint(1,12):02d}/{_random.randint(1,28):02d}/{_random.randint(1980,2000)}"
+    if field_type == "company":
+        return f"{_random.choice(['Acme','Globex','Initech','Umbrella','Stark'])} {_random.choice(['Inc','Corp','LLC'])}"
+    if field_type == "website":
+        return f"https://{_random.choice(['alex','jordan'])}.{_random.choice(['dev','io','me'])}"
+    if field_type == "confirm_password":
+        return "Pass" + _random.choice(_string.ascii_uppercase) + str(_random.randint(1000,9999)) + "!@#"
+
+    if html_type == "text" or tag == "textarea":
+        return _random.choice(["Hello there","Test value","Sample text","Something here"])
+    return None
+
+
+async def _find_field(page, field_info: dict):
+    """Try multiple strategies to locate a form field on the page."""
+    name = field_info.get("name", "")
+    el_id = field_info.get("id", "")
+    placeholder = field_info.get("placeholder", "")
+    label = field_info.get("label", "")
+    aria = field_info.get("aria_label", "")
+    tp = field_info.get("type", "text")
+
+    if el_id:
+        el = page.locator(f"#{el_id}")
+        if await el.count() > 0:
+            return el.first
+    if name:
+        el = page.locator(f"[name='{name}']")
+        if await el.count() > 0:
+            return el.first
+    if placeholder:
+        try:
+            el = page.get_by_placeholder(placeholder, exact=False).first
+            if await el.count() > 0:
+                return el
+        except Exception:
+            pass
+    if label:
+        try:
+            el = page.get_by_label(label, exact=False).first
+            if await el.count() > 0:
+                return el
+        except Exception:
+            pass
+    if aria:
+        el = page.locator(f"[aria-label='{aria}']")
+        if await el.count() > 0:
+            return el.first
+
+    candidates = page.locator(f"input[type='{tp}'], textarea, select")
+    count = await candidates.count()
+    if count > 0:
+        return candidates.first
+    return None
+
+
 class _BrowserSession:
     """
     Bir tarayıcı örneği için tam oturum.
@@ -683,6 +809,79 @@ class _BrowserSession:
                 results.append(f"✗ {selector}: {e}")
         return "Form filled: " + ", ".join(results)
 
+    async def detect_form_fields(self) -> list[dict]:
+        """Scan the page for form fields and return their metadata."""
+        page = await self._get_page()
+        fields = []
+        try:
+            inputs = await page.query_selector_all("input, select, textarea")
+            for el in inputs:
+                tag = await el.evaluate("el => el.tagName.toLowerCase()")
+                tp = await el.evaluate("el => (el.getAttribute('type') || 'text').toLowerCase()")
+                if tp in ("submit", "button", "hidden", "image", "reset", "file"):
+                    continue
+                name = await el.evaluate("el => el.getAttribute('name') || ''")
+                placeholder = await el.evaluate("el => el.getAttribute('placeholder') || ''")
+                el_id = await el.evaluate("el => el.getAttribute('id') || ''")
+                required = await el.evaluate("el => el.hasAttribute('required')")
+                aria_label = await el.evaluate("el => el.getAttribute('aria-label') || ''")
+                label_text = ""
+                if el_id:
+                    label_el = await page.query_selector(f'label[for="{el_id}"]')
+                    if label_el:
+                        label_text = await label_el.inner_text()
+                if not label_text:
+                    parent = await el.evaluate("el => el.closest('label')")
+                    if parent:
+                        label_text = await page.evaluate("el => el.innerText", parent)
+                fields.append({
+                    "tag": tag, "type": tp, "name": name,
+                    "placeholder": placeholder, "id": el_id,
+                    "required": required, "label": label_text.strip(),
+                    "aria_label": aria_label,
+                })
+        except Exception as e:
+            return [{"error": str(e)}]
+        return fields
+
+    async def auto_fill_form(self, form_data: dict | None = None) -> str:
+        """Auto-detect form fields and fill them with provided or generated data."""
+        page = await self._get_page()
+        fields = await self.detect_form_fields()
+        if not fields:
+            return "No form fields found on this page."
+        if isinstance(fields[0], dict) and "error" in fields[0]:
+            return f"Form detection error: {fields[0]['error']}"
+
+        filled = []
+        for f in fields:
+            tag = f["tag"]
+            tp = f["type"]
+            name_lower = (f["name"] + " " + f["label"] + " " + f["placeholder"] + " " + f["aria_label"]).lower()
+            key = f.get("name") or f.get("id")
+            value = None
+
+            if form_data and key and key in form_data:
+                value = form_data[key]
+            if value is None:
+                value = _generate_field_value(name_lower, tp, tag)
+
+            if value is not None:
+                try:
+                    el = await _find_field(page, f)
+                    if el:
+                        await el.clear()
+                        await el.type(str(value), delay=30)
+                        filled.append(f"✓ {f['name'] or f['label'] or tp} → {value[:30]}")
+                    else:
+                        filled.append(f"✗ {f['name'] or tp}: field not found")
+                except Exception as e:
+                    filled.append(f"✗ {f['name'] or tp}: {e}")
+            else:
+                filled.append(f"- {f['name'] or tp}: skipped")
+
+        return "Auto-fill: " + ", ".join(filled) if filled else "Could not fill any fields."
+
     async def smart_click(self, description: str) -> str:
         page = await self._get_page()
         for role in ("button", "link", "searchbox", "textbox", "menuitem", "tab"):
@@ -946,6 +1145,10 @@ def browser_control(
             result = sess.run(sess.scroll(params.get("direction", "down"), int(params.get("amount", 500))))
         elif action == "fill_form":
             result = sess.run(sess.fill_form(params.get("fields", {})))
+        elif action == "detect_form":
+            result = str(sess.run(sess.detect_form_fields()))
+        elif action == "auto_fill":
+            result = sess.run(sess.auto_fill_form(params.get("form_data")))
         elif action == "smart_click":
             result = sess.run(sess.smart_click(params.get("description", "")))
         elif action == "smart_type":

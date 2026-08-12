@@ -6,16 +6,20 @@ import logging
 import time
 from pathlib import Path
 
-from openai import OpenAI
+from core.llm_client import resolve_llm_url
 
 logger = logging.getLogger("browser_use")
 
 
 def _find_config() -> dict:
-    cfg = Path(__file__).resolve().parent.parent / "config" / "api_keys.json"
-    if cfg.exists():
-        return json.loads(cfg.read_text())
-    return {}
+    p = Path(__file__).resolve().parent.parent / "config" / "api_keys.json"
+    try:
+        cfg = json.loads(p.read_text())
+    except Exception:
+        cfg = {}
+    if cfg.get("llm_url_local") or cfg.get("llm_url_remote"):
+        cfg["llm_url"] = resolve_llm_url(cfg)
+    return cfg
 
 
 def _build_llm_client() -> dict | None:

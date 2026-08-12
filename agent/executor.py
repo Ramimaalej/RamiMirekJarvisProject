@@ -14,7 +14,7 @@ from typing import Callable
 
 from agent.planner       import create_plan, replan
 from agent.error_handler import analyze_error, generate_fix, ErrorDecision
-from core.llm_client     import call_llm_text
+from core.llm_client     import call_llm_text_smart as call_llm_text
 from core.workflows      import agent_flow, step_task, tool_task
 
 

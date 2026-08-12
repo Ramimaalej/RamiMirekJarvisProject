@@ -66,19 +66,29 @@ from typing import Any
 import numpy as np
 import sounddevice as sd
 
+logger = logging.getLogger(__name__)
+
 from ui import JarvisUI
 from memory.memory_manager import load_memory, update_memory, format_memory_for_prompt
-from core.llm_client import call_llm, call_llm_stream, get_llm_settings, invalidate_config_cache
+from core.llm_client import call_llm_stream, invalidate_config_cache
 
 from memory.vector_memory      import store_memory, store_conversation, get_relevant_context, get_memory_count, search_memory
-from skills.skill_loader       import get_skill_for_task, get_active_skill_context, list_skills, reload_skills
-from agent.agent_manager       import get_agent_manager, AgentStatus
+from skills.skill_loader       import get_active_skill_context, list_skills, reload_skills
+from agent.agent_manager       import get_agent_manager
 from core.scheduler            import get_scheduler
 from core.safe_math            import safe_math
 
 from actions.file_processor    import file_processor
 from actions.flight_finder     import flight_finder
 from actions.open_app          import open_app
+from actions.fcc_runner        import run_fcc_in_folder
+from actions.dashboard         import (
+    add_to_dashboard,
+    remove_from_dashboard,
+    list_dashboard,
+    open_dashboard,
+    log_usage as dashboard_log_usage,
+)
 from actions.weather_report    import weather_action
 from actions.maps              import maps_action
 from actions.stock_prices      import stock_price_action
@@ -100,16 +110,16 @@ from actions.web_search        import web_search as web_search_action
 from actions.computer_control  import computer_control
 from actions.game_updater      import game_updater
 from actions.get_location      import get_location
-from actions.read_email        import read_email
 from actions.browser_use_agent import run_browser_use_task
 from actions.screen_reader     import get_ui_elements, get_active_window_info
-from actions.face_recognition  import detect_faces, detect_smiles, detect_eyes, analyze_camera_feed
+from actions.face_recognition  import detect_faces, analyze_camera_feed
 from actions.wake_word         import start_wake_word, stop_wake_word
-from actions.github_integration import GitHubClient, _get_client as _get_gh_client
+from actions.github_integration import _get_client as _get_gh_client
+from actions.github_integration import clone_and_run
 from actions.file_search       import search_files
-from actions.finance_tracker   import FinanceClient, _get_client as _get_finance_client
+from actions.finance_tracker   import _get_client as _get_finance_client
 from actions.network_discovery import discover_services, get_local_ips
-from actions.voice_calls       import LiveKitClient, _get_client as _get_lk_client
+from actions.voice_calls       import _get_client as _get_lk_client
 from actions.monitor_manager   import get_monitors, get_monitor_summary, set_monitor_brightness, get_active_monitor
 from actions.obsidian_vault    import save_note, search_notes, list_notes, create_knowledge_graph, set_vault_path, get_all_tags
 from actions.package_manager   import install_package, uninstall_package, list_installed, update_all, detect_os_package_manager
@@ -117,17 +127,24 @@ from actions.goal_engine       import create_goal, list_goals, get_goal, update_
 from actions.task_manager     import task_manager, budget_manager, add_task, complete_task, delete_task, list_tasks, add_transaction, list_transactions, budget_summary
 from actions.screen_explain   import screen_explain
 from actions.comfyui          import generate_image
+from actions.file_converter    import convert_file
+from actions.random_number     import random_number
+from actions.system_info       import system_info
+from actions.unit_converter    import convert_units
 from actions.timer_scheduler  import handle as timer_handle, set_on_fire as timer_set_callback
 from actions.task_graph        import create_task, complete_task, get_available_tasks, get_task_graph_summary, get_critical_path, delete_task, reset_graph
-from actions.security_vault    import HashiVaultClient, store_secret, get_secret, list_secrets, delete_secret
-from actions.context_bus       import get_bus, publish, subscribe, get_context, get_all_context
-from actions.project_scaffold import scaffold_project, list_projects, get_project_status
+from actions.security_vault    import store_secret, get_secret, list_secrets, delete_secret
+from actions.context_bus       import get_bus, get_context, get_all_context
+from actions.project_scaffold import scaffold_project
 from actions.project_init     import handle as project_init_handle
 from actions.projectinitializer import handle as project_initializer_handle
 from actions.relationship_graph import (
     add_node, remove_node, add_edge, remove_edge,
     get_related, resolve_deployment, get_graph_summary,
 )
+from actions.realtime_tutor    import realtime_tutor, stop_tutor
+from actions.email_reader      import read_emails
+from actions.habit_actions     import handle as handle_habit
 from actions.forensics         import file_history, process_history, network_history, what_installed_since, get_forensics_summary
 from actions.google_workspace import google_workspace_action
 from actions.remote_control    import remote_control
@@ -137,7 +154,6 @@ from actions.hermes_agent     import hermes_task as hermes_agent_task
 from gws_bridge                import (
     get_unread_emails as gws_get_unread_emails,
     search_emails as gws_search_emails,
-    read_email as gws_read_email,
     send_email as gws_send_email,
     reply_email as gws_reply_email,
     get_todays_agenda,
@@ -233,7 +249,7 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "web_search",
-        "description": "Searches the web for factual information, recent events, history, news, or any question about the real world. Use this for ANY factual question (who, what, when, where, why) instead of calculate. NOT for book/author queries — use books tool instead. NOT for weather queries — use weather_report instead.",
+        "description": "CRITICAL: Use for ANY real-world, factual, or current-information question. Sports scores, match results, news, history, science, definitions, people, prices, live events, statistics. NEVER answer factual questions from memory — always call web_search. Examples: 'Tunisia vs Japan match', 'bitcoin price', 'who won the Nobel Prize', 'capital of France', 'Beethoven symphonies'. NOT for weather (use weather_report) or books (use books tool).",
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -404,7 +420,8 @@ TOOL_DECLARATIONS = [
         "name": "browser_control",
         "description": (
             "Controls any web browser. Use for: opening websites, searching the web, "
-            "clicking elements, filling forms, scrolling, navigation. "
+            "clicking elements, filling forms (auto_fill auto-detects form fields and fills with generated data), "
+            "scrolling, navigation. "
             "NOT for checking Gmail/emails — use gmail_get_unread instead. "
             "NOT for checking the weather — use weather_action instead. "
             "NOT for taking screenshots — use computer_settings instead. "
@@ -413,7 +430,7 @@ TOOL_DECLARATIONS = [
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "go_to | search | click | type | scroll | fill_form | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | back | forward | reload | switch | list_browsers | close | close_all"},
+                "action":      {"type": "STRING", "description": "go_to | search | click | type | scroll | fill_form | detect_form | auto_fill | smart_click | smart_type | get_text | get_url | press | new_tab | close_tab | back | forward | reload | switch | list_browsers | close | close_all"},
                 "browser":     {"type": "STRING", "description": "chrome | edge | firefox | opera | operagx | brave | vivaldi | safari"},
                 "url":         {"type": "STRING", "description": "URL for go_to / new_tab action. For TradingView charts use: https://www.tradingview.com/chart/?symbol=XAUUSD&interval=1 (interval values: 1=1m, 5=5m, 15=15m, 60=1h, 240=4h, D=1d, W=1w, M=1M)"},
                 "query":       {"type": "STRING", "description": "Search query"},
@@ -601,6 +618,79 @@ TOOL_DECLARATIONS = [
                 "timeout": {"type": "INTEGER", "description": "Timeout in seconds (default 30)"},
             },
             "required": ["code"]
+        }
+    },
+    {
+        "name": "run_fcc",
+        "description": (
+            "Runs Free Claude Code in a folder. Opens the system terminal in the "
+            "chosen folder and starts BOTH fcc-server (background) and fcc-claude "
+            "(foreground). ALWAYS use this when the user says 'run free claude code', "
+            "'start fcc', or 'free claude code in <folder>'. "
+            "Pass the folder name or path; Jarvis finds it automatically. "
+            "If no folder is given, it reuses the last used folder."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "folder": {"type": "STRING", "description": "Folder name or path, e.g. 'Jarvis', '~/MyProjects/Jarvis', 'my portfolio'"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "open_dashboard",
+        "description": (
+            "Opens ALL of the user's daily software at once (their 'dashboard'). "
+            "ALWAYS use this when the user says 'open my dashboard', 'open all my apps', "
+            "or 'open my daily software'. Jarvis learns which apps are daily from usage."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
+        "name": "add_dashboard",
+        "description": (
+            "Adds an app (or list of apps) to the user's daily dashboard. "
+            "Use when the user says 'add chrome to my dashboard', 'my daily software is "
+            "chrome, vscode and whatsapp', or 'add X to my daily apps'. "
+            "Pass apps as a list of app names."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "apps": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "List of app names to add"}
+            },
+            "required": ["apps"]
+        }
+    },
+    {
+        "name": "remove_dashboard",
+        "description": (
+            "Removes an app (or list of apps) from the user's daily dashboard. "
+            "Use when the user says 'remove chrome from my dashboard' or 'delete X from my daily apps'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "apps": {"type": "ARRAY", "items": {"type": "STRING"}, "description": "List of app names to remove"}
+            },
+            "required": ["apps"]
+        }
+    },
+    {
+        "name": "list_dashboard",
+        "description": (
+            "Lists the apps currently on the user's daily dashboard. "
+            "Use when the user asks 'what is on my dashboard' or 'what are my daily apps'."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {},
+            "required": []
         }
     },
     {
@@ -1050,12 +1140,12 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "github",
-        "description": "GitHub API integration. Create/list repos, manage issues and pull requests, view workflows. Requires GITHUB_TOKEN environment variable.",
+        "description": "GitHub integration. Create/list repos, manage issues and pull requests, view workflows, and clone a public repo into ~/MyProjects (clone needs no token). Requires GITHUB_TOKEN for API operations.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":     {"type": "STRING", "description": "list_repos | create_repo | get_repo | list_issues | create_issue | close_issue | list_prs | get_pr | create_pr | merge_pr | list_workflows | list_runs"},
-                "repo":       {"type": "STRING", "description": "Full repo name (e.g. 'user/repo') for repo/issue/PR operations"},
+                "action":     {"type": "STRING", "description": "clone | list_repos | create_repo | get_repo | list_issues | create_issue | close_issue | list_prs | get_pr | create_pr | merge_pr | list_workflows | list_runs"},
+                "repo":       {"type": "STRING", "description": "Repo to clone (URL or 'user/repo'), or full repo name for repo/issue/PR operations"},
                 "name":       {"type": "STRING", "description": "Repo name for create_repo, or issue/PR title"},
                 "description":{"type": "STRING", "description": "Repo description for create_repo"},
                 "private":    {"type": "BOOLEAN", "description": "Make repo private (default: false)"},
@@ -1211,6 +1301,14 @@ TOOL_DECLARATIONS = [
                 "status":   {"type": "STRING", "description": "pending | done — filter for list action"}
             },
             "required": ["action"]
+        }
+    },
+    {
+        "name": "todo_display",
+        "description": "Shows the todo list as a graphical table with stats, due dates, and priorities. Use for: show todo, display tasks, open todo list, view my tasks.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {}
         }
     },
     {
@@ -1404,6 +1502,128 @@ TOOL_DECLARATIONS = [
             "required": []
         }
     },
+    {
+        "name": "realtime_tutor",
+        "description": "Opens the Gemini 2.0 Flash RealTime Tutor — a voice/video/screen tutor inside the Jarvis GUI. Use for: start tutor, open tutor, gemini tutor, real-time tutor, stop tutor, close tutor.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "'start' to launch the tutor, 'stop' to close it",
+                    "enum": ["start", "stop"]
+                }
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "read_emails",
+        "description": "Fetches recent emails from Gmail. Use for: read my emails, check inbox, latest email, new messages, show emails from today.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "hours":  {"type": "INTEGER", "description": "How many hours back to search (default 24)"},
+                "keyword": {"type": "STRING", "description": "Optional keyword to filter emails"},
+                "limit":  {"type": "INTEGER", "description": "Max emails to return (default 10)"}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "habit_tracker",
+        "description": "Track and analyze habits. Supports: list habits, create a habit, mark habit complete, show progress/streaks, weekly/monthly reports. Use for: habit tracker, my habits, track habits, habit progress, log habit, habit streak.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {
+                    "type": "STRING",
+                    "description": "Action to perform: list, create, complete, progress, report, delete",
+                    "enum": ["list", "create", "complete", "progress", "report", "delete"]
+                },
+                "name":     {"type": "STRING", "description": "Habit name (for create, complete, progress, delete)"},
+                "periodicity": {"type": "STRING", "description": "daily or weekly (default: daily)"},
+                "category": {"type": "STRING", "description": "Category like health, education, fitness (default: general)"},
+                "id":       {"type": "INTEGER", "description": "Habit ID (for complete, progress, delete)"}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "set_timer",
+        "description": "Sets a countdown timer for a specified duration. Use for: set a timer for X minutes, remind me in Y minutes, timer for cooking, create an alarm.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "minutes": {"type": "INTEGER", "description": "Duration in minutes"},
+                "message": {"type": "STRING", "description": "Optional message when timer fires"},
+            },
+            "required": ["minutes"]
+        }
+    },
+    {
+        "name": "convert_file",
+        "description": "Converts files between formats: images (png/jpg/webp/gif/bmp/tiff/ico), PDF, Word, Excel, PowerPoint, Markdown, HTML, CSV, JSON, XML, TXT, audio (mp3/wav/ogg/flac/m4a/aac), video (mp4/avi/mkv/mov/webm/gif), and OCR (image to text). Use for: convert X to Y, change format, turn into, OCR this image.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "source_path":    {"type": "STRING", "description": "Full path to the source file"},
+                "target_format":  {"type": "STRING", "description": "Target format e.g. pdf, png, docx, mp3, gif, txt (for OCR)"},
+                "mode":           {"type": "STRING", "description": "auto (default) — convert based on file extension"},
+            },
+            "required": ["source_path", "target_format"]
+        }
+    },
+    {
+        "name": "random_number",
+        "description": "Generates a random number, rolls dice, or flips a coin. Use for: random number, roll dice, flip coin, pick a number.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "min":  {"type": "INTEGER", "description": "Minimum value (default 1)"},
+                "max":  {"type": "INTEGER", "description": "Maximum value (default 100)"},
+                "mode": {"type": "STRING", "description": "number (default), dice, or coin"},
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "system_info",
+        "description": "Returns information about the computer: OS, CPU, RAM, hostname, architecture. Use for: what is my OS, system info, computer specs, show operating system.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query": {"type": "STRING", "description": "What to query: os, cpu, ram, hostname, or all (default)"},
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "convert_units",
+        "description": "Converts between units of measurement: length (km/mi/cm/in/ft), weight (kg/lb/g/oz), temperature (C/F/K), volume (L/gal/ml), speed (kmh/mph/knot), time, data (GB/MB), area. Use for: convert miles to km, how many kg in 10 pounds, 100f to celsius.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "value": {"type": "NUMBER", "description": "The numeric value to convert"},
+                "from":  {"type": "STRING", "description": "Source unit (km, mi, kg, lb, f, c, etc.)"},
+                "to":    {"type": "STRING", "description": "Target unit (km, mi, kg, lb, f, c, etc.)"},
+            },
+            "required": ["value", "from", "to"]
+        }
+    },
+    {
+        "name": "filesystem_query",
+        "description": "Queries the file system: largest files, disk usage, storage space. Use for: largest files in downloads, disk usage, top 10 biggest files, how much space is free.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "largest (default) or disk_usage"},
+                "path":   {"type": "STRING", "description": "Directory to scan: home, downloads, desktop, documents (default: home)"},
+                "count":  {"type": "INTEGER", "description": "Number of files to list (default 10)"},
+            },
+            "required": []
+        }
+    },
 ]
 
 
@@ -1424,11 +1644,9 @@ def _convert_type(t: str) -> str:
 def _convert_props(props: dict) -> dict:
     out = {}
     for k, v in props.items():
-        nv = dict(v)
-        if "type" in nv:
-            nv["type"] = _convert_type(nv["type"])
-        if "items" in nv and isinstance(nv["items"], dict):
-            nv["items"] = {"type": _convert_type(nv["items"].get("type", "string"))}
+        nv: dict = {"type": _convert_type(v.get("type", "string"))}
+        if "items" in v and isinstance(v["items"], dict):
+            nv["items"] = {"type": _convert_type(v["items"].get("type", "string"))}
         out[k] = nv
     return out
 
@@ -1444,11 +1662,12 @@ def _to_ollama_tools(decls: list) -> list:
         req = params.get("required")
         if req:
             new_params["required"] = req
+        desc = d.get("description", "")
         tools.append({
             "type": "function",
             "function": {
                 "name":        d["name"],
-                "description": d["description"],
+                "description": desc,
                 "parameters":  new_params,
             },
         })
@@ -1486,13 +1705,16 @@ _GREETINGS = {
 }
 
 def _is_greeting(text: str) -> bool:
-    """Return True if the user's message is a simple greeting with no action intent."""
+    """Return True only if the user's message is purely a greeting with no query."""
     t = text.lower().strip().rstrip("!?.,").strip()
     if t in _GREETINGS:
         return True
     first_word = t.split()[0] if t.split() else ""
     if first_word in _GREETINGS:
-        return True
+        remaining = t[len(first_word):].strip().rstrip("!?.,").strip()
+        if not remaining or remaining in _GREETINGS:
+            return True
+    return False
 
 
 def calculate(parameters: dict = None) -> str:
@@ -1595,22 +1817,10 @@ def calculate(parameters: dict = None) -> str:
         left_side = eq_match.group(1).strip()
         right_side = eq_match.group(2).strip()
         try:
-            # Solve for x: rearrange ax + b = c → x = (c - b) / a
             left_expr = left_side.replace(' ', '').replace('x', '*x').replace('X', '*x')
             if left_expr.startswith('*x'):
                 left_expr = 'x' + left_expr[2:]
             right_val = safe_math(right_side)
-            import ast as _ast
-            tree = _ast.parse(left_expr, mode='eval')
-            # Simple linear: ax + b = c → x = (c - b) / a
-            # Parse terms: find coefficient of x and constant
-            import ast as _ast
-            tree = _ast.parse(left_expr, mode='eval')
-            # For simple case like "3*x + 7", just substitute and solve
-            # Try direct approach: evaluate without x first to find constant
-            no_x = left_expr.replace('*x', '*0').replace(' x', ' 0').replace('x', '0')
-            # Better: parse coefficients manually
-            # Pattern: (a)*x + (b) or (a)x + (b)
             coef_match = _re.match(r'^([\d.]+)\s*(?:\*\s*)?[xX]\s*([+\-])\s*([\d.]+)$|^([\d.]+)\s*([+\-])\s*([\d.]+)\s*(?:\*\s*)?[xX]$', left_side.replace(' ', ''))
             if coef_match:
                 groups = coef_match.groups()
@@ -1753,6 +1963,9 @@ class JarvisLocal:
         self._text_queue:     queue.Queue = queue.Queue()
         self._tts_queue:      queue.Queue = queue.Queue()
         self._conversation:   list[dict]  = []
+        self._conv_lock = threading.Lock()
+        self._generation = 0
+        self._processing_lock = threading.Lock()
 
         self.ui.on_text_command = self._on_text_command
         self._current_language = "en"
@@ -2011,6 +2224,7 @@ class JarvisLocal:
     # ------------------------------------------------------------------
 
     def _on_text_command(self, text: str) -> None:
+        self._generation += 1  # invalidates any in-flight _process_message with old gen
         self._text_queue.put(text)
 
     # ------------------------------------------------------------------
@@ -2056,6 +2270,34 @@ class JarvisLocal:
             if name == "open_app":
                 r = open_app(parameters=args, response=None, player=self.ui)
                 result = r or f"Opened {args.get('app_name')}."
+                # Feed the dashboard: successful app launches teach Jarvis
+                # which software is used daily.
+                if r and not any(w in r for w in ("Could not", "Failed", "Unsupported")):
+                    try:
+                        dashboard_log_usage(args.get("app_name", ""))
+                    except Exception:
+                        pass
+
+            elif name == "run_fcc":
+                r = run_fcc_in_folder(parameters=args, response=None, player=self.ui)
+                result = r or "Free Claude Code launched."
+
+            elif name == "open_dashboard":
+                r = open_dashboard(parameters=args, response=None, player=self.ui)
+                result = r or "Dashboard opened."
+
+            elif name == "add_dashboard":
+                apps = args.get("apps") or []
+                msgs = [add_to_dashboard(a) for a in apps]
+                result = " ".join(msgs) if msgs else add_to_dashboard("")
+
+            elif name == "remove_dashboard":
+                apps = args.get("apps") or []
+                msgs = [remove_from_dashboard(a) for a in apps]
+                result = " ".join(msgs) if msgs else remove_from_dashboard("")
+
+            elif name == "list_dashboard":
+                result = list_dashboard()
 
             elif name == "weather_report":
                 r = weather_action(parameters=args, player=self.ui)
@@ -2225,8 +2467,7 @@ class JarvisLocal:
                     import time
                     self.speak("Goodbye.")
                     time.sleep(2.5)
-                    from PyQt6.QtWidgets import QApplication
-                    QApplication.instance().quit()
+                    self.ui._win._quit_sig.emit()
 
                 threading.Thread(target=_shutdown, daemon=True).start()
                 return "Shutting down."
@@ -2508,10 +2749,12 @@ class JarvisLocal:
                     result = f"Unknown wake word action: {action}"
 
             elif name == "github":
-                gh = _get_gh_client()
                 action = args.get("action", "")
+                gh = _get_gh_client()
                 try:
-                    if action == "list_repos":
+                    if action == "clone":
+                        result = clone_and_run(args.get("repo", ""), player=self.ui)
+                    elif action == "list_repos":
                         repos = gh.list_repos(user=args.get("user"))
                         lines = [f"Repos ({len(repos)}):"]
                         for r in repos:
@@ -2889,6 +3132,11 @@ class JarvisLocal:
                 except Exception as e:
                     result = f"Task manager error: {e}"
 
+            # ── Todo Display ───────────────────────────────────────────────
+            elif name == "todo_display":
+                from actions.todo_display import show_todo_panel
+                result = show_todo_panel(parameters=args, player=self.ui)
+
             # ── Budget Tracker ──────────────────────────────────────────────
             elif name == "budget":
                 action = args.get("action", "summary").strip().lower()
@@ -3084,17 +3332,52 @@ class JarvisLocal:
             elif name == "jobs":
                 result = job_search_action(parameters=args, player=self.ui)
 
+            elif name == "realtime_tutor":
+                if args.get("action") == "stop":
+                    result = stop_tutor()
+                else:
+                    result = realtime_tutor(parameters=args, player=self.ui)
+
+            elif name == "read_emails":
+                result = read_emails(parameters=args, player=self.ui)
+
+            elif name == "habit_tracker":
+                result = handle_habit(parameters=args, player=self.ui)
+
+            elif name == "set_timer":
+                result = timer_handle(parameters=args, player=self.ui)
+
+            elif name == "convert_file":
+                result = convert_file(parameters=args, player=self.ui)
+
+            elif name == "random_number":
+                result = random_number(parameters=args, player=self.ui)
+
+            elif name == "system_info":
+                result = system_info(parameters=args, player=self.ui)
+
+            elif name == "convert_units":
+                result = convert_units(parameters=args, player=self.ui)
+
+            elif name == "filesystem_query":
+                from actions.file_controller import get_largest_files, get_disk_usage
+                a = (args or {}).get("action", "largest")
+                path = (args or {}).get("path", "home")
+                count = int((args or {}).get("count", 10))
+                if a == "disk_usage":
+                    result = get_disk_usage(path=path)
+                else:
+                    result = get_largest_files(path=path, count=count)
+
             else:
                 result = "I cannot do that."
-                self.ui.write_log(f"ERR: Unknown tool — {name}")
+                self.ui.show_error_state(f"Unknown tool — {name}")
 
         except Exception as e:
             result = "I cannot do that."
             short = str(e)[:120]
-            self.ui.write_log(f"ERR: {name} — {short}")
+            self.ui.show_error_state(f"{name} — {short}")
             traceback.print_exc()
-            if not self.ui.muted:
-                self.ui.set_state("LISTENING")
 
         print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
         return result
@@ -3137,7 +3420,15 @@ class JarvisLocal:
         Tool-call responses never emit sentence events, so the TTS overlap
         only kicks in for pure conversational replies — which is exactly when
         it matters most.
+
+        Cancellation: snapshots self._generation at entry.  If the counter
+        advances (new text command from the UI), this call winds down at the
+        next safe checkpoint so the new message can be processed immediately.
         """
+        _gen = self._generation
+        def _cancelled() -> bool:
+            return _gen != self._generation
+
         # Wait for background prefetch to complete (started in _listen_whisper)
         pf_thread = getattr(self, "_prefetch_thread", None)
         if pf_thread and pf_thread.is_alive():
@@ -3149,7 +3440,8 @@ class JarvisLocal:
         self.ui.set_state("THINKING")
         self.ui.write_log(f"You: {user_text}")
 
-        self._conversation.append({"role": "user", "content": user_text})
+        with self._conv_lock:
+            self._conversation.append({"role": "user", "content": user_text})
 
         MAX_HISTORY = 10
         if len(self._conversation) > MAX_HISTORY:
@@ -3160,12 +3452,12 @@ class JarvisLocal:
         ] + list(self._conversation)
 
         # ── Intent Router: bypass LLM for common commands ─────────────────
-        intent = route_intent(user_text)
-        if intent.matched and not intent.requires_ai:
+        self._last_intent = route_intent(user_text)
+        if self._last_intent.matched and not self._last_intent.requires_ai:
             # Route directly — no LLM call needed
-            tool_params = intent.handler_params
-            self.ui.write_log(f"INTENT: {intent.intent_name} → {tool_params}")
-            result = self._execute_tool(intent.intent_name, tool_params)
+            tool_params = self._last_intent.handler_params
+            self.ui.write_log(f"INTENT: {self._last_intent.intent_name} → {tool_params}")
+            result = self._execute_tool(self._last_intent.handler_name, tool_params)
             if result == "__SILENT__":
                 # Silent tools (save_memory) — don't speak, don't store
                 return
@@ -3173,8 +3465,13 @@ class JarvisLocal:
                 self.speak(result)
                 self.ui.write_log_instant(f"Jarvis: {result}")
             assistant_msg = {"role": "assistant", "content": result or ""}
-            self._conversation.append(assistant_msg)
+            with self._conv_lock:
+                self._conversation.append(assistant_msg)
             threading.Thread(target=store_conversation, args=(user_text, result or ""), daemon=True).start()
+            return
+
+        if _cancelled():
+            self.ui.write_log("SYS: Cancelled — new input received")
             return
 
         # Tools whose output needs a second LLM round to summarise/interpret.
@@ -3189,26 +3486,36 @@ class JarvisLocal:
 
         MAX_TOOL_ROUNDS = 6
         for _round in range(MAX_TOOL_ROUNDS):
+            if _cancelled():
+                self.ui.write_log("SYS: Cancelled — new input received")
+                break
+
             final_content    = ""
             final_tool_calls: list = []
             _streamed: list[str] = []
 
             # Skip sending ~50 tool definitions for simple greetings
-            # and only attach the large OLLAMA_TOOLS payload to Ollama
-            # backends. Sending the full tools list to cloud providers can
-            # bloat the request and increase latency severely.
             try:
                 from core.llm_client import get_llm_provider
                 _provider = get_llm_provider()
             except Exception:
                 _provider = "ollama"
 
+            # Ollama, Groq, NVIDIA NIM, OpenRouter, and OpenAI-compatible
+            # providers all support tool calling — send tools unless it's
+            # a greeting on the first round.
             _tools = None
-            if _provider == "ollama" and not (_round == 0 and _is_greeting(user_text)):
+            if not (_round == 0 and _is_greeting(user_text)):
                 _tools = OLLAMA_TOOLS
 
+            # ── Apply per-intent model override if configured ──────────
+            override = None
+            if self._last_intent.matched:
+                ov = _load_config().get("model_overrides", {}).get(self._last_intent.intent_name)
+                if ov:
+                    override = (ov.get("provider"), ov.get("model"))
             try:
-                for event in call_llm_stream(messages, _tools):
+                for event in call_llm_stream(messages, _tools, model_override=override):
                     if event["type"] == "sentence":
                         # ── Overlap TTS with LLM generation ─────────────────
                         # Queue this sentence immediately; the TTS worker
@@ -3224,7 +3531,12 @@ class JarvisLocal:
                         final_content    = event["content"]
                         final_tool_calls = event["tool_calls"]
             except RuntimeError as e:
-                self.speak_error("LLM", e)
+                short = str(e)[:120]
+                self.ui.write_log(f"ERR: LLM — {short}")
+                self.speak("I cannot do that.")
+                fallback = {"role": "assistant", "content": f"I'm sorry, I encountered an error: {short}"}
+                with self._conv_lock:
+                    self._conversation.append(fallback)
                 return
 
             # ── Greeting guard ────────────────────────────────────────────────
@@ -3242,12 +3554,14 @@ class JarvisLocal:
                     # Text already written to log during streaming — just update history.
                     assistant_msg = {"role": "assistant", "content": final_content}
                     messages.append(assistant_msg)
-                    self._conversation.append(assistant_msg)
+                    with self._conv_lock:
+                        self._conversation.append(assistant_msg)
                 elif final_content:
                     # Very short response (no sentence boundary) — speak now.
                     assistant_msg = {"role": "assistant", "content": final_content}
                     messages.append(assistant_msg)
-                    self._conversation.append(assistant_msg)
+                    with self._conv_lock:
+                        self._conversation.append(assistant_msg)
                     self.ui.write_log(f"Jarvis: {final_content}")
                     self.speak(final_content)
                 # Store in vector memory
@@ -3262,7 +3576,8 @@ class JarvisLocal:
                 "tool_calls": final_tool_calls,
             }
             messages.append(assistant_msg)
-            self._conversation.append(assistant_msg)
+            with self._conv_lock:
+                self._conversation.append(assistant_msg)
 
             # ── Fast path: save_memory + verbal content in same round ────────
             _only_memory = all(
@@ -3281,7 +3596,8 @@ class JarvisLocal:
                     self._execute_tool("save_memory", targs)
                 assistant_msg2 = {"role": "assistant", "content": final_content}
                 messages.append(assistant_msg2)
-                self._conversation.append(assistant_msg2)
+                with self._conv_lock:
+                    self._conversation.append(assistant_msg2)
                 self.ui.write_log(f"Jarvis: {final_content}")
                 if not _streamed:
                     self.speak(final_content)
@@ -3317,7 +3633,12 @@ class JarvisLocal:
                     tool_msg["tool_call_id"] = tc_id
 
                 messages.append(tool_msg)
-                self._conversation.append(tool_msg)
+                with self._conv_lock:
+                    self._conversation.append(tool_msg)
+
+            if _cancelled():
+                self.ui.write_log("SYS: Cancelled after tool execution")
+                break
 
             # ── Fast-ack: every call was save_memory (silent) ────────────────
             # Instead of saying "Noted.", do a real conversational follow-up.
@@ -3331,7 +3652,8 @@ class JarvisLocal:
                 _, _reply = _tool_results[-1]
                 _amsg = {"role": "assistant", "content": _reply}
                 messages.append(_amsg)
-                self._conversation.append(_amsg)
+                with self._conv_lock:
+                    self._conversation.append(_amsg)
                 self.ui.write_log(f"Jarvis: {_reply}")
                 self.speak(_reply)
                 # Store in vector memory
@@ -3451,9 +3773,14 @@ class JarvisLocal:
             try:
                 text = self._text_queue.get(timeout=0.5)
                 if text.strip():
-                    self._process_message(text)
+                    with self._processing_lock:
+                        self._process_message(text)
             except queue.Empty:
                 pass
+            except Exception as e:
+                short = str(e)[:120]
+                self.ui.show_error_state(f"TextCmd — {short}")
+                traceback.print_exc()
 
     # ------------------------------------------------------------------
     # Entry point
@@ -3583,7 +3910,10 @@ class JarvisLocal:
             self.ui.set_startup_status("● JARVIS online · Voice loading in background…")
 
             # ── Fetch location in background (cached for later use) ───────
+            _loc_set = False
+
             def _init_location():
+                nonlocal _loc_set
                 try:
                     from actions.get_location import get_location
                     r = get_location(player=self.ui, force_refresh=True)
@@ -3591,9 +3921,10 @@ class JarvisLocal:
                     m = re.search(r'currently in ([^,]+)', r)
                     if m:
                         self.ui.set_location(m.group(1).strip())
+                        _loc_set = True
                 except Exception:
                     pass
-                if self.ui._win._loc_lbl.text() == "LOC  --":
+                if not _loc_set:
                     try:
                         from actions.get_location import _ip_location
                         ip_data = _ip_location()

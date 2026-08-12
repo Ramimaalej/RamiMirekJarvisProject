@@ -452,12 +452,12 @@ class TestLatencyOptimizations:
         cfg = json.loads((PROJECT / "config" / "api_keys.json").read_text())
         assert cfg.get("stt_model") == "tiny", "stt_model should be 'tiny'"
         assert cfg.get("stt_language") == "en", "stt_language should be 'en'"
-        assert "embed_url" in cfg, "embed_url should be configured"
-        assert "embed_model" in cfg, "embed_model should be configured"
+        # embed_url / embed_model are optional — only needed when the
+        # LLM provider doesn't serve embeddings at the standard path.
 
     def test_vad_silence_reduced(self):
         content = (PROJECT / "main.py").read_text()
-        assert "silence_sec:    float = 0.45" in content, "VAD silence should be 0.45"
+        assert "silence_sec:    float = 0.3" in content, "VAD silence should be 0.3"
 
     def test_vector_memory_deduped(self):
         content = (PROJECT / "memory" / "vector_memory.py").read_text()

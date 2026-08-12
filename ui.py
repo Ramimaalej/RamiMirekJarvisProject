@@ -28,8 +28,14 @@ from PyQt6.QtWidgets import (
     QMainWindow, QPushButton, QScrollArea, QSizePolicy, QSplitter, QStackedWidget, QTextEdit,
     QVBoxLayout, QWidget, QProgressBar, QGridLayout,
 )
+try:
+    from PyQt6.QtWebEngineWidgets import QWebEngineView
+    _HAS_WEBENGINE = True
+except ImportError:
+    _HAS_WEBENGINE = False
 
 from actions.timer_scheduler import list_timers
+from core.llm_client import resolve_llm_url
 
 def request_api_key(service_name: str, key_name: str = "") -> str:
     """Show a modal dialog asking for an API key. Saves to config if provided."""
@@ -167,6 +173,9 @@ class _SysMetrics:
         self._running = True
         t = threading.Thread(target=self._loop, daemon=True)
         t.start()
+
+    def stop(self):
+        self._running = False
 
     def _loop(self):
         while self._running:
@@ -382,6 +391,12 @@ class _SysMetrics:
 
 _metrics = _SysMetrics()
 
+_BLUE      = "#00bfff"
+_BLUE_LIGHT = "#66d9ff"
+_BLUE_DIM  = "#006688"
+_BLUE_GLOW = "#003344"
+_CYAN      = "#00e5ff"
+
 class HudCanvas(QWidget):
     clicked = pyqtSignal()
 
@@ -440,52 +455,52 @@ class HudCanvas(QWidget):
     def _step(self):
         self._tick += 1
         now = time.time()
-        if now - self._last_t > (0.12 if self.speaking else 0.5):
+        sp = 0.38 if self.speaking else 0.15
+        if now - self._last_t > (0.08 if self.speaking else 0.3):
             if self.speaking:
-                self._tgt_scale = random.uniform(1.06, 1.14)
-                self._tgt_halo  = random.uniform(145, 190)
+                self._tgt_scale = random.uniform(1.06, 1.16)
+                self._tgt_halo  = random.uniform(160, 210)
             elif self.muted:
                 self._tgt_scale = random.uniform(0.998, 1.002)
                 self._tgt_halo  = random.uniform(15, 28)
             else:
-                self._tgt_scale = random.uniform(1.001, 1.008)
-                self._tgt_halo  = random.uniform(48, 68)
+                self._tgt_scale = random.uniform(1.002, 1.012)
+                self._tgt_halo  = random.uniform(55, 80)
             self._last_t = now
 
-        sp = 0.38 if self.speaking else 0.15
         self._scale += (self._tgt_scale - self._scale) * sp
         self._halo  += (self._tgt_halo  - self._halo)  * sp
 
-        speeds = [1.3, -0.9, 2.0] if self.speaking else [0.55, -0.35, 0.9]
+        speeds = [1.8, -1.2, 2.5] if self.speaking else [0.7, -0.4, 1.1]
         for i, spd in enumerate(speeds):
             self._rings[i] = (self._rings[i] + spd) % 360
 
-        self._scan  = (self._scan  + (3.0 if self.speaking else 1.3)) % 360
-        self._scan2 = (self._scan2 + (-2.0 if self.speaking else -0.75)) % 360
+        self._scan  = (self._scan  + (4.0 if self.speaking else 1.5)) % 360
+        self._scan2 = (self._scan2 + (-2.5 if self.speaking else -0.8)) % 360
 
         fw  = min(self.width(), self.height())
-        lim = fw * 0.74
-        spd = 4.2 if self.speaking else 2.0
+        lim = fw * 0.78
+        spd = 5.0 if self.speaking else 2.5
         self._pulses = [r + spd for r in self._pulses if r + spd < lim]
-        if len(self._pulses) < 3 and random.random() < (0.07 if self.speaking else 0.025):
+        if len(self._pulses) < 4 and random.random() < (0.10 if self.speaking else 0.03):
             self._pulses.append(0.0)
 
-        if self.speaking and random.random() < 0.28:
+        if random.random() < (0.35 if self.speaking else 0.05):
             cx, cy = self.width() / 2, self.height() / 2
             ang = random.uniform(0, 2 * math.pi)
             r_s = fw * 0.28
             self._particles.append([
                 cx + math.cos(ang) * r_s, cy + math.sin(ang) * r_s,
-                math.cos(ang) * random.uniform(0.9, 2.4),
-                math.sin(ang) * random.uniform(0.9, 2.4) - 0.4, 1.0,
+                math.cos(ang) * random.uniform(1.0, 3.0),
+                math.sin(ang) * random.uniform(1.0, 3.0) - 0.3, 1.0,
             ])
         self._particles = [
-            [p[0]+p[2], p[1]+p[3], p[2]*0.97, p[3]*0.97, p[4]-0.028]
+            [p[0]+p[2], p[1]+p[3], p[2]*0.97, p[3]*0.97, p[4]-0.022]
             for p in self._particles if p[4] > 0
         ]
 
         self._blink_tick += 1
-        if self._blink_tick >= 38:
+        if self._blink_tick >= 30:
             self._blink = not self._blink
             self._blink_tick = 0
         self.update()
@@ -493,44 +508,45 @@ class HudCanvas(QWidget):
     def paintEvent(self, _):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
-        p.fillRect(self.rect(), qcol(C.BG))
+        p.fillRect(self.rect(), qcol("#000a0f"))
 
         W, H = self.width(), self.height()
         cx, cy = W / 2, H / 2
         fw = min(W, H)
 
-        # subtle grid dots
-        p.setPen(QPen(qcol(C.PRI_GHO), 1))
-        for x in range(0, W, 56):
-            for y in range(0, H, 56):
+        # subtle blue grid dots
+        p.setPen(QPen(qcol(_BLUE_DIM, 50), 1))
+        for x in range(0, W, 48):
+            for y in range(0, H, 48):
                 p.drawPoint(x, y)
 
         r_face = fw * 0.31
 
-        # halo glow — grayscale rings
-        for i in range(6):
-            r   = r_face * (1.6 - i * 0.10)
-            frc = 1.0 - i / 6
-            a   = max(0, min(255, int(self._halo * 0.07 * frc)))
-            col = qcol(C.PRI_DIM, a)
-            p.setPen(QPen(col, 1.2)); p.setBrush(Qt.BrushStyle.NoBrush)
+        # blue energy halo rings
+        for i in range(8):
+            r   = r_face * (1.8 - i * 0.08)
+            frc = 1.0 - i / 8
+            a   = max(0, min(255, int(self._halo * 0.09 * frc)))
+            col = qcol(_BLUE if i % 2 == 0 else _BLUE_DIM, a)
+            p.setPen(QPen(col, 1.5 - i * 0.12)); p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawEllipse(QRectF(cx - r, cy - r, r * 2, r * 2))
 
-        # pulse rings
+        # blue pulse rings
         for pr in self._pulses:
-            a   = max(0, int(180 * (1.0 - pr / (fw * 0.74))))
-            col = qcol(C.PRI_DIM, a)
-            p.setPen(QPen(col, 1.2)); p.setBrush(Qt.BrushStyle.NoBrush)
+            a   = max(0, int(200 * (1.0 - pr / (fw * 0.78))))
+            col = qcol(_CYAN, a)
+            wd  = 2.0 if a > 100 else 1.0
+            p.setPen(QPen(col, wd)); p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawEllipse(QRectF(cx - pr, cy - pr, pr * 2, pr * 2))
 
-        # spinning arc rings — simplified, white/gray
+        # spinning arc rings — blue
         for idx, (r_frac, w_r, arc_l, gap) in enumerate(
-            [(0.48, 2, 100, 85), (0.40, 1, 70, 60)]
+            [(0.48, 3, 120, 75), (0.40, 2, 90, 50), (0.55, 1, 60, 90)]
         ):
             ring_r = fw * r_frac
-            base   = self._rings[idx]
-            a_val  = max(0, min(255, int(self._halo * (0.7 - idx * 0.15))))
-            col    = qcol(C.PRI_DIM, a_val)
+            base   = self._rings[idx] if idx < 3 else 0
+            a_val  = max(0, min(255, int(self._halo * (0.8 - idx * 0.12))))
+            col    = qcol(_CYAN if idx == 0 else _BLUE, a_val)
             p.setPen(QPen(col, w_r)); p.setBrush(Qt.BrushStyle.NoBrush)
             angle = base
             rect  = QRectF(cx - ring_r, cy - ring_r, ring_r * 2, ring_r * 2)
@@ -538,19 +554,25 @@ class HudCanvas(QWidget):
                 p.drawArc(rect, int(angle * 16), int(arc_l * 16))
                 angle += arc_l + gap
 
-        # scanner
+        # scanner with blue glow
         sr = fw * 0.50
-        sa = min(255, int(self._halo * 1.2))
-        ex = 60 if self.speaking else 40
-        p.setPen(QPen(qcol(C.PRI_DIM, sa), 2))
+        sa = min(255, int(self._halo * 1.5))
+        ex = 70 if self.speaking else 45
+        p.setPen(QPen(qcol(_BLUE_LIGHT, sa), 2))
         p.setBrush(Qt.BrushStyle.NoBrush)
         srect = QRectF(cx - sr, cy - sr, sr * 2, sr * 2)
         p.drawArc(srect, int(self._scan * 16), int(ex * 16))
+        # scanner trail
+        trail_a = max(0, sa - 120)
+        p.setPen(QPen(qcol(_BLUE_DIM, trail_a), 1))
+        p.drawArc(srect, int((self._scan - ex * 0.5) * 16), int(ex * 16))
 
-        # tick marks
+        # tick marks — blue
         t_out, t_in = fw * 0.497, fw * 0.478
-        p.setPen(QPen(qcol(C.PRI_DIM, 100), 1))
         for deg in range(0, 360, 15):
+            active_sector = abs(deg - self._scan) < 60 or abs(deg - self._scan + 360) < 60
+            a_val = 180 if active_sector else 60
+            p.setPen(QPen(qcol(_BLUE_LIGHT if active_sector else _BLUE_DIM, a_val), 1))
             rad = math.radians(deg)
             inn = t_in if deg % 30 == 0 else t_in + 4
             p.drawLine(
@@ -558,23 +580,32 @@ class HudCanvas(QWidget):
                 QPointF(cx + inn  * math.cos(rad), cy - inn  * math.sin(rad)),
             )
 
-        # crosshair
+        # crosshair — blue
         ch_r, gap_h = fw * 0.51, fw * 0.18
-        p.setPen(QPen(qcol(C.PRI_DIM, int(self._halo * 0.4)), 1))
+        ha = int(self._halo * 0.5)
+        p.setPen(QPen(qcol(_CYAN, ha), 1))
         p.drawLine(QPointF(cx - ch_r, cy), QPointF(cx - gap_h, cy))
         p.drawLine(QPointF(cx + gap_h, cy), QPointF(cx + ch_r, cy))
         p.drawLine(QPointF(cx, cy - ch_r), QPointF(cx, cy - gap_h))
         p.drawLine(QPointF(cx, cy + gap_h), QPointF(cx, cy + ch_r))
+        # center dot
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QBrush(qcol(_CYAN, ha)))
+        p.drawEllipse(QPointF(cx, cy), 2, 2)
 
-        # corner brackets
-        bl = 18
-        bc = qcol(C.PRI_DIM, 160)
-        hl, hr = cx - fw // 2, cx + fw // 2
-        ht, hb = cy - fw // 2, cy + fw // 2
-        p.setPen(QPen(bc, 1.5))
+        # corner brackets — blue
+        bl = 22
+        bc = qcol(_CYAN, 180)
+        hl, hr = cx - fw // 2 + 4, cx + fw // 2 - 4
+        ht, hb = cy - fw // 2 + 4, cy + fw // 2 - 4
         for bx, by, dx, dy in [(hl,ht,1,1),(hr,ht,-1,1),(hl,hb,1,-1),(hr,hb,-1,-1)]:
+            p.setPen(QPen(bc, 2))
             p.drawLine(QPointF(bx, by), QPointF(bx + dx * bl, by))
             p.drawLine(QPointF(bx, by), QPointF(bx, by + dy * bl))
+            # second parallel line
+            p.setPen(QPen(qcol(_BLUE_DIM, 80), 1))
+            p.drawLine(QPointF(bx + dx * 2, by + dy * 2), QPointF(bx + dx * (bl + 2), by + dy * 2))
+            p.drawLine(QPointF(bx + dx * 2, by + dy * 2), QPointF(bx + dx * 2, by + dy * (bl + 2)))
 
         # face
         if self._face_px:
@@ -586,33 +617,39 @@ class HudCanvas(QWidget):
             )
             p.drawPixmap(int(cx - fsz / 2), int(cy - fsz / 2), scaled)
         else:
-            orb_r = int(fw * 0.27 * self._scale)
-            for i in range(6, 0, -1):
-                r2  = int(orb_r * i / 6)
-                frc = i / 6
-                v   = min(255, int(80 * frc))
-                a   = max(0, min(255, int(self._halo * 0.9 * frc)))
-                p.setBrush(QBrush(QColor(v, v, v, a)))
+            orb_r = int(fw * 0.29 * self._scale)
+            for i in range(8, 0, -1):
+                r2  = int(orb_r * i / 8)
+                frc = i / 8
+                a   = max(0, min(255, int(self._halo * 0.8 * frc)))
+                grad = QRadialGradient(cx, cy, r2)
+                grad.setColorAt(0.0, qcol(_BLUE_LIGHT, a))
+                grad.setColorAt(0.5, qcol(_BLUE, a))
+                grad.setColorAt(1.0, qcol(_BLUE_DIM, 0))
+                p.setBrush(QBrush(grad))
                 p.setPen(Qt.PenStyle.NoPen)
                 p.drawEllipse(QRectF(cx - r2, cy - r2, r2 * 2, r2 * 2))
-            p.setPen(QPen(qcol(C.TEXT_DIM, 180), 1))
-            p.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
-            p.drawText(QRectF(cx - 80, cy - 14, 160, 28),
+            p.setPen(QPen(qcol(_CYAN, 220), 1))
+            p.setFont(QFont("Courier New", 12, QFont.Weight.Bold))
+            p.drawText(QRectF(cx - 90, cy - 16, 180, 32),
                        Qt.AlignmentFlag.AlignCenter, "J.A.R.V.I.S")
 
-        # particles
+        # blue glow particles
         for pt in self._particles:
-            a = max(0, min(255, int(pt[4] * 200)))
+            a = max(0, min(255, int(pt[4] * 220)))
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QBrush(qcol(C.TEXT_DIM, a)))
-            p.drawEllipse(QPointF(pt[0], pt[1]), 2, 2)
+            p.setBrush(QBrush(qcol(_BLUE_LIGHT, a)))
+            p.drawEllipse(QPointF(pt[0], pt[1]), 3, 3)
+            if a > 100:
+                p.setBrush(QBrush(qcol(_BLUE, a // 3)))
+                p.drawEllipse(QPointF(pt[0], pt[1]), 6, 6)
 
-        # status text — monochrome
+        # status text — blue
         sy = cy + fw * 0.40
         if self.muted:
-            txt = "⊘  MUTED"
+            txt = "◉  MUTED"
         elif self.speaking:
-            txt = "●  SPEAKING"
+            txt = "◉  SPEAKING"
         elif self.state == "THINKING":
             sym = "◈" if self._blink else "◇"
             txt = f"{sym}  THINKING"
@@ -620,30 +657,52 @@ class HudCanvas(QWidget):
             sym = "▷" if self._blink else "▶"
             txt = f"{sym}  PROCESSING"
         elif self.state == "LISTENING":
-            sym = "●" if self._blink else "○"
+            sym = "◉" if self._blink else "○"
             txt = f"{sym}  LISTENING"
+        elif self.state == "ERROR":
+            sym = "▲" if self._blink else "⚠"
+            txt = f"{sym}  ERROR"
+            p.setPen(QPen(qcol(C.RED), 1))
+            p.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
+            p.drawText(QRectF(0, sy, W, 26), Qt.AlignmentFlag.AlignCenter, txt)
+            # red waveform
+            wy = sy + 30
+            N, bw = 48, 5
+            wx0 = (W - N * bw) / 2
+            for i in range(N):
+                hgt = int(2 + 3 * math.sin(self._tick * 0.15 + i * 0.8))
+                cl  = qcol(C.RED, 120)
+                p.fillRect(QRectF(wx0 + i * bw, wy + 18 - hgt, bw - 1, hgt), cl)
+            return
         else:
-            sym = "●" if self._blink else "○"
+            sym = "◉" if self._blink else "○"
             txt = f"{sym}  {self.state}"
 
-        p.setPen(QPen(qcol(C.TEXT), 1))
+        p.setPen(QPen(qcol(_BLUE_LIGHT), 1))
         p.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
         p.drawText(QRectF(0, sy, W, 26), Qt.AlignmentFlag.AlignCenter, txt)
 
-        # waveform
+        # enhanced blue waveform
         wy = sy + 30
-        N, bw = 32, 7
-        wx0 = (W - N * bw) / 2
+        N, bw = 48, 5
+        gap = 2
+        wx0 = (W - N * (bw + gap)) / 2
         for i in range(N):
             if self.muted:
-                hgt, cl = 2, qcol(C.TEXT_DIM)
+                hgt, cl = 2, qcol(_BLUE_DIM, 80)
             elif self.speaking:
-                hgt = random.randint(3, 18)
-                cl  = qcol(C.TEXT) if hgt > 10 else qcol(C.TEXT_DIM)
+                hgt = random.randint(4, 24)
+                if hgt > 14:
+                    cl = qcol(_BLUE_LIGHT, 200)
+                elif hgt > 8:
+                    cl = qcol(_BLUE, 160)
+                else:
+                    cl = qcol(_BLUE_DIM, 100)
             else:
-                hgt = int(3 + 2 * math.sin(self._tick * 0.09 + i * 0.6))
-                cl  = qcol(C.BORDER)
-            p.fillRect(QRectF(wx0 + i * bw, wy + 18 - hgt, bw - 1, hgt), cl)
+                phase = self._tick * 0.12 + i * 0.5
+                hgt = int(4 + 4 * math.sin(phase))
+                cl = qcol(_BLUE_DIM if hgt < 6 else _BLUE, 100)
+            p.fillRect(QRectF(wx0 + i * (bw + gap), wy + 20 - hgt, bw, hgt), cl)
 
 class MetricBar(QWidget):
 
@@ -1467,6 +1526,7 @@ class SetupOverlay(QWidget):
 
 class ConnectionsOverlay(QWidget):
     done = pyqtSignal(str)
+    _auth_result_sig = pyqtSignal(bool, str)  # success, msg — emitted from background auth thread
 
     def __init__(self, parent=None, initial: dict | None = None, active_tab_key: str | None = None):
         super().__init__(parent)
@@ -1577,8 +1637,8 @@ class ConnectionsOverlay(QWidget):
                     QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
                 """)
                 val = self._init.get(f_key, "")
-                if not val and f_key == "ollama_url":
-                    val = "http://localhost:11434"
+                if not val and f_key == "llm_url_local":
+                    val = self._init.get("ollama_url", "http://localhost:11434")
                 inp.setText(val)
                 
                 form_lay.addWidget(f_lbl, idx, 0)
@@ -1646,7 +1706,7 @@ class ConnectionsOverlay(QWidget):
             scroll_lay.setSpacing(10)
             
             if cat_id == 0:
-                scroll_lay.addWidget(_card("Ollama", [("Base URL", "ollama_url", False, "http://localhost:11434")], ["ollama_url"]))
+                scroll_lay.addWidget(_card("Ollama", [("Local URL  (LAN / 192.168.x)", "llm_url_local", False, "http://localhost:11434"), ("Remote URL  (home / public)", "llm_url_remote", False, "https://…")], ["llm_url_local"]))
                 scroll_lay.addWidget(_card("OpenAI", [("API Key", "openai_api_key", True, "sk-...")], ["openai_api_key"]))
                 scroll_lay.addWidget(_card("Google Gemini", [("API Key", "gemini_api_key", True, "AIzaSy...")], ["gemini_api_key"]))
                 scroll_lay.addWidget(_card("Anthropic Claude", [("API Key", "anthropic_api_key", True, "sk-ant-...")], ["anthropic_api_key"]))
@@ -1704,12 +1764,13 @@ class ConnectionsOverlay(QWidget):
                     gws_status.setText("✓ Authenticated" if ok else "")
                     gws_status.setStyleSheet(f"color: {C.GREEN if ok else C.TEXT_DIM}; background: transparent;")
 
+                self._auth_result_sig.connect(lambda s, m: (_gws_update_auth_status(), gws_status.setText(m) or True))
+
                 def _gws_do_signin():
                     gws_signin_btn.setEnabled(False)
                     gws_status.setText("Opening browser…")
                     def _on_result(success: bool, msg: str):
-                        gws_status.setText(msg)
-                        _gws_update_auth_status()
+                        self._auth_result_sig.emit(success, msg)
                     # Save credentials from inputs before auth
                     gws_client_id = self.inputs.get("gws_client_id", QLineEdit()).text().strip()
                     gws_client_secret = self.inputs.get("gws_client_secret", QLineEdit()).text().strip()
@@ -2020,6 +2081,11 @@ class _AuthBanner(QWidget):
         lay.addWidget(self._btn)
 
 class WorkspacePanel(QWidget):
+    _gmail_ready = pyqtSignal(list)
+    _cal_ready = pyqtSignal(list)
+    _drive_ready = pyqtSignal(list)
+    _loading_sig = pyqtSignal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._auth_banner = None
@@ -2194,6 +2260,11 @@ class WorkspacePanel(QWidget):
         self._timer.timeout.connect(self._auto_refresh)
         self._timer.start(60000)
 
+        self._gmail_ready.connect(self._update_gmail_ui)
+        self._cal_ready.connect(self._update_cal_ui)
+        self._drive_ready.connect(self._update_drive_ui)
+        self._loading_sig.connect(self._set_loading_text)
+
     def set_main_window(self, mw):
         self._main_window = mw
 
@@ -2219,11 +2290,13 @@ class WorkspacePanel(QWidget):
         return s
 
     def _loading_on(self, text="Loading…"):
-        self._loading.setText(text)
-        QApplication.processEvents()
+        self._loading_sig.emit(text)
 
     def _loading_off(self):
-        self._loading.setText("")
+        self._loading_sig.emit("")
+
+    def _set_loading_text(self, text: str):
+        self._loading.setText(text)
 
     def _show_banner(self):
         if not self._auth_banner:
@@ -2365,6 +2438,7 @@ class WorkspacePanel(QWidget):
             import gws_bridge
             creds_path = Path(__file__).resolve().parent / "gws" / "credentials.json"
             if not creds_path.exists():
+                self._loading_sig.emit("")
                 return
             emails = _run_async(gws_bridge.get_unread_emails(limit=10))
             if not isinstance(emails, list):
@@ -2372,7 +2446,7 @@ class WorkspacePanel(QWidget):
             self._main_window._log_sig.emit(f"GWS: {len(emails)} unread emails")
         except Exception as e:
             emails = []
-        self._update_gmail_ui(emails)
+        self._gmail_ready.emit(emails)
 
     def _update_gmail_ui(self, emails: list):
         self._gmail_list_lay.setUpdatesEnabled(False)
@@ -2397,6 +2471,7 @@ class WorkspacePanel(QWidget):
             import gws_bridge
             creds_path = Path(__file__).resolve().parent / "gws" / "credentials.json"
             if not creds_path.exists():
+                self._loading_sig.emit("")
                 return
             events = _run_async(gws_bridge.get_todays_agenda())
             if not isinstance(events, list):
@@ -2404,7 +2479,7 @@ class WorkspacePanel(QWidget):
             self._main_window._log_sig.emit(f"GWS: {len(events)} agenda items")
         except Exception as e:
             events = []
-        self._update_cal_ui(events)
+        self._cal_ready.emit(events)
 
     def _update_cal_ui(self, events: list):
         self._cal_list_lay.setUpdatesEnabled(False)
@@ -2437,7 +2512,7 @@ class WorkspacePanel(QWidget):
         except Exception as e:
             files = []
             self._main_window._log_sig.emit(f"GWS: drive search failed — {e}")
-        self._update_drive_ui(files)
+        self._drive_ready.emit(files)
 
     def _update_drive_ui(self, files: list):
         self._drive_list_lay.setUpdatesEnabled(False)
@@ -2509,10 +2584,10 @@ class WorkspacePanel(QWidget):
                         Q_ARG(str, f"Meet link: {link}"),
                     )
                     self._main_window._log_sig.emit(f"GWS: Meet created — {link}")
-                self._loading_off()
+                self._loading_sig.emit("")
             except Exception as e:
                 self._main_window._log_sig.emit(f"GWS: Meet creation failed — {e}")
-                self._loading_off()
+                self._loading_sig.emit("")
         threading.Thread(target=_do, daemon=True).start()
 
     def _open_meet(self, url: str):
@@ -2535,9 +2610,15 @@ class MainWindow(QMainWindow):
     write_log     = pyqtSignal(str)
     write_log_instant = pyqtSignal(str, str)
     _log_sig = write_log
-    _state_sig   = pyqtSignal(str)
-    _loc_sig     = pyqtSignal(str)
-    _startup_sig = pyqtSignal(str, str)  # action, data — thread-safe startup panel control
+    _state_sig     = pyqtSignal(str)
+    _error_sig     = pyqtSignal(str)  # message — thread-safe error state display
+    _loc_sig       = pyqtSignal(str)
+    _startup_sig   = pyqtSignal(str, str)  # action, data — thread-safe startup panel control
+    _quit_sig      = pyqtSignal()
+    _open_tutor_sig = pyqtSignal(str)
+    _open_todo_sig = pyqtSignal(str)
+    _close_tutor_sig = pyqtSignal()
+    _api_key_sig   = pyqtSignal(str, str)  # service_name, key_name
 
     def __init__(self, face_path: str):
         super().__init__()
@@ -2585,10 +2666,18 @@ class MainWindow(QMainWindow):
         self._left_panel = self._build_left_panel()
         body.addWidget(self._left_panel)
 
+        # Center area: stacked widget for HUD or tutor web view
+        self._center_stack = QStackedWidget()
+        self._center_stack.setStyleSheet("background: transparent; border: none;")
+
         self.hud = HudCanvas(face_path)
         self.hud.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.hud.clicked.connect(self._on_hud_clicked)
-        body.addWidget(self.hud)
+        self._center_stack.addWidget(self.hud)  # page 0
+
+        self._tutor_view = None
+        self._center_stack.setCurrentIndex(0)
+        body.addWidget(self._center_stack)
 
         self._right_panel = self._build_right_panel()
         body.addWidget(self._right_panel)
@@ -2616,11 +2705,23 @@ class MainWindow(QMainWindow):
         self._metric_tmr.start(2000)
         self._update_metrics()
 
+        QApplication.instance().aboutToQuit.connect(_metrics.stop)
+
         self._log_sig.connect(self._log.append_log)
         self.write_log_instant.connect(self._log.append_instant)
         self._state_sig.connect(self._apply_state)
+        self._error_sig.connect(self._show_error_state)
         self._loc_sig.connect(self._update_location)
         self._startup_sig.connect(self._on_startup_sig)
+
+        self._quit_sig.connect(self.close)
+        self._open_tutor_sig.connect(self.open_tutor_panel)
+        self._open_todo_sig.connect(self.open_todo_panel)
+        self._close_tutor_sig.connect(self.close_tutor_panel)
+
+        self._api_key_event = threading.Event()
+        self._api_key_result = ""
+        self._api_key_sig.connect(self._on_api_key_request)
 
         self._overlay: SetupOverlay | None = None
         self._startup_panel: StartupPanel | None = None
@@ -2638,6 +2739,18 @@ class MainWindow(QMainWindow):
 
     def _update_location(self, loc_text: str):
         self._loc_lbl.setText(f"LOC  {loc_text}")
+
+    def _on_api_key_request(self, service_name: str, key_name: str):
+        from PyQt6.QtWidgets import QInputDialog, QLineEdit
+        k = key_name or f"{service_name.lower().replace(' ', '_')}_api_key"
+        result, ok = QInputDialog.getText(
+            self,
+            f"API Key Required — {service_name}",
+            f"{service_name} requires an API key.\nEnter your {service_name} API key:",
+            QLineEdit.EchoMode.Password,
+        )
+        self._api_key_result = result.strip() if ok and result.strip() else ""
+        self._api_key_event.set()
 
     def _toggle_fullscreen(self):
         if self.isFullScreen():
@@ -3058,11 +3171,12 @@ class MainWindow(QMainWindow):
         self._log = LogWidget()
         lay.addWidget(self._log, stretch=1)
 
-        # ── Input ──
+        # ── Input + send ──
+        input_row = QHBoxLayout(); input_row.setSpacing(6)
         self._input = QLineEdit()
         self._input.setPlaceholderText("Type a command or question…")
         self._input.setFont(QFont(_FONT, _FONT_SZ_SM))
-        self._input.setFixedHeight(42)
+        self._input.setFixedHeight(40)
         self._input.setStyleSheet(f"""
             QLineEdit {{
                 background: {C.PANEL2}; color: {C.WHITE};
@@ -3073,7 +3187,26 @@ class MainWindow(QMainWindow):
             QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
         """)
         self._input.returnPressed.connect(self._send)
-        lay.addWidget(self._input)
+        input_row.addWidget(self._input, stretch=1)
+
+        self._send_btn = QPushButton("➤")
+        self._send_btn.setFixedSize(40, 40)
+        self._send_btn.setFont(QFont(_FONT, 13, QFont.Weight.Bold))
+        self._send_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._send_btn.setToolTip("Send (Enter)")
+        self._send_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {C.ACC_DIM}; color: {C.ACC};
+                border: 1px solid {C.ACC_DIM}; border-radius: 8px;
+            }}
+            QPushButton:hover {{ background: {C.ACC}; color: #ffffff; border: 1px solid {C.ACC}; }}
+        """)
+        self._send_btn.clicked.connect(self._send)
+        input_row.addWidget(self._send_btn)
+        lay.addLayout(input_row)
+
+        # ── Quick commands ──
+        lay.addWidget(self._build_quick_chips())
 
         # ── Buttons ──
         btn_row = QHBoxLayout(); btn_row.setSpacing(6)
@@ -3111,36 +3244,44 @@ class MainWindow(QMainWindow):
 
         return w
 
-    def _build_input_row(self) -> QHBoxLayout:
-        row = QHBoxLayout(); row.setSpacing(5)
-        self._input = QLineEdit()
-        self._input.setPlaceholderText("Type a command or question…")
-        self._input.setFont(QFont("Courier New", 9))
-        self._input.setFixedHeight(30)
-        self._input.setStyleSheet(f"""
-            QLineEdit {{
-                background: {C.PANEL2}; color: {C.TEXT};
-                border: 1px solid {C.BORDER}; border-radius: 3px; padding: 3px 7px;
-            }}
-            QLineEdit:focus {{ border: 1px solid {C.TEXT_DIM}; }}
-        """)
-        self._input.returnPressed.connect(self._send)
-        row.addWidget(self._input)
+    def _build_quick_chips(self) -> QWidget:
+        """One-click shortcuts that fire common commands (dashboard, email, …)."""
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(6)
+        for label, cmd in [
+            ("Dashboard", "open my dashboard"),
+            ("Email",     "check my emails"),
+            ("Weather",   "what's the weather"),
+            ("Tasks",     "show my tasks"),
+            ("Music",     "play some music"),
+            ("Terminal",  "open terminal"),
+        ]:
+            b = QPushButton(label)
+            b.setFixedHeight(26)
+            b.setFont(QFont(_FONT, _FONT_SZ_XS))
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.setToolTip(f"Say: {cmd}")
+            b.setStyleSheet(f"""
+                QPushButton {{
+                    background: {C.PANEL2}; color: {C.TEXT_MED};
+                    border: 1px solid {C.BORDER}; border-radius: 13px;
+                    padding: 0 10px;
+                }}
+                QPushButton:hover {{
+                    color: {C.ACC}; border: 1px solid {C.ACC};
+                    background: {C.ACC_GHO};
+                }}
+            """)
+            b.clicked.connect(lambda _=False, c=cmd: self._run_quick_cmd(c))
+            lay.addWidget(b)
+        lay.addStretch()
+        return w
 
-        send = QPushButton("▸")
-        send.setFixedSize(30, 30)
-        send.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
-        send.setCursor(Qt.CursorShape.PointingHandCursor)
-        send.setStyleSheet(f"""
-            QPushButton {{
-                background: {C.PANEL}; color: {C.PRI};
-                border: 1px solid {C.PRI_DIM}; border-radius: 3px;
-            }}
-            QPushButton:hover {{ background: {C.PRI_GHO}; border: 1px solid {C.PRI}; }}
-        """)
-        send.clicked.connect(self._send)
-        row.addWidget(send)
-        return row
+    def _run_quick_cmd(self, command: str):
+        self._input.setText(command)
+        self._send()
 
     def _build_footer(self) -> QWidget:
         w = QWidget()
@@ -3215,6 +3356,37 @@ class MainWindow(QMainWindow):
                 QPushButton:hover {{ background: {C.ACC_GHO}; }}
             """)
 
+    def open_tutor_panel(self, url: str):
+        if not _HAS_WEBENGINE:
+            import webbrowser
+            webbrowser.open(url)
+            return
+        if self._tutor_view is None:
+            self._tutor_view = QWebEngineView()
+            self._tutor_view.setStyleSheet("background: transparent; border: none;")
+            self._center_stack.addWidget(self._tutor_view)  # page 1
+        self._tutor_view.load(QUrl(url))
+        self._center_stack.setCurrentIndex(1)
+        self._log.append_log(f"SYS: Gemini Tutor opened.")
+
+    def close_tutor_panel(self):
+        if self._tutor_view is not None and self._center_stack.currentIndex() == 1:
+            self._center_stack.setCurrentIndex(0)
+            self._log.append_log("SYS: Gemini Tutor closed.")
+
+    def open_todo_panel(self, url: str):
+        if not _HAS_WEBENGINE:
+            import webbrowser
+            webbrowser.open(url)
+            return
+        if self._tutor_view is None:
+            self._tutor_view = QWebEngineView()
+            self._tutor_view.setStyleSheet("background: transparent; border: none;")
+            self._center_stack.addWidget(self._tutor_view)
+        self._tutor_view.load(QUrl(url))
+        self._center_stack.setCurrentIndex(1)
+        self._log.append_log("SYS: Todo list opened.")
+
     def _send(self):
         txt = self._input.text().strip()
         if not txt: return
@@ -3226,6 +3398,19 @@ class MainWindow(QMainWindow):
         self.hud.state    = state
         self.hud.speaking = (state == "SPEAKING")
         self._update_status_bar()
+
+    def _show_error_state(self, message: str):
+        self.hud.state    = "ERROR"
+        self.hud.speaking = False
+        self._update_status_bar()
+        self._log.append_log(f"ERR: {message}")
+        QTimer.singleShot(2500, self._clear_error)
+
+    def _clear_error(self):
+        if self.hud.state == "ERROR":
+            self.hud.state = "LISTENING"
+            self.hud.speaking = False
+            self._update_status_bar()
 
     def _set_status_lbl(self, lbl: QLabel, color: str, text: str):
         lbl.setText(f"●  {text}")
@@ -3241,6 +3426,8 @@ class MainWindow(QMainWindow):
         elif state in ("LISTENING", "PROCESSING"):
             ai_col = "#ffcc00"
         elif state == "MUTED":
+            ai_col = C.RED
+        elif state == "ERROR":
             ai_col = C.RED
         else:
             ai_col = C.TEXT_DIM
@@ -3308,11 +3495,7 @@ class MainWindow(QMainWindow):
         if not API_FILE.exists(): return False
         try:
             d = json.loads(API_FILE.read_text(encoding="utf-8"))
-            return (
-                bool(d.get("llm_model")) and
-                bool(d.get("stt_engine")) and
-                bool(d.get("tts_engine"))
-            )
+            return bool(d.get("stt_engine")) and bool(d.get("tts_engine"))
         except Exception:
             return False
 
@@ -3436,6 +3619,13 @@ class MainWindow(QMainWindow):
         
         current.update(diff)
         
+        # Auto-resolve LLM URL based on current network
+        if current.get("llm_url_local") or current.get("llm_url_remote"):
+            current["llm_url"] = resolve_llm_url(current)
+        
+        # Clean up old dead key
+        current.pop("ollama_url", None)
+        
         os.makedirs("config", exist_ok=True)
         API_FILE.write_text(json.dumps(current, indent=4), encoding="utf-8")
         if getattr(self, "_overlay_prov", None):
@@ -3523,6 +3713,15 @@ class JarvisUI:
     def set_state(self, state: str):
         self._win._state_sig.emit(state)
 
+    def show_error_state(self, message: str = ""):
+        self._win._error_sig.emit(message)
+
+    def open_tutor_panel(self, url: str):
+        self._win._open_tutor_sig.emit(url)
+
+    def close_tutor_panel(self):
+        self._win._close_tutor_sig.emit()
+
     def write_log(self, text: str):
         self._win._log_sig.emit(text)
 
@@ -3534,19 +3733,16 @@ class JarvisUI:
 
     def request_api_key(self, service_name: str, key_name: str = "") -> str:
         """Thread-safe — asks user for an API key via modal dialog."""
-        from PyQt6.QtWidgets import QInputDialog, QLineEdit
-        k = key_name or f"{service_name.lower().replace(' ', '_')}_api_key"
-        result, ok = QInputDialog.getText(
-            self._win,
-            f"API Key Required — {service_name}",
-            f"{service_name} requires an API key.\nEnter your {service_name} API key:",
-            QLineEdit.EchoMode.Password,
-        )
-        if ok and result.strip():
+        self._win._api_key_result = ""
+        self._win._api_key_event.clear()
+        self._win._api_key_sig.emit(service_name, key_name)
+        self._win._api_key_event.wait()
+        result = self._win._api_key_result
+        if result:
+            k = key_name or f"{service_name.lower().replace(' ', '_')}_api_key"
             from memory.config_manager import save_config
-            save_config({k: result.strip()})
-            return result.strip()
-        return ""
+            save_config({k: result})
+        return result
 
     # ── Startup panel (all thread-safe) ──────────────────────────────────
     def show_startup_panel(self) -> None:

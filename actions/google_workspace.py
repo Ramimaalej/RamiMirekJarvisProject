@@ -8,17 +8,18 @@ from __future__ import annotations
 import json
 import logging
 import os
-import pickle
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from google.oauth2.credentials import Credentials
+ 
 logger = logging.getLogger("google_workspace")
 
 GOOGLE_DIR = Path(__file__).resolve().parent.parent / "gws"
-TOKEN_PATH = GOOGLE_DIR / "token.pickle"
+TOKEN_PATH = GOOGLE_DIR / "token.json"
 CREDENTIALS_PATH = GOOGLE_DIR / "credentials.json"
 
 SCOPES = [
@@ -75,8 +76,8 @@ def _load_token():
         return _creds
     if TOKEN_PATH.exists():
         try:
-            with open(TOKEN_PATH, "rb") as f:
-                _creds = pickle.load(f)
+            with open(TOKEN_PATH, "r") as f:
+                _creds = Credentials.from_json(f.read())
             return _creds
         except Exception as e:
             logger.warning(f"Failed to load token: {e}")
@@ -87,8 +88,8 @@ def _save_token(creds) -> None:
     global _creds
     _creds = creds
     GOOGLE_DIR.mkdir(parents=True, exist_ok=True)
-    with open(TOKEN_PATH, "wb") as f:
-        pickle.dump(creds, f)
+    with open(TOKEN_PATH, "w") as f:
+        f.write(creds.to_json())
     _notify_listeners()
 
 
@@ -241,10 +242,16 @@ def create_event(summary: str, start_time: str, end_time: str, description: str 
 # ── Drive ─────────────────────────────────────────────────────────────────
 
 
+def _escape_drive_query(query: str) -> str:
+    """Escape single quotes and backslashes for Drive API query syntax."""
+    return query.replace("\\", "\\\\").replace("'", "\\'")
+
+
 def search_drive(query: str, max_results: int = 10) -> list[dict]:
     service = _get_service("drive", "v3")
+    safe_q = _escape_drive_query(query)
     results = service.files().list(
-        q=f"name contains '{query}'",
+        q=f"name contains '{safe_q}'",
         pageSize=max_results,
         fields="files(id, name, mimeType, size, webViewLink)",
     ).execute()
