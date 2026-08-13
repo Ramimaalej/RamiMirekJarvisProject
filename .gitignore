@@ -20,3 +20,6 @@ PyWhatKit_DB.txt
 RealTimeTutor/
 .idea/
 .vscode/
+config/api_keys.json
+config/.email_key
+config/email_creds.enc
