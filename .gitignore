@@ -10,3 +10,13 @@ logs/
 .env
 *.log
 PyWhatKit_DB.txt
+*.bak
+*.bak2
+*.rpm
+*.csv
+.next/
+.pytest_cache/
+.venv/
+RealTimeTutor/
+.idea/
+.vscode/
