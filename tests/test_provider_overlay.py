@@ -1,4 +1,4 @@
-"""Headless smoke test for the Provider Overlay — run with:
+"""Headless smoke test for the Provider Overlay (grid-of-cards design) — run with:
 QT_QPA_PLATFORM=offscreen pytest tests/test_provider_overlay.py -v
 """
 import json
@@ -28,9 +28,10 @@ def test_overlay_creation(qapp):
         "llm_model": "qwen2.5:7b",
     })
     assert ov._selected_pid in ("ollama", "")
-    assert len(ov._card_widgets) == 5
+    # grid-of-cards design: one card per provider
+    assert len(ov._cards) == 5
     # models should be pre-filled from defaults at minimum
-    combo = ov._card_widgets["ollama"]._model_combo
+    combo = ov._cards["ollama"]._model_combo
     assert combo.count() >= 5
     ov.deleteLater()
 

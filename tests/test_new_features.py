@@ -23,8 +23,8 @@ sys.path.insert(0, str(PROJECT))
 def test_provider_overlay_creates(qapp):
     from core.provider_overlay import ProviderOverlay
     ov = ProviderOverlay(initial={"llm_provider": "ollama", "llm_model": "qwen3:8b"})
-    assert len(ov._card_widgets) == 5
-    assert ov._card_widgets["ollama"]._model_combo.count() >= 5
+    assert len(ov._cards) == 5
+    assert ov._cards["ollama"]._model_combo.count() >= 5
     ov._submit()
     ov.deleteLater()
 

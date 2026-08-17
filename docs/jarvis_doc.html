@@ -133,6 +133,16 @@
   .hero{ border:2px solid var(--accent); padding:28px 30px; margin-bottom:10px; }
   .hero h1{ font-size:34px; letter-spacing:3px; color:var(--fg); }
   .hero .sub{ color:var(--muted); font-size:15px; margin-top:6px; }
+  .hero-inner{ display:flex; gap:24px; align-items:center; }
+  .hero-text{ flex:1; min-width:0; }
+  .hero-3d{ position:relative; width:300px; height:300px; flex-shrink:0; border:1px solid var(--line); background:#000; }
+  .hero-3d canvas{ display:block; width:100%; height:100%; }
+  .hero-3d .hud{
+    position:absolute; bottom:0; left:0; right:0;
+    color:var(--accent); font-family:var(--mono); font-size:10px; letter-spacing:2px;
+    padding:5px 10px; background:rgba(0,0,0,0.65); text-transform:uppercase;
+  }
+  @media (max-width:900px){ .hero-inner{ flex-direction:column; } .hero-3d{ width:100%; max-width:300px; height:260px; } }
   .badge{
     display:inline-block; background:var(--bg3); border:1px solid var(--line);
     color:var(--accent); font-size:11px; letter-spacing:2px; padding:3px 10px; margin-right:6px;
@@ -181,15 +191,23 @@
 <!-- ══════════════════════ VUE D'ENSEMBLE ══════════════════════ -->
 <section id="intro">
   <div class="hero">
-    <h1>JARVIS — MARK XL</h1>
-    <div class="sub">Assistant IA local vocal · PyQt6 · Ollama / Groq / NVIDIA / OpenRouter / OpenAI · Automatisation complète du poste de travail</div>
-    <div style="margin-top:14px">
-      <span class="badge">Python 3.10+</span>
-      <span class="badge">PyQt6</span>
-      <span class="badge">Ollama</span>
-      <span class="badge">Playwright CDP</span>
-      <span class="badge">Whisper</span>
-      <span class="badge">Memorisée épaisodique</span>
+    <div class="hero-inner">
+      <div class="hero-text">
+        <h1>JARVIS — MARK XL</h1>
+        <div class="sub">Assistant IA local vocal · PyQt6 · Ollama / Groq / NVIDIA / OpenRouter / OpenAI · Automatisation complète du poste de travail</div>
+        <div style="margin-top:14px">
+          <span class="badge">Python 3.10+</span>
+          <span class="badge">PyQt6</span>
+          <span class="badge">Ollama</span>
+          <span class="badge">Playwright CDP</span>
+          <span class="badge">Whisper</span>
+          <span class="badge">Mémoire épaisodique</span>
+        </div>
+      </div>
+      <div class="hero-3d" aria-hidden="true">
+        <canvas id="sphere3d"></canvas>
+        <div class="hud">Neural core · online</div>
+      </div>
     </div>
   </div>
 
@@ -208,6 +226,87 @@
 
   <div class="callout ok"><b>EN BREF</b>Un seul fichier à lancer : <code>python main.py</code>. Tout le reste s'organise automatiquement : détection du fournisseur LLM disponible, chargement des modèles, initialisation de la mémoire, démarrage de l'interface.</div>
 </section>
+
+<script>
+(function(){
+  /* ── 3D particle sphere, never stops ── */
+  var canvas = document.getElementById("sphere3d");
+  if(!canvas || !canvas.getContext) return;
+  var ctx = canvas.getContext("2d");
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var size = function(){ var r = canvas.getBoundingClientRect();
+    canvas.width = r.width * dpr; canvas.height = r.height * dpr; };
+  size(); window.addEventListener("resize", size);
+
+  var N = 260, R = 0.62, pts = [];
+  for(var i=0;i<N;i++){
+    var phi = Math.acos(2*Math.random()-1);
+    var th  = Math.random()*2*Math.PI;
+    pts.push({x:Math.sin(phi)*Math.cos(th), y:Math.cos(phi), z:Math.sin(phi)*Math.sin(th)});
+  }
+  var rotY = 0, rotX = 0.35;
+  var acc = "rgba(56,189,248,", line = "rgba(56,189,248,", core = "#38bdf8";
+
+  function render(){
+    var W = canvas.width, H = canvas.height;
+    ctx.clearRect(0,0,W,H);
+    var cx = W/2, cy = H/2, s = Math.min(W,H)/2 * 0.94;
+    var cy2 = Math.cos(rotY), sy2 = Math.sin(rotY);
+    var cx2 = Math.cos(rotX), sx2 = Math.sin(rotX);
+    var proj = new Array(N);
+    for(var i=0;i<N;i++){
+      var p = pts[i];
+      // rotate Y
+      var x1 = p.x*cy2 + p.z*sy2;
+      var z1 = -p.x*sy2 + p.z*cy2;
+      // rotate X
+      var y1 = p.y*cx2 - z1*sx2;
+      var z2 = p.y*sx2 + z1*cx2;
+      var zc = z2 + 1.8;
+      var k = 1.6/zc;
+      proj[i] = {px: cx + x1*s*k, py: cy - y1*s*k, z: z2, k: k};
+    }
+    // edges between close projected points
+    ctx.lineWidth = 1 * dpr;
+    for(var i=0;i<N;i++){
+      for(var j=i+1;j<N;j++){
+        var dx = proj[i].px-proj[j].px, dy = proj[i].py-proj[j].py;
+        var d2 = dx*dx + dy*dy;
+        var thr = (26*dpr)*(26*dpr);
+        if(d2 < thr){
+          var alpha = (1 - Math.sqrt(d2)/ (26*dpr)) * 0.5;
+          var fade = ((proj[i].z+proj[j].z)/2 + 1) * 0.5;
+          ctx.strokeStyle = line + (alpha*fade).toFixed(3) + ")";
+          ctx.beginPath();
+          ctx.moveTo(proj[i].px, proj[i].py);
+          ctx.lineTo(proj[j].px, proj[j].py);
+          ctx.stroke();
+        }
+      }
+    }
+    // points
+    for(var i=0;i<N;i++){
+      var fade = ((proj[i].z+1)/2);
+      var r = (1.1 + 1.6*fade) * dpr;
+      var a = 0.25 + 0.75*fade;
+      ctx.fillStyle = acc + a.toFixed(3) + ")";
+      ctx.beginPath();
+      ctx.arc(proj[i].px, proj[i].py, r, 0, 2*Math.PI);
+      ctx.fill();
+    }
+    // outer glow ring
+    var g = ctx.createRadialGradient(cx, cy, s*0.55, cx, cy, s*1.05);
+    g.addColorStop(0, "rgba(56,189,248,0)");
+    g.addColorStop(1, "rgba(56,189,248,0.10)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,W,H);
+
+    rotY += 0.008;          // never stops
+    requestAnimationFrame(render);
+  }
+  render();
+})();
+</script>
 
 <!-- ══════════════════════ INSTALLATION ══════════════════════ -->
 <section id="install">

@@ -264,6 +264,85 @@ def clone_repo(repo: str, dest_dir: str | None = None, player=None) -> str:
     return str(dest)
 
 
+def run_from_readme(folder: Path) -> str:
+    """Read the project README and extract the installation / run commands.
+
+    Looks for fenced code blocks or indented lines that look like shell
+    commands (npm/pip/docker/cargo/go/make/gradle commands), then picks the
+    *last* install block followed by the *first* run block.  Returns "" when
+    nothing usable is found.
+    """
+    import re
+    readme = None
+    for cand in ("README.md", "readme.md", "Readme.md", "README.rst",
+                 "README.txt", "README"):
+        if (folder / cand).exists():
+            readme = folder / cand
+            break
+    if readme is None:
+        return ""
+    try:
+        text = readme.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+    install_patterns = [
+        re.compile(r"npm\s+install", re.I), re.compile(r"(pip|pip3)\s+install", re.I),
+        re.compile(r"yarn\s+install", re.I), re.compile(r"yarn", re.I),
+        re.compile(r"pnpm\s+install", re.I), re.compile(r"bun\s+install", re.I),
+        re.compile(r"composer\s+install", re.I), re.compile(r"bundle\s+install", re.I),
+        re.compile(r"gradle\s+(wrapper|build)", re.I), re.compile(r"go\s+mod\s+(download|tidy)", re.I),
+        re.compile(r"cargo\s+build", re.I), re.compile(r"make\s+install", re.I),
+        re.compile(r"docker\s+(compose\s+)?build", re.I), re.compile(r"mvn\s+(package|install)", re.I),
+    ]
+    run_patterns = [
+        re.compile(r"npm\s+run\s+\w+", re.I), re.compile(r"npm\s+start", re.I),
+        re.compile(r"(pip|pip3)\s+install", re.I),
+        re.compile(r"python(3)?\s+[\w./\\-]+\.py", re.I),
+        re.compile(r"streamlit\s+run", re.I),
+        re.compile(r"node\s+[\w./\\-]+\.(js|mjs|cjs)", re.I),
+        re.compile(r"react-scripts\s+start", re.I), re.compile(r"vite|next\s+dev", re.I),
+        re.compile(r"ng\s+serve", re.I), re.compile(r"expo\s+(start|run)", re.I),
+        re.compile(r"flutter\s+run", re.I), re.compile(r"cargo\s+run", re.I),
+        re.compile(r"go\s+run", re.I), re.compile(r"java\s+-jar", re.I),
+        re.compile(r"mvn\s+spring-boot:run", re.I), re.compile(r"gradlew", re.I),
+        re.compile(r"docker\s+(compose\s+)?up", re.I), re.compile(r"make\s+run", re.I),
+        re.compile(r"php\s+artisan\s+serve", re.I), re.compile(r"rails\s+server", re.I),
+        re.compile(r"php\s+-S", re.I), re.compile(r"dotnet\s+run", re.I),
+    ]
+
+    # Extract fenced code blocks tagged shell/bash or generic ```
+    blocks = re.findall(r"```(?:shell|bash|sh|console|zsh)?\n(.*?)```", text, re.S | re.I)
+    if not blocks:
+        # Fallback: any indented lines that look like commands
+        blocks = [line for line in text.splitlines()
+                  if line.startswith(("    ", "\t")) and
+                  re.match(r"\s*(?:npm|pip|python|node|yarn|docker|make|cargo|go|java|mvn|gradle|php|rails|dotnet|flutter|react-scripts|ng|streamlit|bun|pnpm|composer|bundle)\b", line, re.I)]
+    if not blocks:
+        return ""
+
+    install_cmd = ""
+    run_cmd = ""
+    for block in blocks:
+        lines = [ln.strip() for ln in block.splitlines()
+                 if ln.strip() and not ln.strip().startswith(("#", "//", "<!--"))]
+        for line in lines:
+            line = line.lstrip("$").lstrip("#").strip()
+            if not line:
+                continue
+            if any(p.search(line) for p in install_patterns) and not install_cmd:
+                install_cmd = line
+            elif any(p.search(line) for p in run_patterns) and not run_cmd:
+                run_cmd = line
+            if install_cmd and run_cmd:
+                break
+        if install_cmd and run_cmd:
+            break
+
+    parts = [p for p in (install_cmd, run_cmd) if p]
+    return " && ".join(parts)
+
+
 def detect_run_command(folder: Path) -> str:
     """Figure out how to run a freshly cloned project. Returns a shell command."""
     if not folder.is_dir():
@@ -319,7 +398,7 @@ def clone_and_run(repo: str, dest_dir: str | None = None, player=None) -> str:
     folder = Path(path_str)
     try:
         from actions.fcc_runner import open_terminal_in
-        run_cmd = detect_run_command(folder)
+        run_cmd = detect_run_command(folder) or run_from_readme(folder)
         command = run_cmd if run_cmd else "exec bash"
         if open_terminal_in(folder, command=command):
             if run_cmd:

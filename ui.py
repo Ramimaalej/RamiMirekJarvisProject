@@ -21,7 +21,7 @@ from PyQt6.QtCore import (
 from PyQt6.QtGui import (
     QBrush, QColor, QDragEnterEvent, QDropEvent, QFont, QFontDatabase,
     QKeySequence, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap,
-    QRadialGradient, QShortcut,
+    QRadialGradient, QShortcut, QTextOption,
 )
 from PyQt6.QtWidgets import (
     QApplication, QComboBox, QFileDialog, QFrame, QHBoxLayout, QInputDialog, QLabel, QLineEdit,
@@ -80,7 +80,7 @@ API_FILE   = CONFIG_DIR / "api_keys.json"
 _DEFAULT_W, _DEFAULT_H = 1200, 780
 _MIN_W,     _MIN_H     = 960, 620
 _LEFT_W  = 185
-_RIGHT_W = 360
+_RIGHT_W = 440
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
@@ -766,6 +766,7 @@ class LogWidget(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setReadOnly(True)
+        self.setWordWrapMode(QTextOption.WrapMode.WrapAnywhere)
         self.setFont(QFont(_FONT, _FONT_SZ_SM))
         self.setStyleSheet(f"""
             QTextEdit {{
@@ -775,7 +776,7 @@ class LogWidget(QTextEdit):
                
                 padding: 10px;
                 selection-background-color: {C.ACC_GHO};
-                font-size: 13px;
+                font-size: 12px;
                 line-height: 1.5;
             }}
             QScrollBar:vertical {{
@@ -3228,8 +3229,9 @@ class MainWindow(QMainWindow):
 
         # ── Buttons ──
         btn_row = QHBoxLayout(); btn_row.setSpacing(6)
+        btn_row.setContentsMargins(0, 6, 0, 0)
         self._mute_btn = QPushButton("Mic")
-        self._mute_btn.setFixedHeight(32)
+        self._mute_btn.setFixedHeight(30)
         self._mute_btn.setFont(QFont(_FONT, _FONT_SZ_SM))
         self._mute_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._mute_btn.clicked.connect(self._toggle_mute)
@@ -3237,28 +3239,30 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(self._mute_btn)
 
         for label, cb in [
-            ("Fullscreen", self._toggle_fullscreen),
+            ("Fullscr.", self._toggle_fullscreen),
             ("Providers", self._show_providers),
             ("Ollama", self._show_ollama_models),
             ("Settings", self._show_config),
-            ("Connections", self._show_connections),
+            ("Connect.", self._show_connections),
             ("Island", self._toggle_island),
         ]:
             btn = QPushButton(label)
-            btn.setFixedHeight(32)
-            btn.setFont(QFont(_FONT, _FONT_SZ_SM))
+            btn.setFixedHeight(30)
+            btn.setMinimumWidth(86)
+            btn.setMaximumWidth(100)
+            btn.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Fixed)
+            btn.setFont(QFont(_FONT, 9, QFont.Weight.Bold))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background: transparent; color: {C.TEXT_DIM};
                     border: 1px solid {C.BORDER};
-                    padding: 2px 12px;
+                    padding: 0px 4px;
                 }}
                 QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.ACC}; background: {C.PRI_GHO}; }}
             """)
             btn.clicked.connect(cb)
             btn_row.addWidget(btn)
-
         btn_row.addStretch()
         lay.addLayout(btn_row)
 
@@ -3268,8 +3272,8 @@ class MainWindow(QMainWindow):
         """One-click shortcuts that fire common commands (dashboard, email, …)."""
         w = QWidget()
         lay = QHBoxLayout(w)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(6)
+        lay.setContentsMargins(0, 0, 0, 4)
+        lay.setSpacing(5)
         for label, cmd in [
             ("Dashboard", "open my dashboard"),
             ("Email",     "check my emails"),
@@ -3279,7 +3283,8 @@ class MainWindow(QMainWindow):
             ("Terminal",  "open terminal"),
         ]:
             b = QPushButton(label)
-            b.setFixedHeight(26)
+            b.setFixedHeight(24)
+            b.setMinimumWidth(74)
             b.setFont(QFont(_FONT, _FONT_SZ_XS))
             b.setCursor(Qt.CursorShape.PointingHandCursor)
             b.setToolTip(f"Say: {cmd}")

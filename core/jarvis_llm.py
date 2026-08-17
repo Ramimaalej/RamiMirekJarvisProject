@@ -222,8 +222,11 @@ def _process_message(self, user_text: str) -> None:
                     final_tool_calls = event["tool_calls"]
         except RuntimeError as e:
             short = str(e)[:120]
+            hint = _llm_error_hint(short)
             self.ui.write_log(f"ERR: LLM — {short}")
-            self.speak("I cannot do that.")
+            if hint:
+                self.ui.write_log(hint)
+            self.speak(hint_short(hint) if hint else "I cannot do that.")
             fallback = {"role": "assistant", "content": f"I'm sorry, I encountered an error: {short}"}
             with self._conv_lock:
                 self._conversation.append(fallback)

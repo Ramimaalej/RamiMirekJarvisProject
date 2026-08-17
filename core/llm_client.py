@@ -337,12 +337,27 @@ def get_llm_settings() -> tuple[str, str]:
     """Returns (base_url, model_name).
 
     Falls back to provider-specific defaults when the config value is empty.
+    Safety guard: a cloud provider can never be sent to a local Ollama URL
+    (e.g. Groq → http://localhost:11434), and Ollama can never be sent to a
+    cloud URL. The per-provider default URL is always used when there is a
+    mismatch between the configured  llm_url  and the configured  llm_provider.
     """
     cfg      = _load_config()
     provider = get_llm_provider()
     def_url, def_model = _PROVIDER_DEFAULTS.get(provider, (_DEFAULTS["llm_url"], _DEFAULTS["llm_model"]))
     url   = (cfg.get("llm_url")   or def_url).rstrip("/")
     model = cfg.get("llm_model")  or def_model
+
+    # ── Provider / URL mismatch guard ──────────────────────────────────────
+    cfg_is_local = url.lower().startswith(("http://localhost", "http://127.0.0.1", "127.0.0.1"))
+    if _is_openai_compatible(provider) and cfg_is_local:
+        # Cloud provider (groq, openrouter, …) but the URL is a leftover
+        # local Ollama address → use the provider's own default URL.
+        url = def_url
+    if provider == "ollama" and not cfg_is_local:
+        # Ollama selected but the URL points to a cloud address (leftover
+        # from a previous provider) → go back to localhost:11434.
+        url = "http://localhost:11434"
     return url, model
 
 

@@ -931,7 +931,7 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "github",
-        "description": "GitHub integration. Create/list repos, manage issues and pull requests, view workflows, and clone a public repo into ~/MyProjects (clone needs no token). Requires GITHUB_TOKEN for API operations.",
+        "description": "GitHub integration. Create/list repos, manage issues and pull requests, view workflows, and CLONE ANY public GitHub repo and RUN it automatically — it clones into ~/MyProjects, reads the README to detect the install and run commands (npm, pip, docker, cargo, go, gradle, maven, dotnet…), opens a terminal and starts the project. Clone needs no token. Other actions require GITHUB_TOKEN.",
         "parameters": {
             "type": "OBJECT",
             "properties": {

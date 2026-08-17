@@ -164,10 +164,24 @@ _INTENTS: list[dict[str, Any]] = [
     },
 
     {
+        "name": "send_message",
+        "subsystem": "messaging",
+        "patterns": [
+            r"^(send|write|text)\s+(a\s+)?(message|dm|text)\s+(to|for)\s+.+\b(on|via)\b\s+(whatsapp|telegram|messenger|signal|discord|sms|imessage)",
+            r"^(send|write)\s+(a\s+)?(whatsapp|telegram|signal|sms)\s+(message\s+)?(to|for)",
+        ],
+        "handler": "send_message",
+        "params": {},
+        "requires_ai": True,
+        "priority": "high",
+    },
+
+    {
         "name": "gmail_send",
         "subsystem": "gmail",
         "patterns": [
-            r"^(send|compose|write)\s+(an?\s+)?(email|mail|message)\s+(to|for)",
+            r"^(send|compose|write)\s+(an?\s+)?(email|mail)\s+(to|for)",
+            r"^(send|compose|write)\s+(a\s+)?message\s+(to|for)\s+(?!.+\b(on|via)\b\s+(whatsapp|telegram|messenger|signal|discord|sms|imessage))",
             r"email\s+.*\s+that",
         ],
         "handler": "gmail_send",
@@ -1393,6 +1407,26 @@ class IntentRouter:
             app = text[match.end():].strip().rstrip("!?., ")
             if app:
                 params["app_name"] = app
+
+        elif intent["name"] == "send_message":
+            t = text.lower()
+            # platform: explicit mention after on/via, or at start
+            plat = None
+            mplat = re.search(r"\b(on|via)\s+(whatsapp|telegram|messenger|signal|discord|sms|imessage)\b", t)
+            if mplat:
+                plat = mplat.group(2)
+            else:
+                mplat2 = re.search(r"\b(whatsapp|telegram|signal|sms)\b", t)
+                if mplat2:
+                    plat = mplat2.group(1)
+            if plat:
+                params["platform"] = plat
+            # receiver: word(s) right after "to <name>" — naive extraction;
+            # the LLM will refine when requires_ai=True.
+            mto = re.search(r"\bto\s+([a-z][a-z\s]{0,18}?)\s+(on|via|that|saying|with|about|right|now|,|\.)", t)
+            if mto:
+                params["receiver"] = mto.group(1).strip()
+            params["message_text"] = text
 
         elif intent["name"] == "auto_register":
             site = ""

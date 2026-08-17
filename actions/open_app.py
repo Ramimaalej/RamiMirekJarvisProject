@@ -598,6 +598,21 @@ def open_app(
             if launcher(app_name):
                 return f"Opened {app_name}."
 
+        # System apps must NEVER fall back to a website — "open terminal"
+        # should not open terminal.com in the browser.
+        _SYSTEM_APP_KEYS = {
+            "terminal", "cmd", "powershell", "bash", "shell", "console",
+            "explorer", "file explorer", "task manager", "settings",
+            "calculator", "notepad", "control center", "finder", "activity monitor",
+        }
+        if normalized.lower().strip() in _SYSTEM_APP_KEYS or app_name.lower().strip() in _SYSTEM_APP_KEYS:
+            return (
+                f"Could not open '{app_name}' — the program was not found on this "
+                "system. On Windows 11 use 'terminal' (wt), on macOS 'Terminal', "
+                "and on Linux install your terminal (e.g. sudo apt install "
+                "gnome-terminal) or set the default terminal in your settings."
+            )
+
         # ── Web fallback: try opening as a website ─────────────────────────
         # Common video/tutorial keywords → YouTube search
         _VIDEO_KEYWORDS = {"tutorial", "video", "guide", "walkthrough", "how to", "how-to", "lesson", "course", "demo", "match", "game", "stream", "clip", "trailer", "highlights", "episode", "review", "vs", "versus"}
