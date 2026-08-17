@@ -396,7 +396,7 @@ class TestMonitorManager:
 
 class TestMainToolDeclarations:
     def test_new_tools_in_declarations(self):
-        with open(PROJECT / "main.py") as f:
+        with open(PROJECT / "core" / "tools" / "declarations.py") as f:
             tree = ast.parse(f.read())
 
         tools_node = None
@@ -423,23 +423,23 @@ class TestMainToolDeclarations:
             assert expected in names, f"Tool '{expected}' not found in TOOL_DECLARATIONS"
 
     def test_dispatcher_entries_exist(self):
-        with open(PROJECT / "main.py") as f:
-            content = f.read()
+        content = (PROJECT / "core" / "tools" / "executor.py").read_text()
+
         for tool in ("screen_read", "active_window", "detect_faces",
                      "wake_word", "github", "search_files_fast",
                      "finance", "network_scan", "voice_call", "monitors"):
             assert f'elif name == "{tool}":' in content, f"Dispatcher for '{tool}' not found"
 
     def test_imports_exist(self):
-        with open(PROJECT / "main.py") as f:
-            content = f.read()
+        content = (PROJECT / "core" / "tools" / "executor.py").read_text()
+
         imports = [
             "screen_reader", "face_recognition", "wake_word",
             "github_integration", "file_search", "finance_tracker",
             "network_discovery", "voice_calls", "monitor_manager",
         ]
         for imp in imports:
-            assert f"from actions.{imp}" in content, f"Import for '{imp}' not found"
+            assert f"actions.{imp}" in content, f"Import for '{imp}' not found"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -733,31 +733,33 @@ class TestFederation:
 # ═══════════════════════════════════════════════════════════════════════
 
 class TestNewToolDeclarations:
+    def _decl_source(self):
+        return (PROJECT / "core" / "tools" / "declarations.py").read_text()
     def test_tool_declarations_exist(self):
-        with open(PROJECT / "main.py") as f:
-            content = f.read()
+        content = self._decl_source()
+
         for name in ("scaffold", "relationship_graph", "forensics",
                      "remote_control", "federation"):
             assert f'"{name}"' in content or f"'{name}'" in content, \
-                f"Tool declaration '{name}' not found in main.py"
+                f"Tool declaration '{name}' not found in declarations.py"
 
     def test_dispatcher_entries_exist(self):
-        with open(PROJECT / "main.py") as f:
-            content = f.read()
+        content = (PROJECT / "core" / "tools" / "executor.py").read_text()
+
         for tool in ("scaffold", "relationship_graph", "forensics",
                      "remote_control", "federation"):
             assert f'elif name == "{tool}":' in content, \
                 f"Dispatcher for '{tool}' not found"
 
     def test_imports_exist(self):
-        with open(PROJECT / "main.py") as f:
-            content = f.read()
+        content = (PROJECT / "core" / "tools" / "executor.py").read_text()
+
         imports = [
             "project_scaffold", "relationship_graph", "forensics",
             "remote_control", "federation",
         ]
         for imp in imports:
-            assert f"from actions.{imp}" in content, \
+            assert f"actions.{imp}" in content, \
                 f"Import for '{imp}' not found"
 
     def test_new_deps_in_requirements(self):

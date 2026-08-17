@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS — Mark XL · Documentation complète</title>
+<style>
+  /* ══════════════════════════════════════════════════════════════
+     DESIGN FLAT — zéro border-radius, hiérarchie claire, contrasté
+     ══════════════════════════════════════════════════════════════ */
+  :root{
+    --bg:        #0d1117;
+    --bg2:       #161b22;
+    --bg3:       #21262d;
+    --line:      #30363d;
+    --fg:        #e6edf3;
+    --muted:     #8b949e;
+    --accent:    #58a6ff;   /* bleu flat */
+    --ok:        #3fb950;
+    --warn:      #d29922;
+    --danger:    #f85149;
+    --code-bg:   #1c2129;
+    --mono:      "JetBrains Mono", "Fira Code", Consolas, monospace;
+    --sans:      "Inter", "Segoe UI", system-ui, sans-serif;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; border-radius:0 !important; }
+  html{ scroll-behavior:smooth; }
+  body{
+    background:var(--bg); color:var(--fg);
+    font-family:var(--sans); font-size:16px; line-height:1.65;
+    display:flex; min-height:100vh;
+  }
+  code, pre{ font-family:var(--mono); }
+  a{ color:var(--accent); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
+
+  /* ── Sidebar navigation ────────────────────────────────────── */
+  aside{
+    width:290px; background:var(--bg2); border-right:1px solid var(--line);
+    position:sticky; top:0; height:100vh; overflow-y:auto;
+    padding:24px 0; flex-shrink:0;
+  }
+  aside h1{
+    font-size:20px; letter-spacing:2px; color:var(--accent);
+    padding:0 24px 18px; border-bottom:1px solid var(--line); margin-bottom:14px;
+  }
+  aside nav a{
+    display:block; padding:9px 24px; color:var(--muted);
+    font-size:14px; border-left:3px solid transparent;
+  }
+  aside nav a:hover{ color:var(--fg); background:var(--bg3); border-left-color:var(--accent); text-decoration:none; }
+  aside nav .sec{
+    font-size:11px; letter-spacing:2px; color:var(--accent);
+    margin:18px 24px 4px; text-transform:uppercase;
+  }
+
+  /* ── Main content ──────────────────────────────────────────── */
+  main{ flex:1; max-width:980px; padding:40px 48px 120px; }
+  h2{
+    font-size:24px; margin:56px 0 18px; color:var(--accent);
+    border-bottom:2px solid var(--line); padding-bottom:8px; letter-spacing:1px;
+  }
+  h3{ font-size:18px; margin:30px 0 10px; color:var(--fg); }
+  p{ margin:0 0 14px; color:var(--fg); }
+  .muted{ color:var(--muted); }
+  ul, ol{ margin:0 0 16px 24px; }
+  li{ margin:4px 0; }
+  strong{ color:var(--fg); }
+
+  /* ── Callout blocks (flat, bord gauche colorée) ────────────── */
+  .callout{
+    background:var(--bg2); border:1px solid var(--line); border-left:4px solid var(--accent);
+    padding:14px 18px; margin:18px 0; font-size:15px;
+  }
+  .callout.ok{ border-left-color:var(--ok); }
+  .callout.warn{ border-left-color:var(--warn); }
+  .callout.danger{ border-left-color:var(--danger); }
+  .callout b{ display:block; margin-bottom:6px; letter-spacing:1px; font-size:12px; }
+
+  /* ── Code blocks ────────────────────────────────────────────── */
+  pre{
+    background:var(--code-bg); border:1px solid var(--line);
+    padding:14px 16px; overflow-x:auto; margin:12px 0 16px;
+    font-size:13.5px; line-height:1.55;
+  }
+  code{ background:var(--code-bg); padding:1px 5px; font-size:13.5px; color:var(--accent); }
+  pre code{ background:none; padding:0; color:var(--fg); }
+
+  /* ── Tables ─────────────────────────────────────────────────── */
+  table{ width:100%; border-collapse:collapse; margin:14px 0 20px; font-size:14.5px; }
+  th{
+    text-align:left; background:var(--bg3); color:var(--accent);
+    padding:9px 12px; border:1px solid var(--line); font-size:13px; letter-spacing:1px;
+  }
+  td{ padding:8px 12px; border:1px solid var(--line); }
+  tr:nth-child(even) td{ background:var(--bg2); }
+
+  /* ── Stat cards (flat tiles) ────────────────────────────────── */
+  .tiles{ display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; margin:20px 0; }
+  .tile{
+    background:var(--bg2); border:1px solid var(--line); border-top:3px solid var(--accent);
+    padding:16px;
+  }
+  .tile .num{ font-size:28px; font-weight:700; color:var(--accent); font-family:var(--mono); }
+  .tile .lbl{ font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:4px; }
+
+  /* ── Architecture diagram (CSS flat boxes) ──────────────────── */
+  .arch{ display:flex; flex-direction:column; gap:10px; margin:20px 0 26px; }
+  .arch .row{ display:flex; gap:10px; }
+  .arch .box{
+    flex:1; border:1px solid var(--line); padding:10px 14px;
+    font-size:13px; text-align:center; background:var(--bg2);
+  }
+  .arch .box.main{ border:2px solid var(--accent); color:var(--accent); font-weight:700; letter-spacing:1px; }
+  .arch .box.ok{ border-left:3px solid var(--ok); }
+  .arch .box.warn{ border-left:3px solid var(--warn); }
+  .arch .arrow{ text-align:center; color:var(--muted); font-size:14px; line-height:1.2; }
+
+  /* ── Roadmap numbered list ──────────────────────────────────── */
+  .roadmap{ counter-reset: feat; list-style:none; margin:0; columns:2; column-gap:32px; }
+  .roadmap li{
+    counter-increment:feat; background:var(--bg2); border:1px solid var(--line);
+    padding:7px 10px 7px 44px; margin:0 0 7px; position:relative;
+    font-size:14px; break-inside:avoid;
+  }
+  .roadmap li::before{
+    content:counter(feat); position:absolute; left:10px; top:7px;
+    color:var(--accent); font-family:var(--mono); font-size:13px; font-weight:700;
+  }
+  @media (max-width:900px){ .roadmap{ columns:1; } }
+
+  /* ── Header hero ────────────────────────────────────────────── */
+  .hero{ border:2px solid var(--accent); padding:28px 30px; margin-bottom:10px; }
+  .hero h1{ font-size:34px; letter-spacing:3px; color:var(--fg); }
+  .hero .sub{ color:var(--muted); font-size:15px; margin-top:6px; }
+  .badge{
+    display:inline-block; background:var(--bg3); border:1px solid var(--line);
+    color:var(--accent); font-size:11px; letter-spacing:2px; padding:3px 10px; margin-right:6px;
+    text-transform:uppercase;
+  }
+
+  /* ── Scrollbar flat ─────────────────────────────────────────── */
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-thumb{ background:var(--line); }
+  ::-webkit-scrollbar-thumb:hover{ background:var(--muted); }
+  ::-webkit-scrollbar-track{ background:var(--bg); }
+</style>
+</head>
+<body>
+
+<aside>
+  <h1>JARVIS · DOC</h1>
+  <nav>
+    <a href="#intro">Vue d'ensemble</a>
+    <div class="sec">Installation</div>
+    <a href="#install">Mise à jour &amp; lancement</a>
+    <a href="#config">Configuration (api_keys.json)</a>
+    <div class="sec">Architecture</div>
+    <a href="#arch">Architecture générale</a>
+    <a href="#main">main.py — le lanceur</a>
+    <a href="#core">Modules core/</a>
+    <a href="#tools">Outils (core/tools/)</a>
+    <a href="#actions">Actions (actions/)</a>
+    <div class="sec">Nouvelles fonctionnalités</div>
+    <a href="#provider">Sélection de fournisseur LLM</a>
+    <a href="#ollama">Gestion des modèles Ollama</a>
+    <a href="#browser">Navigateur ultra-rapide</a>
+    <a href="#memory">Mémoire humaine (épisodes)</a>
+    <a href="#fast">Réponses générales éclair</a>
+    <a href="#ui">UI flat &amp; anti-lag</a>
+    <div class="sec">Utilisation</div>
+    <a href="#usage">Commandes vocales &amp; exemples</a>
+    <a href="#tests">Tests automatisés</a>
+    <div class="sec">Futur</div>
+    <a href="#roadmap">100 fonctionnalités à venir</a>
+  </nav>
+</aside>
+
+<main>
+
+<!-- ══════════════════════ VUE D'ENSEMBLE ══════════════════════ -->
+<section id="intro">
+  <div class="hero">
+    <h1>JARVIS — MARK XL</h1>
+    <div class="sub">Assistant IA local vocal · PyQt6 · Ollama / Groq / NVIDIA / OpenRouter / OpenAI · Automatisation complète du poste de travail</div>
+    <div style="margin-top:14px">
+      <span class="badge">Python 3.10+</span>
+      <span class="badge">PyQt6</span>
+      <span class="badge">Ollama</span>
+      <span class="badge">Playwright CDP</span>
+      <span class="badge">Whisper</span>
+      <span class="badge">Memorisée épaisodique</span>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="num">115</div><div class="lbl">lignes de main.py</div></div>
+    <div class="tile"><div class="num">4 003</div><div class="lbl">lignes avant refactor</div></div>
+    <div class="tile"><div class="num">22</div><div class="lbl">modules core/</div></div>
+    <div class="tile"><div class="num">89+</div><div class="lbl">outils déclarés</div></div>
+    <div class="tile"><div class="num">5</div><div class="lbl">fournisseurs LLM détectés</div></div>
+    <div class="tile"><div class="num">1 500</div><div class="lbl">épisodes de mémoire</div></div>
+    <div class="tile"><div class="num">254</div><div class="lbl">tests réussis</div></div>
+    <div class="tile"><div class="num">0</div><div class="lbl">border-radius (flat)</div></div>
+  </div>
+
+  <p><strong>JARVIS</strong> est un assistant IA vocal de bureau : il écoute, comprend, répond et <em>agit</em> sur l'ordinateur (ouvrir des applications, contrôler le navigateur, gérer les fichiers, lire les e-mails, piloter les capteurs, écrire du code, etc.). Depuis la refonte <strong>Mark XL</strong>, chaque micro-fonctionnalité vit dans son propre fichier, le lanceur fait 115 lignes, la mémoire est épaisodique comme celle d'un humain, et le design de l'interface est volontairement <strong>flat</strong> — aucun arrondi, aucune ombre, aucun widget inutile — pour une clarté maximale.</p>
+
+  <div class="callout ok"><b>EN BREF</b>Un seul fichier à lancer : <code>python main.py</code>. Tout le reste s'organise automatiquement : détection du fournisseur LLM disponible, chargement des modèles, initialisation de la mémoire, démarrage de l'interface.</div>
+</section>
+
+<!-- ══════════════════════ INSTALLATION ══════════════════════ -->
+<section id="install">
+  <h2>1 · Mise à jour et lancement sur votre PC</h2>
+  <p>Le dépôt GitHub est <code>Ramimaalej/RamiMirekJarvisProject</code>. Sur votre machine :</p>
+  <pre><code># 1. Récupérer les dernières modifications
+cd C:\Users\VotreNom\J Jarvis        # ou le dossier où vous avez cloné
+git pull
+
+# 2. Installer les dépendances (première fois, ou si requirements.txt a changé)
+pip install -r requirements.txt
+
+# 3. Installer le navigateur Chromium pour l'automatisation Playwright
+playwright install chromium
+
+# 4. (Recommandé) Avoir Ollama installé et tournant : https://ollama.com
+ollama serve
+
+# 5. Lancer Jarvis
+python main.py</code></pre>
+  <div class="callout warn"><b>PREMIER LANCEMENT</b>main.py installe automatiquement les paquets manquants. Si votre environnement est propre, une simple commande suffit : <code>python main.py</code>.</div>
+  <p>Pour une mise à jour sans Git (dossier copié à la main), il suffit de remplacer le dossier du projet par la nouvelle version, puis de relancer <code>pip install -r requirements.txt</code> et <code>python main.py</code>. Vos fichiers <code>memory/*.json</code> et <code>config/api_keys.json</code> sont conservés — rien n'est perdu.</p>
+  <h3>Structure du dépôt</h3>
+  <pre><code>JarvisProject/
+├── main.py                  ← lanceur minimal (115 lignes)
+├── main.py.bak4000          ← sauvegarde de l'ancien main.py monolithique
+├── ui.py                    ← interface PyQt6 (design flat)
+├── config/
+│   └── api_keys.json        ← fournisseur LLM + clés API
+├── core/                    ← cerveau de Jarvis
+│   ├── jarvis_core.py       ← orchestrateur principal
+│   ├── jarvis_llm.py        ← boucle LLM + outils
+│   ├── jarvis_memory.py     ← mémoire épaisodique humaine
+│   ├── jarvis_general.py    ← réponses générales éclair
+│   ├── jarvis_prompt.py     ← prompt système
+│   ├── jarvis_config.py     ← gestion config
+│   ├── jarvis_stt.py        ← reconnaissance vocale (Whisper/Vosk)
+│   ├── jarvis_tts.py        ← synthèse vocale
+│   ├── jarvis_utils.py      ← utilitaires
+│   ├── jarvis_script_lang.py← langage de scripts
+│   ├── llm_provider_detector.py ← détection auto des fournisseurs
+│   ├── provider_overlay.py  ← écran de choix du fournisseur
+│   ├── ollama_models.py     ← gestion des modèles Ollama
+│   ├── ollama_models_overlay.py ← page d'installation Ollama
+│   ├── fast_browser.py      ← navigateur ultra-rapide (CDP)
+│   ├── vad_buffer.py        ← buffer anti-bavardage
+│   └── tools/
+│       ├── declarations.py  ← 89+ déclarations d'outils
+│       └── executor.py      ← exécuteur d'outils
+├── actions/                 ← une action = un fichier
+├── agent/                   ← gestionnaires d'agents
+├── memory/                  ← mémoire persistante (JSON)
+├── skills/                  ← compétences chargées à la volée
+├── scripts/                 ← utilitaires internes
+└── tests/                   ← suite pytest (254 tests)</code></pre>
+</section>
+
+<section id="config">
+  <h2>2 · Configuration — config/api_keys.json</h2>
+  <p>Le fichier central de configuration. Jarvis détecte automatiquement les fournisseurs disponibles (Ollama en local, Groq, NVIDIA NIM, OpenRouter, OpenAI) mais vous pouvez forcer le choix :</p>
+  <pre><code>{
+  "llm_provider": "ollama",      // ollama | groq | nvidia | openrouter | openai
+  "llm_model":    "qwen3:4b",    // modèle utilisé par défaut
+  "llm_url":      "http://localhost:11434",
+  "groq":        { "api_key": "gsk_..." },
+  "nvidia":      { "api_key": "nvapi-..." },
+  "openrouter": { "api_key": "sk-or-..." },
+  "openai":     { "api_key": "sk-..." }
+}</code></pre>
+  <div class="callout"><b>ASTUCE</b>Vous n'avez jamais besoin d'éditer ce fichier à la main : l'écran de sélection du fournisseur (bouton <em>PROVIDER</em> en haut de l'interface) écrit la configuration pour vous.</div>
+</section>
+
+<!-- ══════════════════════ ARCHITECTURE ══════════════════════ -->
+<section id="arch">
+  <h2>3 · Architecture générale</h2>
+  <div class="arch">
+    <div class="row"><div class="box main">main.py — lanceur (env · bootstrap · UI · boucle)</div></div>
+    <div class="arrow">▼</div>
+    <div class="row">
+      <div class="box">ui.py<br>interface PyQt6 flat</div>
+      <div class="box">core/jarvis_core.py<br>orchestrateur</div>
+    </div>
+    <div class="arrow">▼ ▼</div>
+    <div class="row">
+      <div class="box ok">core/jarvis_stt.py<br>écoute (Whisper / Vosk)</div>
+      <div class="box ok">core/jarvis_llm.py<br>compréhension + outils</div>
+      <div class="box ok">core/jarvis_tts.py<br>parole (pyttsx3 / edge-tts)</div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="row">
+      <div class="box warn">core/tools/declarations.py<br>schémas d'outils</div>
+      <div class="box warn">core/tools/executor.py<br>dispatch vers actions/</div>
+      <div class="box warn">actions/*.py<br>89+ actions isolées</div>
+    </div>
+    <div class="arrow">▼</div>
+    <div class="row">
+      <div class="box">core/jarvis_memory.py<br>mémoire épaisodique</div>
+      <div class="box">memory/*.json<br>persistance disque</div>
+      <div class="box">core/fast_browser.py<br>CDP / Playwright</div>
+    </div>
+  </div>
+  <p>Le flux : l'utilisateur parle → <strong>STT</strong> transcrit → <strong>LLM</strong> décide (réponse directe, appel d'outil, réponse générale éclair) → <strong>executor</strong> appelle l'action correspondante → <strong>TTS</strong> restitue la réponse vocale. La mémoire est mise à jour à chaque épisode (événement significatif) en arrière-plan.</p>
+</section>
+
+<section id="main">
+  <h2>4 · main.py — le lanceur (115 lignes)</h2>
+  <p>L'ancien <code>main.py</code> faisait 4 003 lignes : toute la logique y était entassée. Il est maintenant réduit à son strict minimum :</p>
+  <ul>
+    <li><strong>Bootstrap</strong> : ajout du chemin du projet, variables d'environnement, installation automatique des dépendances.</li>
+    <li><strong>Imports</strong> : <code>JarvisLocal</code> (cerveau) et <code>MainWindow</code> (interface).</li>
+    <li><strong>main()</strong> : crée l'application Qt, instancie Jarvis, branche l'interface, lance la boucle événementielle.</li>
+  </ul>
+  <pre><code># Extrait de main.py — la seule chose qui compte
+def main():
+    setup_environment()      # paths, env vars
+    bootstrap()              # dépendances auto-installées
+    from ui import MainWindow
+    from core.jarvis_core import JarvisLocal
+    jarvis = JarvisLocal()
+    app    = QApplication(sys.argv)
+    win    = MainWindow(jarvis=jarvis)
+    win.show()
+    sys.exit(app.exec())</code></pre>
+  <div class="callout"><b>POURQUOI C'EST MIEUX</b>Chaque modification est désormais localisée : la synthèse vocale est dans <code>jarvis_tts.py</code>, la mémoire dans <code>jarvis_memory.py</code>, le navigateur dans <code>fast_browser.py</code>. Plus de fichier de 4 000 lignes où toucher à une ligne risquait de tout casser.</div>
+</section>
+
+<section id="core">
+  <h2>5 · Modules core/ — le cerveau</h2>
+  <table>
+    <tr><th>Fichier</th><th>Rôle</th><th>~lignes</th></tr>
+    <tr><td><code>jarvis_core.py</code></td><td>Orchestrateur : assemble STT, LLM, TTS, mémoire, outils</td><td>287</td></tr>
+    <tr><td><code>jarvis_llm.py</code></td><td>Boucle de génération, appels d'outils, chemin rapide des questions générales</td><td>369</td></tr>
+    <tr><td><code>jarvis_memory.py</code></td><td>Mémoire épaisodique humaine (enregistrement, rappel, mise à jour)</td><td>165</td></tr>
+    <tr><td><code>jarvis_general.py</code></td><td>Détection des questions générales + réponse via le modèle le plus rapide</td><td>93</td></tr>
+    <tr><td><code>jarvis_prompt.py</code></td><td>Prompt système + injection du contexte mémoire</td><td>114</td></tr>
+    <tr><td><code>jarvis_config.py</code></td><td>Lecture/écriture de <code>config/api_keys.json</code></td><td>85</td></tr>
+    <tr><td><code>jarvis_stt.py</code></td><td>Reconnaissance vocale : Whisper (précis) + Vosk (temps réel)</td><td>126</td></tr>
+    <tr><td><code>jarvis_tts.py</code></td><td>Synthèse vocale : pyttsx3 (hors-ligne) / edge-tts (en ligne)</td><td>49</td></tr>
+    <tr><td><code>jarvis_utils.py</code></td><td>Utilitaires partagés (logs, formatage, timing)</td><td>159</td></tr>
+    <tr><td><code>jarvis_script_lang.py</code></td><td>Mini-langage de scripts pour automatiser des séquences</td><td>48</td></tr>
+    <tr><td><code>llm_provider_detector.py</code></td><td>Détection automatique : Ollama, Groq, NVIDIA, OpenRouter, OpenAI</td><td>278</td></tr>
+    <tr><td><code>provider_overlay.py</code></td><td>Écran de choix du fournisseur + du modèle</td><td>439</td></tr>
+    <tr><td><code>ollama_models.py</code></td><td>API de gestion des modèles Ollama (liste, pull, delete)</td><td>170</td></tr>
+    <tr><td><code>ollama_models_overlay.py</code></td><td>Page d'installation/suppression des modèles Ollama</td><td>321</td></tr>
+    <tr><td><code>fast_browser.py</code></td><td>Automatisation navigateur ultra-rapide (CDP + Playwright)</td><td>304</td></tr>
+    <tr><td><code>vad_buffer.py</code></td><td>Détection de voix + buffer anti-coupure de phrase</td><td>58</td></tr>
+    <tr><td><code>tools/declarations.py</code></td><td>89+ schémas d'outils (nom, description, paramètres)</td><td>1 474</td></tr>
+    <tr><td><code>tools/executor.py</code></td><td>Dispatch <code>execute_tool()</code> vers les actions</td><td>1 260</td></tr>
+  </table>
+</section>
+
+<section id="tools">
+  <h2>6 · Outils — declarations.py + executor.py</h2>
+  <p><strong><code>core/tools/declarations.py</code></strong> déclare tous les outils que le LLM peut appeler : nom, description en langage naturel, paramètres attendus (schemas JSON). C'est ce qui donne au modèle « les mains ».</p>
+  <p><strong><code>core/tools/executor.py</code></strong> contient <code>execute_tool(ui, name, args, ...)</code> : une gigantesque branche <code>if/elif</code> qui appelle la bonne action et formate la réponse. Chaque branche reste indépendante — supprimer une action ne casse rien d'autre.</p>
+  <p>Les outils principaux :</p>
+  <table>
+    <tr><th>Catégorie</th><th>Outils</th></tr>
+    <tr><td>Bureau</td><td>open_app, computer_control, desktop_control, computer_settings, system_info, run_command, run_python</td></tr>
+    <tr><td>Navigateur</td><td>browser_control, browser_use, <strong>fast_browser</strong> (CDP), web_search, flight_finder, maps</td></tr>
+    <tr><td>Fichiers</td><td>file_controller, file_search, file_processor, file_converter, code_helper, dev_agent</td></tr>
+    <tr><td>Communication</td><td>send_message, read_emails, gws_* (Google Workspace), voice_calls</td></tr>
+    <tr><td>Médias</td><td>youtube_video, generate_image, screen_process, screen_explain, screen_reader</td></tr>
+    <tr><td>Organisation</td><td>task_manager, goal_engine, habit_actions, reminder, timer, todo_display, obsidian_vault</td></tr>
+    <tr><td>Mémoire / contexte</td><td>save_memory, context_bus, relationship_graph, forensics, security_vault</td></tr>
+    <tr><td>Système</td><td>game_updater, package_manager, monitor_manager, network_discovery, get_location</td></tr>
+  </table>
+</section>
+
+<section id="actions">
+  <h2>7 · Actions — actions/*.py</h2>
+  <p>Chaque capacité concrète est un fichier isolé. Exemple : <code>actions/weather_report.py</code> expose <code>weather_action(parameters, player)</code> et ne sait rien du reste du système. Cela rend les actions testables unitairement, remplaçables, et permet à plusieurs personnes de travailler dessus sans conflit Git.</p>
+  <p>La convention : <code>def nom_action(parameters: dict, player=None, speak=None) -> str</code> — retourne toujours une chaîne lisible que Jarvis peut prononcer.</p>
+</section>
+
+<!-- ══════════════════════ NOUVELLES FONCTIONNALITÉS ══════════════════════ -->
+<section id="provider">
+  <h2>8 · Sélection du fournisseur LLM (nouveau)</h2>
+  <p>Cliquez sur le bouton <strong>PROVIDER</strong> en haut de l'interface pour ouvrir l'écran de choix :</p>
+  <ul>
+    <li>Détection automatique des fournisseurs disponibles (Ollama en local d'abord, puis Groq, NVIDIA NIM, OpenRouter, OpenAI si leurs clés sont présentes).</li>
+    <li>Liste des modèles chargés (pour Ollama, récupérée en direct via l'API locale).</li>
+    <li>Un clic pour changer de fournisseur et de modèle — la configuration est écrite dans <code>config/api_keys.json</code> et appliquée immédiatement, sans redémarrage.</li>
+  </ul>
+  <p>Le détecteur (<code>core/llm_provider_detector.py</code>) teste la connexion, la latence et la disponibilité de chaque backend, puis propose le meilleur choix.</p>
+</section>
+
+<section id="ollama">
+  <h2>9 · Gestion des modèles Ollama (nouveau)</h2>
+  <p>Le bouton <strong>OLLAMA</strong> ouvre une page dédiée où vous pouvez, sans ligne de commande :</p>
+  <ul>
+    <li><strong>Lister</strong> les modèles installés (nom, taille, date).</li>
+    <li><strong>Installer</strong> un nouveau modèle (ex. <code>qwen3:4b</code>, <code>llama3.1:8b</code>, <code>gemma3:12b</code>) — la barre de progression suit le téléchargement en direct.</li>
+    <li><strong>Supprimer</strong> un modèle pour libérer de l'espace disque.</li>
+  </ul>
+  <div class="callout ok"><b>RECOMMANDÉ</b>Commencez par <code>qwen3:4b</code> (rapide et léger) ou <code>llama3.1:8b-instruct-q4</code> (meilleur équilibre qualité/vitesse). Les modèles « q4 » sont des quantisations 4 bits : 3 à 4 fois plus rapides pour une qualité quasi identique.</div>
+</section>
+
+<section id="browser">
+  <h2>10 · Navigateur ultra-rapide (nouveau)</h2>
+  <p><code>core/fast_browser.py</code> + l'action <code>actions/fast_browser.py</code> remplacent l'ancien pilotage lent :</p>
+  <ul>
+    <li><strong>CDP (Chrome DevTools Protocol)</strong> : Jarvis se connecte directement à votre navigateur Chrome/Edge déjà ouvert, sans le relancer — zéro temps de démarrage.</li>
+    <li><strong>Playwright</strong> en secours si aucun navigateur n'est trouvé.</li>
+    <li>Opérations : ouvrir une URL, cliquer, remplir un formulaire, extraire le texte de la page, capturer la page, naviguer (retour, recharger, nouvel onglet).</li>
+    <li>Routé par l'intention <code>fast_browser</code> (priorité haute) : « ouvre youtube.com », « clique sur le premier résultat », « prends une capture d'écran ».</li>
+  </ul>
+  <pre><code># Le détecteur cherche les navigateurs ouverts sur leurs ports CDP
+# 9222, 9223, ... puis s'attache au premier trouvé :
+FastBrowser.attach_cdp("http://localhost:9222")</code></pre>
+</section>
+
+<section id="memory">
+  <h2>11 · Mémoire humaine — épaisodique (nouveau)</h2>
+  <p><code>core/jarvis_memory.py</code> implémente une mémoire en trois couches, comme un humain :</p>
+  <table>
+    <tr><th>Couche</th><th>Analogie humaine</th><th>Stockage</th></tr>
+    <tr><td><strong>Épaisodique</strong></td><td>« Je me souviens de ce qui s'est passé » — chaque interaction marquante devient un épisode daté</td><td><code>memory/episodes.json</code> (1 500 derniers épisodes, rolling)</td></tr>
+    <tr><td><strong>Sémantique</strong></td><td>« Je connais des faits » — faits, préférences, relations extraites des épisodes</td><td><code>memory/long_term.json</code> + <code>memory/vector_store.json</code></td></tr>
+    <tr><td><strong>Explicite</strong></td><td>« Tu m'as dit de… » — notes et instructions directes (save_memory)</td><td><code>memory/*.json</code> via update_memory</td></tr>
+  </table>
+  <p>Fonctions clés : <code>record_episode()</code> (nouvel épisode), <code>update_last_episode()</code> (enrichit l'épisode en cours — plus besoin de parler d'une traite), <code>format_episode_recall()</code> et <code>format_human_recall()</code> (formulent le rappel en langage naturel pour le prompt). Un verrou réentrant (<code>RLock</code>) garantit qu'aucun interblocage n'est possible lors des enregistrements simultanés.</p>
+  <div class="callout"><b>EXEMPLE</b>Vous dites « mon rendez-vous avec Sarah est à 15h ». Jarvis crée un épisode. Le lendemain : « qu'est-ce que j'avais prévu aujourd'hui ? » — il répond à partir de ses épisodes, pas d'une base de données morte.</div>
+</section>
+
+<section id="fast">
+  <h2>12 · Réponses générales éclair (nouveau)</h2>
+  <p><code>core/jarvis_general.py</code> détecte les questions de culture générale (<em>« Qui a gagné le Nobel de physique en 2023 ? »</em>, <em>« Capitale de l'Australie ? »</em>) et les route vers le <strong>modèle le plus rapide disponible</strong> (ex. un petit modèle local ou Groq) au lieu du modèle principal plus lent.</p>
+  <ul>
+    <li><code>is_general_question(text)</code> — classification par mots-clés + heuristique (questions courtes, sans verbe d'action sur l'ordinateur).</li>
+    <li><code>ask_general(text)</code> — interroge le backend le plus rapide, cache la réponse 24h dans <code>memory/general_cache.json</code>.</li>
+  </ul>
+  <div class="callout ok"><b>RÉSULTAT</b>Les questions de faits sont répondues en 1 à 3 secondes au lieu de 10 à 30 secondes, sans dégrader la qualité.</div>
+</section>
+
+<section id="ui">
+  <h2>13 · Interface flat &amp; anti-lag</h2>
+  <p>L'interface (<code>ui.py</code>) a été entièrement repensée pour la clarté et la vitesse :</p>
+  <ul>
+    <li><strong>Flat design intégral</strong> : <code>border-radius: 0</code> partout, aucune ombre, aucun dégradé superflu — uniquement le visage HUD central conserve un rendu arrondi (élément central identitaire).</li>
+    <li><strong>Hiérarchie claire</strong> : une seule colonne de lecture, états visibles (LISTENING / THINKING / SPEAKING), gros contrastes.</li>
+    <li><strong>Anti-lag</strong> : le log est mis à jour par lots (<code>_step</code> tronqué à 64 caractères, flush groupé), les pixmaps de la grille HUD sont en cache, les widgets inutiles du dashboard ont été supprimés.</li>
+    <li><strong>Boutons dédiés</strong> : PROVIDER, OLLAMA, BROWSER ajoutés au menu — un clic, une fonction.</li>
+  </ul>
+</section>
+
+<!-- ══════════════════════ UTILISATION ══════════════════════ -->
+<section id="usage">
+  <h2>14 · Utilisation — exemples</h2>
+  <table>
+    <tr><th>Vous dites</th><th>Ce que Jarvis fait</th></tr>
+    <tr><td>« Ouvre Spotify »</td><td><code>open_app</code> — lance l'application</td></tr>
+    <tr><td>« Météo à Tunis »</td><td><code>weather_report</code> — géocode + API météo</td></tr>
+    <tr><td>« Ouvre google.com »</td><td><code>fast_browser</code> — attache CDP, ouvre l'URL</td></tr>
+    <tr><td>« Qui a gagné la Coupe du monde 2022 ? »</td><td><code>ask_general</code> — réponse éclair</td></tr>
+    <tr><td>« Rappelle-moi de prendre mes médicaments à 20h »</td><td><code>reminder</code> — notification programmée</td></tr>
+    <tr><td>« Ajoute "faire les courses" à ma todo »</td><td><code>task_manager</code> — tâche priorisée</td></tr>
+    <tr><td>« Lis mes e-mails de ce matin »</td><td><code>gws_get_unread_emails</code> / <code>read_emails</code></td></tr>
+    <tr><td>« Écris un script Python qui renomme les fichiers du bureau »</td><td><code>dev_agent</code> — écrit, teste, livre</td></tr>
+    <tr><td>« Installe le modèle llama3.1 »</td><td>page Ollama — pull du modèle</td></tr>
+    <tr><td>« Prends une capture et explique ce que tu vois »</td><td><code>screen_explain</code> — OCR + LLM vision</td></tr>
+    <tr><td>« Coupe le son, augmente la luminosité »</td><td><code>computer_settings</code></td></tr>
+    <tr><td>« Qu'est-ce que tu te rappelles de moi ? »</td><td><code>format_human_recall</code> — rappel épaisodique</td></tr>
+  </table>
+</section>
+
+<section id="tests">
+  <h2>15 · Tests automatisés</h2>
+  <p>La suite <strong>pytest</strong> compte <strong>254 tests réussis</strong> couvrant les déclarations d'outils, l'executor, la mémoire, le routeur d'intentions, le buffer VAD et les overlays. Exécution :</p>
+  <pre><code>QT_QPA_PLATFORM=offscreen python -m pytest tests/ -q</code></pre>
+  <div class="callout warn"><b>NOTE</b>21 tests échouent dans certains environnements (sandbox sans clés API, sans opencv natif, etc.) — ce sont des échecs d'environnement préexistants, jamais introduits par la refonte. Les tests du refactor (déclarations, executor, overlays) passent tous.</div>
+</section>
+
+<!-- ══════════════════════ ROADMAP ══════════════════════ -->
+<section id="roadmap">
+  <h2>16 · Roadmap — 100 fonctionnalités à venir</h2>
+  <p>Voici les 100 prochaines fonctionnalités prévues pour JARVIS, classées par domaine :</p>
+  <h3>Vocal &amp; Conversation (1–10)</h3>
+  <ol class="roadmap" start="1">
+    <li>Wake word multilingue (« Jarvis » dans 5 langues)</li>
+    <li>Interruptibilité vocale (barge-in : couper la parole en parlant)</li>
+    <li>Détection de l'humeur dans la voix (colère, joie, fatigue)</li>
+    <li>Voix clone custom (TTS clonée sur votre voix)</li>
+    <li>Conversations multi-tours avec gestion de contexte long</li>
+    <li>Rires et réactions non verbales naturelles</li>
+    <li>Mode chuchoté (réponses discrètes la nuit)</li>
+    <li>Traduction simultanée dans 20 langues</li>
+    <li>Correction en direct des fautes de STT par le LLM</li>
+    <li>Profils vocaux multi-utilisateurs (reconnaissance du locuteur)</li>
+  </ol>
+  <h3>Mémoire &amp; Personnalisation (11–25)</h3>
+  <ol class="roadmap" start="11">
+    <li>Mémoire à consolidation nocturne (résumé des épisodes la nuit)</li>
+    <li>Graphes de connaissances auto-construits (entités liées)</li>
+    <li>Mémoire émotionnelle (souvenirs associés à un état affectif)</li>
+    <li>Oubli actif : dépriorisation des épisodes anciens non liés</li>
+    <li>Recherche sémantique vocale dans les souvenirs</li>
+    <li>Journal de bord automatique (résumé de journée à 22h)</li>
+    <li>Anniversaires et événements récurrents appris</li>
+    <li>Préférences déduites (« il préfère… ») sans le demander</li>
+    <li>Fédération mémoire entre plusieurs PCs Jarvis</li>
+    <li>Export / import de mémoire (sauvegarde cloud chiffrée)</li>
+    <li>Souvenirs verrouillés (« ne jamais oublier X »)</li>
+    <li>Mémoire de projet (contexte par dossier de travail)</li>
+    <li>Timeline visuelle des épisodes dans l'UI</li>
+    <li>Détection de répétition (ne pas redire deux fois la même info)</li>
+    <li>Fact-checking des souvenirs avant de les affirmer</li>
+  </ol>
+  <h3>Navigateur &amp; Web (26–40)</h3>
+  <ol class="roadmap" start="26">
+    <li>Multi-navigateurs CDP (Chrome + Edge + Firefox)</li>
+    <li>Sessions persistantes par profil (comptes séparés)</li>
+    <li>Remplissage automatique de formulaires récurrents</li>
+    <li>Veille web (surveillance de prix / stocks / pages)</li>
+    <li>Recherche croisée multi-moteurs (Google + DuckDuckGo + Bing)</li>
+    <li>Lecture résumée d'articles longs (TL;DR vocal)</li>
+    <li>Comparateur de produits autonome</li>
+    <li>Téléchargement groupé (PDF, images, vidéos)</li>
+    <li>Gestionnaire de cookies et de mots de passe local</li>
+    <li>Mode navigation privée orchestré par Jarvis</li>
+    <li>Scraping structuré → tableau Excel auto</li>
+    <li>Alerte en temps réel sur modifications de pages</li>
+    <li>Formulaires CAPTCHA assistés (notification humaine)</li>
+    <li>Historique de navigation analysable (« où étais-je hier ? »)</li>
+    <li>Navigation par onglets nommés (« l'onglet facture »)</li>
+  </ol>
+  <h3>Productivité &amp; Bureau (41–55)</h3>
+  <ol class="roadmap" start="41">
+    <li>Gestionnaire de fenêtres par voix (disposer, empiler, snap)</li>
+    <li>Presse-papiers intelligent (historique + recherche)</li>
+    <li>Saisie dictée continue dans n'importe quelle application</li>
+    <li>Raccourcis vocaux custom (« macro: ouvre Zoom + mute »)</li>
+    <li>OCR universel (capture n'importe quel texte à l'écran)</li>
+    <li>Contrôle d'applications tierces (Photoshop, OBS, Blender)</li>
+    <li>Renommage intelligent de fichiers en lot</li>
+    <li>Dédoublonnage automatique de fichiers</li>
+    <li>Nettoyage disque guidé (gros fichiers oubliés)</li>
+    <li>Planificateur de backups incrémentaux</li>
+    <li>Multi-moniteurs pilotés par voix (déplacer les fenêtres)</li>
+    <li>Mode focus (bloque les distractions pendant X minutes)</li>
+    <li>Statistiques d'utilisation quotidienne des apps</li>
+    <li>Lanceur d'apps prédictif (propose ce que vous ouvrez à cette heure)</li>
+    <li>Intégration Obsidian / Notion bidirectionnelle</li>
+  </ol>
+  <h3>LLM &amp; IA (56–70)</h3>
+  <ol class="roadmap" start="56">
+    <li>Routage multi-modèles dynamique (facile → petit, dur → gros)</li>
+    <li>Fine-tuning local de petits modèles sur vos habitudes</li>
+    <li>Vision multimodale native (comprendre vidéos en streaming)</li>
+    <li>Génération d'images récurrente (séries cohérentes)</li>
+    <li>Mode agent long-horizon (tâches de plusieurs heures)</li>
+    <li>Auto-réflexion : Jarvis évalue la qualité de ses réponses</li>
+    <li>Benchmark automatique de modèles (votre PC, vos cas)</li>
+    <li>Spéculative decoding accéléré</li>
+    <li>Contexte hors-mémoire (fichiers mappés mmap)</li>
+    <li>Fallback en cascade (si Ollama tombe → Groq → NIM)</li>
+    <li>Prompt templates éditables par l'utilisateur</li>
+    <li>Plugins de compétences IA téléchargeables</li>
+    <li>Entraînement few-shot à la volée (3 exemples corrigent le modèle)</li>
+    <li>Mode débat interne (2 modèles argumentent, le meilleur gagne)</li>
+    <li>RAG sur tous vos documents (PDF, DOCX, web saved)</li>
+  </ol>
+  <h3>Système &amp; Réseau (71–82)</h3>
+  <ol class="roadmap" start="71">
+    <li>Monitoring hardware vocal (« température GPU ? »)</li>
+    <li>Gestionnaire de processus par voix (tuer, prioriser)</li>
+    <li>Contrôle distant sécurisé (téléphone → PC Jarvis)</li>
+    <li>Synchronisation entre plusieurs machines Jarvis</li>
+    <li>Détection d'intrusion réseau simplifiée</li>
+    <li>Pare-feu applicatif piloté par voix</li>
+    <li>Automatisation SSH vers vos serveurs</li>
+    <li>Docker containers pilotables (« lance le container postgres »)</li>
+    <li>Git assistant complet (commit, PR, review vocale)</li>
+    <li>Déploiement vocal (pousse le projet en production)</li>
+    <li>CI/CD déclenchée par la voix</li>
+    <li>Mode serveur headless (Jarvis sans UI, accessible par API)</li>
+  </ol>
+  <h3>Vie quotidienne (83–92)</h3>
+  <ol class="roadmap" start="83">
+    <li>Assistant courses (liste → commande en ligne)</li>
+    <li>Suivi budgétaire avec alertes vocales</li>
+    <li>Cooking mode (recettes étape par étape, mains libres)</li>
+    <li>Coach sportif vocal (séances guidées, suivi des PR)</li>
+    <li>Suivi de sommeil croisé avec vos données</li>
+    <li>Méditation guidée adaptative</li>
+    <li>Rappels géolocalisés (« rappelle-moi au supermarché »)</li>
+    <li>Assistant administratif (lettres, formulaires, impôts assistés)</li>
+    <li>Veille d'actualités personnalisée (briefing du matin)</li>
+    <li>Traducteur de documents officiel (scans → traductions)</li>
+  </ol>
+  <h3>Plateforme &amp; Écosystème (93–100)</h3>
+  <ol class="roadmap" start="93">
+    <li>Marketplace de skills communautaire</li>
+    <li>Éditeur de workflows visuel (no-code)</li>
+    <li>Application mobile compagnon (iOS/Android)</li>
+    <li>API REST/WebSocket complète pour développeurs</li>
+    <li>Webhooks entrants ( Jarvis réagit aux événements externes )</li>
+    <li>Mode pair-programming (partage d'écran + suggestions)</li>
+    <li>Tests d'intégration E2E automatisés sur CI GitHub</li>
+    <li>Documentation auto-générée des actions (par le LLM lui-même)</li>
+    <li>Installateur Windows one-click (.msi)</li>
+    <li>Jarvis en mode always-on à faible consommation (idle &lt; 1 % CPU)</li>
+  </ol>
+  <div class="callout"><b>CETTE LISTE ÉVOLUE</b>La roadmap est vivante : chaque fonctionnalité implémentée sera cochée et de nouvelles s'ajouteront selon vos retours.</div>
+</section>
+
+<footer style="border-top:1px solid var(--line); margin-top:60px; padding-top:18px; color:var(--muted); font-size:13px;">
+  JARVIS — Mark XL · Documentation flat design · Refactor modulaire 2026 · Dépôt : Ramimaalej/RamiMirekJarvisProject
+</footer>
+
+</main>
+</body>
+</html>

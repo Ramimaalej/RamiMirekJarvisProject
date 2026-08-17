@@ -204,6 +204,22 @@ _INTENTS: list[dict[str, Any]] = [
 
     # ── Browser / Web ────────────────────────────────────────────────
     {
+        "name": "fast_browser",
+        "subsystem": "browser",
+        "patterns": [
+            r"^(open|go\s+to|visit|navigate\s+to)\s+(https?://|www\.|[a-z0-9\-]+\.[a-z])",
+            r"^click\s+.+",
+            r"^scroll\s+(up|down)",
+            r"^(refresh|reload|back|new\s+tab|close\s+tab)",
+            r"^grab\s+(the\s+)?page",
+            r"^screenshot",
+        ],
+        "handler": "fast_browser",
+        "params": {},
+        "requires_ai": False,
+        "priority": "high",
+    },
+    {
         "name": "open_app",
         "subsystem": "browser",
         "patterns": [
