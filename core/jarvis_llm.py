@@ -367,6 +367,27 @@ def _process_message(self, user_text: str) -> None:
         self.ui.set_state("LISTENING")
 
 # ------------------------------------------------------------------
+# LLM error hints (clear, actionable messages for the user)
+# ------------------------------------------------------------------
+
+def _llm_error_hint(short: str) -> str:
+    """Return a short, actionable hint for common LLM errors (URL/Auth)."""
+    s = short.lower()
+    if "localhost:11434" in short or "ollama" in s:
+        return "Local model server (Ollama) is not reachable — run: ollama serve"
+    if "401" in s or "api key" in s or "unauthorized" in s or "forbidden" in s:
+        if "groq" in s:
+            return "Groq API key missing/invalid — create a free key at console.groq.com and add it in Settings"
+        return "API key missing or invalid — open Settings → PROVIDER and enter your API key"
+    if "groq" in s or "openrouter" in s or "nvidia" in s or "openai" in s:
+        return f"Cloud provider unreachable — check your API key and internet connection"
+    return ""
+
+def hint_short(hint: str) -> str:
+    """Return a short spoken version of an error hint."""
+    return hint or "I cannot do that."
+
+# ------------------------------------------------------------------
 # STT listening loops
 # ------------------------------------------------------------------
 

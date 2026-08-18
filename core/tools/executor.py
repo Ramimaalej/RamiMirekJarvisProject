@@ -1,6 +1,8 @@
 """Per-tool execution logic (extracted from main.py _execute_tool)."""
 from __future__ import annotations
+import json
 import threading
+import traceback
 
 # ── Action imports (identiques au main.py original) ──────────────────────
 from actions.file_processor import file_processor
@@ -953,14 +955,14 @@ def execute_tool(ui, name: str, args: dict,
             action = args.get("action", "")
             try:
                 if action == "create":
-                    t = create_task(
+                    t = tg_create_task(
                         task_id=args.get("task_id", ""),
                         description=args.get("description", ""),
                         depends_on=args.get("depends_on", []),
                     )
                     result = f"Task '{t['id']}' created (deps: {t.get('dependencies', [])})"
                 elif action == "complete":
-                    t = complete_task(task_id=args.get("task_id", ""))
+                    t = tg_complete_task(task_id=args.get("task_id", ""))
                     result = f"Task '{t['id']}' completed." if t.get("done") else t.get("error", "Failed")
                 elif action == "available":
                     tasks = get_available_tasks()
@@ -977,7 +979,7 @@ def execute_tool(ui, name: str, args: dict,
                     path = get_critical_path()
                     result = f"Critical path: {' → '.join(path)}" if path else "No tasks in graph."
                 elif action == "delete":
-                    ok = delete_task(task_id=args.get("task_id", ""))
+                    ok = tg_delete_task(task_id=args.get("task_id", ""))
                     result = "Task deleted." if ok else "Task not found."
                 elif action == "reset":
                     reset_graph()

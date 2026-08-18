@@ -4,6 +4,19 @@ import traceback
 import time
 import re
 import queue
+import threading
+
+import numpy as np
+try:
+    import sounddevice as sd  # noqa: F401  (lazy: used inside functions only)
+except OSError:
+    # PortAudio missing (headless server / Windows without lib) — import
+    # must not crash startup; failure surfaces later when the mic stream
+    # is actually opened (SD_MISSING guard).
+    sd = None  # type: ignore[assignment]
+
+from core.vad_buffer import _VADBuffer
+from core.audio_consts import SAMPLE_RATE_IN, CHANNELS, BLOCK_SIZE
 
 def _listen_whisper(self) -> None:
     """Mic → VAD → Whisper → LLM loop.

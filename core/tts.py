@@ -14,7 +14,10 @@ import threading
 from typing import Callable, Optional
 
 import numpy as np
-import sounddevice as sd
+try:
+    import sounddevice as sd  # noqa: F401  (lazy: used inside functions only)
+except OSError:
+    sd = None  # type: ignore[assignment]
 
 from core.hf_utils import remove_broken_hf_snapshot, reset_hf_offline_flags
 

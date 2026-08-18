@@ -167,7 +167,7 @@ class JarvisLocal:
             # ── LLM warmup thread ─────────────────────────────────────────
             def _do_warmup():
                 try:
-                    warmup_model(system_prompt=load_system_prompt())
+                    warmup_model(system_prompt=_load_system_prompt())
                     self.ui.write_log("SYS: LLM ready.")
                 except Exception as e:
                     self.ui.write_log(f"ERR: LLM warmup — {e}")

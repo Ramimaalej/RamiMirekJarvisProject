@@ -140,6 +140,7 @@ def revoke_auth() -> None:
     global _creds
     if _creds:
         try:
+            from google.auth.transport.requests import Request
             _creds.revoke(Request())
         except Exception:
             pass

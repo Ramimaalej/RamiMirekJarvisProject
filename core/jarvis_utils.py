@@ -3,6 +3,15 @@ from __future__ import annotations
 from typing import Any
 import logging
 
+from core.safe_math import safe_math
+
+_GREETINGS = {
+    "hi", "hello", "hey", "yo", "salut", "bonjour", "coucou",
+    "hi jarvis", "hello jarvis", "hey jarvis", "salut jarvis",
+    "good morning", "good afternoon", "good evening", "good night",
+    "bonsoir", "bonne nuit", "bon matin",
+}
+
 def _is_greeting(text: str) -> bool:
     """Return True only if the user's message is purely a greeting with no query."""
     t = text.lower().strip().rstrip("!?.,").strip()
