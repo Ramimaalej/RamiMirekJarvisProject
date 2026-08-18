@@ -244,6 +244,23 @@ _INTENTS: list[dict[str, Any]] = [
         "requires_ai": False,
     },
     {
+        "name": "screen_vision",
+        "subsystem": "vision",
+        "patterns": [
+            r"^(see|look\s+at|show\s+me|read|scan)\s+(the\s+|my\s+|your\s+)?(screen|display|monitor)",
+            r"^(what('s|\s+is)\s+(on|in)\s+(my\s+)?(screen|display))",
+            r"^what\s+am\s+i\s+(looking\s+at|seeing)",
+            r"^(lis|montre|montre-?moi|lisez)\b(\s+\S+){0,6}\s+(é|e)?cran",
+            r"^(qu('?est|est\s+il)\s+-?ce\s+(qu('?il|il)\s+y\s+a|que\s+(tu|j)e\s+(vois|regard)|je\s+vois)|dis-?moi\s+(ce\s+)?que\s+(tu|j)e\s+(vois|regarde|lis))",
+            r"^(lis|montre|lis-?moi|lis\s+moi)\b(?!\s+(moi\s+)?(une?|la|le|des|du))\s*(.*)\s*(é|e)?cran",
+            r"^(screen|what\s+text\s+(is\s+on|do\s+you\s+see)|read\s+(the\s+)?text)\b",
+        ],
+        "priority": "high",
+        "handler": "screen_vision",
+        "params": {},
+        "requires_ai": False,
+    },
+    {
         "name": "web_search",
         "subsystem": "browser",
         "patterns": [

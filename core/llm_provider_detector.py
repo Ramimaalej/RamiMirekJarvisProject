@@ -60,6 +60,18 @@ PROVIDERS: list[dict[str, Any]] = [
         "category":  "cloud",
     },
     {
+        "id":        "gemini",
+        "label":     "Google Gemini",
+        "tagline":   "Google Gemini (Nano / Flash / Pro) — one key for all",
+        "url":       "https://generativelanguage.googleapis.com/v1beta/openai",
+        "url_key":   None,
+        "key_field": "gemini_api_key",
+        "key_env":   "GOOGLE_API_KEY",
+        "protocol":  "openai",
+        "discover":  "models",
+        "category":  "cloud",
+    },
+    {
         "id":        "nvidia_nim",
         "label":     "NVIDIA NIM",
         "tagline":   "NVIDIA cloud models (Llama, Nemotron, Qwen…)",
@@ -104,6 +116,7 @@ DEFAULT_MODELS: dict[str, list[str]] = {
     "groq":       ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "deepseek-r1-distill-llama-70b"],
     "nvidia_nim": ["meta/llama-3.1-8b-instruct", "meta/llama-3.3-70b-instruct", "mistralai/mixtral-8x7b-instruct-v0.1", "qwen/qwen3-32b"],
     "openrouter": ["openai/gpt-4.1-mini", "anthropic/claude-sonnet-4", "google/gemini-2.5-flash", "meta-llama/llama-3.3-70b-instruct"],
+    "gemini":     ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.5-flash-nano"],
     "openai":     ["gpt-4.1-mini", "gpt-4.1", "gpt-5-mini", "llama3.2"],
 }
 

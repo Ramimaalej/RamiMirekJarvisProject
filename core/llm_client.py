@@ -27,6 +27,20 @@ Supports multiple backends — selected via  "llm_provider"  in config/api_keys.
         Requires  "llm_api_key"  in config (OpenRouter API key).
         Default URL: https://openrouter.ai/api/v1
         Models: openai/gpt-4o, anthropic/claude-3.5-sonnet, google/gemini-2.0-flash, etc.
+
+  "llm_provider": "gemini"
+        Uses Google Gemini (Nano / Flash / Pro) via the AI Studio
+        OpenAI-compatible endpoint.
+        Requires  "gemini_api_key"  in config (free at
+        https://aistudio.google.com/app/apikey).
+        Default URL: https://generativelanguage.googleapis.com/v1beta/openai
+        Models: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash, etc.
+
+  "llm_provider": "groq"
+        Uses Groq ultra-fast cloud inference.
+        Requires  "groq_api_key"  in config (https://console.groq.com).
+        Default URL: https://api.groq.com/openai/v1
+        Models: llama-3.3-70b-versatile, mixtral-8x7b-32768, etc.
 """
 import json
 import re
@@ -76,11 +90,12 @@ _PROVIDER_DEFAULTS: dict[str, tuple[str, str]] = {
     "nvidia-nim":  ("https://integrate.api.nvidia.com/v1",    "meta/llama-3.1-8b-instruct"),
     "openrouter":  ("https://openrouter.ai/api/v1",           "openai/gpt-4o-mini"),
     "groq":        ("https://api.groq.com/openai/v1",         "llama-3.3-70b-versatile"),
+    "gemini":      ("https://generativelanguage.googleapis.com/v1beta/openai", "gemini-2.5-flash"),
 }
 
 def _is_openai_compatible(provider: str) -> bool:
     """Returns True for any provider that speaks the OpenAI chat completions protocol."""
-    return provider in ("openai", "nvidia-nim", "openrouter", "groq")
+    return provider in ("openai", "nvidia-nim", "openrouter", "groq", "gemini")
 
 
 def detect_network_mode() -> str:
@@ -118,7 +133,7 @@ def resolve_llm_url(cfg: dict) -> str:
 
 
 def get_llm_provider() -> str:
-    """Returns 'ollama', 'openai', 'nvidia-nim', 'openrouter', or 'groq'."""
+    """Returns 'ollama', 'openai', 'nvidia-nim', 'openrouter', 'groq', or 'gemini'."""
     raw = _load_config().get("llm_provider", "ollama").strip().lower().replace(" ", "_").replace("-", "_")
     if raw in ("nvidia_nim", "nvidia"):
         return "nvidia-nim"
@@ -128,6 +143,8 @@ def get_llm_provider() -> str:
         return "openai"
     if raw in ("groq",):
         return "groq"
+    if raw in ("gemini", "google_gemini"):
+        return "gemini"
     return "ollama"
 
 
@@ -143,7 +160,7 @@ def _load_config() -> dict:
         pass  # return stale cache on error
     # Auto-resolve LLM URL from network-aware keys — only for local providers
     provider = _CONFIG_CACHE.get("llm_provider", "ollama")
-    if provider not in ("groq", "openai", "openrouter", "nvidia-nim"):
+    if provider not in ("groq", "openai", "openrouter", "nvidia-nim", "gemini"):
         if _CONFIG_CACHE.get("llm_url_local") or _CONFIG_CACHE.get("llm_url_remote"):
             _CONFIG_CACHE["llm_url"] = resolve_llm_url(_CONFIG_CACHE)
     return _CONFIG_CACHE
@@ -175,6 +192,12 @@ def get_llm_headers() -> dict:
     if provider == "openrouter":
         headers["HTTP-Referer"] = "https://github.com/anomalyco/opencode"
         headers["X-Title"] = "MARK XL"
+    if provider == "gemini":
+        # Gemini also accepts the key in a query param; keep Bearer header
+        # (OpenAI-compatible endpoint) as primary.
+        key = (cfg.get("gemini_api_key") or "").strip()
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
     return headers
 
 

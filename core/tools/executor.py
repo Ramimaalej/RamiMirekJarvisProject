@@ -53,6 +53,7 @@ from actions.package_manager import install_package, uninstall_package, list_ins
 from actions.goal_engine import create_goal, list_goals, get_goal, update_goal_progress, complete_step, delete_goal, get_goal_summary
 from actions.task_manager import task_manager, budget_manager, add_task, complete_task, delete_task, list_tasks, add_transaction, list_transactions, budget_summary
 from actions.screen_explain import screen_explain
+from actions.screen_vision import screen_vision as screen_vision_action
 from actions.comfyui import generate_image
 from actions.file_converter import convert_file
 from actions.random_number import random_number
@@ -268,6 +269,13 @@ def execute_tool(ui, name: str, args: dict,
         elif name == "web_search":
             r = web_search_action(parameters=args, player=ui)
             result = r or "Done."
+
+        elif name == "screen_vision":
+            r = screen_vision_action(args)
+            result = r or "The screen is empty."
+            # Tag the log so the chat panel marks it as a system note
+            ui.write_log(f"Jarvis: {result[:300]}")
+            result = ""  # already logged; keep TTS from double-speaking
 
         elif name == "file_processor":
             if not args.get("file_path") and ui.current_file:

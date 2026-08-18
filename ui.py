@@ -109,6 +109,12 @@ class C:
     ACC       = "#6c7bef"
     ACC_DIM   = "#353b6a"
     ACC_GHO   = "#1a1d3a"
+    _theme_hooks: list = []
+
+    @classmethod
+    def on_theme_change(cls, hook):
+        cls._theme_hooks.append(hook)
+
     GREEN     = "#7ae07a"
     GREEN_D   = "#3a8a3a"
     RED       = "#e04444"
@@ -150,6 +156,11 @@ class C:
             cls.TEXT_DIM  = "#555555"
             cls.TEXT_MED  = "#888888"
             cls.BAR_BG    = "#1a1a1a"
+        for _hook in cls._theme_hooks:
+            try:
+                _hook()
+            except Exception:
+                pass
 
 _FONT = "Cantarell"
 _FONT_SZ = 12
@@ -906,6 +917,136 @@ class LogWidget(QTextEdit):
             self._tmr.stop()
             self.ensureCursorVisible()
             QTimer.singleShot(15, self._next)
+
+
+class ChatWidget(QWidget):
+    """Message-area widget styled like a modern chat (bubbles, right-aligned
+    user messages, left-aligned Jarvis replies).
+
+    Palette is strictly BLACK & WHITE — the only accent kept is BLUE (C.ACC)
+    for the user's bubbles and interactive states.
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        C.on_theme_change(self.refresh_theme)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(8, 6, 8, 6)
+        lay.setSpacing(4)
+        lay.addStretch()
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+        )
+        self._bubble_box = QWidget()
+        self._bubble_box.setStyleSheet("background: transparent;")
+        self._box_lay = QVBoxLayout(self._bubble_box)
+        self._box_lay.setContentsMargins(0, 0, 0, 0)
+        self._box_lay.setSpacing(6)
+        self._box_lay.addStretch()
+        self._scroll.setWidget(self._bubble_box)
+        lay.addWidget(self._scroll, stretch=1)
+
+    # ── helpers ──────────────────────────────────────────────────────
+    @staticmethod
+    def _bubble_style(side: str) -> str:
+        if side == "you":
+            # User bubble: BLUE accent (kept), white text — right aligned
+            return (f"QWidget {{ background: {C.ACC}; }}"
+                    f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
+        # Jarvis bubble: white/grey on black — left aligned
+        return (f"QWidget {{ background: {C.PANEL2}; border: 1px solid {C.BORDER}; }}"
+                f"QLabel {{ color: {C.TEXT}; background: transparent; border: none; }}")
+
+    @staticmethod
+    def _tag_style(tag: str) -> str:
+        return f"color: {C.TEXT_DIM}; background: transparent; border: none;"
+
+    def _timestamp(self) -> str:
+        return time.strftime("%H:%M")
+
+    def _add_bubble(self, text: str, side: str, tag: str = "") -> None:
+        bubble = QWidget()
+        bubble.setStyleSheet(self._bubble_style(side))
+        b_lay = QVBoxLayout(bubble)
+        b_lay.setContentsMargins(10, 7, 10, 7)
+        b_lay.setSpacing(3)
+
+        lbl = QLabel(text)
+        lbl.setWordWrap(True)
+        lbl.setFont(QFont(_FONT, _FONT_SZ_SM))
+        lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        lbl.setStyleSheet(f"color: {'#ffffff' if side == 'you' else C.TEXT}; background: transparent; border: none;")
+        lbl.setMaximumWidth(340)
+        b_lay.addWidget(lbl)
+
+        ts = QLabel(self._timestamp())
+        ts.setFont(QFont("Courier New", 7))
+        ts.setStyleSheet(self._tag_style(tag))
+        ts.setAlignment(Qt.AlignmentFlag.AlignRight)
+        b_lay.addWidget(ts)
+
+        # Insert just before the trailing stretch so new bubbles stay at the bottom
+        idx = max(0, self._box_lay.count() - 1)
+        if side == "you":
+            self._box_lay.insertWidget(idx, bubble, alignment=Qt.AlignmentFlag.AlignRight)
+        else:
+            self._box_lay.insertWidget(idx, bubble, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        # Auto-scroll to the newest bubble
+        QTimer.singleShot(30, lambda: self._scroll.verticalScrollBar().setValue(
+            self._scroll.verticalScrollBar().maximum()))
+
+    def refresh_theme(self) -> None:
+        """Re-apply current-theme styles to existing bubbles (called by
+        C.apply_theme so black/white swap is instant everywhere)."""
+        n = self._box_lay.count()
+        for i in range(n):
+            item = self._box_lay.itemAt(i)
+            w = item.widget() if item else None
+            if w is not None and isinstance(w, QWidget) and w.layout() is not None:
+                w.setStyleSheet(self._bubble_style("you" if "AlignRight" in str(w.layout().alignment()) else "ai"))
+                lbls = w.findChildren(QLabel)
+                for lbl in lbls:
+                    if lbl.font().pixelSize() <= 0 or lbl.font().pointSize() <= 7:
+                        lbl.setStyleSheet(self._tag_style(""))
+                    elif w.layout().alignment() == Qt.AlignmentFlag.AlignRight:
+                        lbl.setStyleSheet("color: #ffffff; background: transparent; border: none;")
+                    else:
+                        lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent; border: none;")
+
+    def add_message(self, text: str, tag: str = "sys") -> None:
+        """Parse 'You: …' / 'Jarvis: …' and render as chat bubbles.
+        Anything else (SYS / ERR / FILE / INTENT / tool activity) is dropped
+        — no logs, only the conversation."""
+        tl = text.strip()
+        low = tl.lower()
+        if low.startswith(("you:", "you :")):
+            self._add_bubble(tl.split(":", 1)[1].strip(), "you")
+        elif low.startswith(("jarvis:", "jarvis :")):
+            self._add_bubble(tl.split(":", 1)[1].strip(), "ai")
+        # everything else (SYS/ERR/FILE/INTENT/SCHED/…) is silently ignored
+
+    def add_instant(self, text: str, tag: str = "ai") -> None:
+        """Same as add_message — kept for signal compatibility."""
+        self.add_message(text, tag)
+
+    def append_log(self, text: str) -> None:
+        """LogWidget-compatible API — logs are intentionally dropped."""
+        self.add_message(text)
+
+    def append_instant(self, text: str, tag: str = "sys") -> None:
+        self.add_message(text, tag)
+
+    def clear(self) -> None:
+        while self._box_lay.count() > 1:   # keep the trailing stretch
+            item = self._box_lay.itemAt(0)
+            if item and item.widget():
+                w = item.widget()
+                self._box_lay.removeWidget(w)
+                w.deleteLater()
 _FILE_ICONS = {
     "image":   ("🖼", "#00d4ff"), "video":   ("🎬", "#ff6b00"),
     "audio":   ("🎵", "#cc44ff"), "pdf":     ("📄", "#ff4444"),
@@ -3092,7 +3233,10 @@ class MainWindow(QMainWindow):
             cur_llm = ""
         self._llm_lbl = QLabel(f"LLM  {cur_llm if cur_llm else '--'}")
         self._llm_lbl.setFont(QFont("Courier New", 8, QFont.Weight.Bold))
+        self._llm_lbl.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._llm_lbl.setToolTip("Click to change AI provider (Ollama / Groq / Gemini / …)")
         self._llm_lbl.setStyleSheet(f"color: {C.ACC}; background: transparent; border: none;")
+        self._llm_lbl.mousePressEvent = lambda _e: self._show_providers()
         ip_lay.addWidget(self._llm_lbl)
 
         m_wrap_lay.addWidget(info_panel)
@@ -3180,14 +3324,8 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(8)
 
-        # ── Chat header ──
-        chat_header = QLabel("CHAT")
-        chat_header.setFont(QFont("Courier New", 7, QFont.Weight.Bold))
-        chat_header.setStyleSheet(f"color: {C.TEXT_DIM}; background: transparent; letter-spacing: 1px; padding: 0 2px;")
-        lay.addWidget(chat_header)
-
-        # ── Chat log ──
-        self._log = LogWidget()
+        # ── Chat bubbles (no logs — conversation only) ──
+        self._log = ChatWidget()
         lay.addWidget(self._log, stretch=1)
 
         # ── Input + send ──
