@@ -151,6 +151,30 @@
       "due": "",
       "done": false,
       "created": "2026-08-17T13:16:14.192904"
+    },
+    {
+      "id": "task-1787054908127",
+      "title": "crud test",
+      "priority": "normal",
+      "due": "",
+      "done": false,
+      "created": "2026-08-18T12:08:28.127863"
+    },
+    {
+      "id": "task-1787054908134",
+      "title": "urgent",
+      "priority": "high",
+      "due": "2026-12-31",
+      "done": false,
+      "created": "2026-08-18T12:08:28.134653"
+    },
+    {
+      "id": "task-1787054908148",
+      "title": "dispatch test",
+      "priority": "normal",
+      "due": "",
+      "done": false,
+      "created": "2026-08-18T12:08:28.148853"
     }
   ],
   "transactions": [
@@ -423,6 +447,51 @@
       "type": "expense",
       "date": "2026-08-17",
       "created": "2026-08-17T13:16:14.196657"
+    },
+    {
+      "id": "tx-1787054908149",
+      "description": "Salary",
+      "amount": 5000,
+      "category": "other",
+      "type": "income",
+      "date": "2026-08-18",
+      "created": "2026-08-18T12:08:28.149779"
+    },
+    {
+      "id": "tx-1787054908150",
+      "description": "Groceries",
+      "amount": 150.5,
+      "category": "food",
+      "type": "expense",
+      "date": "2026-08-18",
+      "created": "2026-08-18T12:08:28.150676"
+    },
+    {
+      "id": "tx-1787054908151",
+      "description": "Salary",
+      "amount": 5000,
+      "category": "other",
+      "type": "income",
+      "date": "2026-08-18",
+      "created": "2026-08-18T12:08:28.151594"
+    },
+    {
+      "id": "tx-1787054908151",
+      "description": "Rent",
+      "amount": 1200,
+      "category": "other",
+      "type": "expense",
+      "date": "2026-08-18",
+      "created": "2026-08-18T12:08:28.151862"
+    },
+    {
+      "id": "tx-1787054908152",
+      "description": "Freelance",
+      "amount": 1000.0,
+      "category": "other",
+      "type": "expense",
+      "date": "2026-08-18",
+      "created": "2026-08-18T12:08:28.152799"
     }
   ]
 }

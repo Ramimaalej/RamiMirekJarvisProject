@@ -173,7 +173,7 @@ class TestProviderOverlayAdmin:
 
     def test_card_count(self):
         ov = self._make()
-        assert len(ov._cards) == 5
+        assert len(ov._cards) == 6
 
     def test_badges_text(self):
         ov = self._make()

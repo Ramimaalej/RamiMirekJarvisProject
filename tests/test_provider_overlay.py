@@ -29,7 +29,7 @@ def test_overlay_creation(qapp):
     })
     assert ov._selected_pid in ("ollama", "")
     # grid-of-cards design: one card per provider
-    assert len(ov._cards) == 5
+    assert len(ov._cards) == 6
     # models should be pre-filled from defaults at minimum
     combo = ov._cards["ollama"]._model_combo
     assert combo.count() >= 5
