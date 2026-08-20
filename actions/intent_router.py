@@ -34,6 +34,297 @@ logger = logging.getLogger("intent_router")
 # Patterns are matched in order — first match wins.
 
 _INTENTS: list[dict[str, Any]] = [
+    # ── Extra micro-tools / public APIs / opencode ─────────────
+    {
+        "name": "devices_scan",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(list|show|affiche|montre)\s+(connected|plugged|branch)\s+(devices|devices on|appareils|periphériques|périphériques|dispositifs)',
+            r"^q\s*u?\s*['’-]?\s*est[- ]?ce\s+qui\s+est\s+.*?(connect|branch|plug|allum)",
+            r"^q\s*u?\s*['’-]?\s*est[- ]?ce\s+(qui\s+|que\s+)?(je\s+dois\s+avoir|tu\s+as)\s+.*?(connect|branch|plug|allum)",
+            r'^que\s*(qu)?\s*est[- ]?ce\s+qui\s+est\s+.*?(connect|branch|plug|allum)',
+            r'^(connect|branch|plug|allum)é?\s+(sur\s+mon\s+pc|sur\s+ma\s+machine|à\s+mon\s+pc)',
+            r'^what\s+(is\s+)?(connected|plugged|plugged in|allume|branche)\s+(on\s+(my\s+)?pc|sur\s+mon\s+pc|in\s+my\s+pc|my\s+pc|my\s+machine)',
+            r'^whats\s+(connected|plugged|allume|branche)\s+(on\s+(my\s+)?pc|sur\s+mon\s+pc|in\s+my\s+pc|my\s+pc|my\s+machine)',
+            r'^(monitors|screens|écrans|displays)\s+(connected|connected to my pc|displayed|sur mon pc)',
+            r'^(show|liste|affiche)\s+(me\s+|mes\s+)?(monitors|screens|écrans|displays)',
+            r'^devices\s+(connected|connectés|sur mon pc|sur ma machine)',
+            r'^(bluetooth|usb|adb)\s+(devices|périphériques|connectés|sur mon pc)',
+        ],
+        "handler": "devices_scan",
+        "requires_ai": False,
+    },
+    {
+        "name": "qr_tools",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(generate|create|make|fais|génère)\s+(a\s+)?(qr\s*code|qr)\s+(for|pour)\s+',
+            r'^(read|scan|lire|scanner|décoder|decode)\s+(a\s+|this\s+|le\s+|ce\s+)?(qr\s*code|qr)\s*',
+            r'\b(qr\s*code|qr)\s+(for|pour)\s+',
+        ],
+        "handler": "qr_tools",
+        "requires_ai": False,
+    },
+    {
+        "name": "clipboard_mgr",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(what|whats|qu?est)\s*(-?ce\s+que\s+(-?il\s+y\s+a)?\s*)?(is\s+|il\s+y\s+a)?\s*(in\s+)?(my\s+)?clipboard',
+            r'^(lis|montrer|voir|read|show)\s+(mon\s+|my\s+)?(presse[- ]?papiers|clipboard)',
+            r'^(copy|copie|copier|colle|coller)\s+.*\b(clipboard|presse[- ]?papiers)\b',
+            r'\bclipboard\b',
+        ],
+        "handler": "clipboard_mgr",
+        "requires_ai": False,
+    },
+    {
+        "name": "dictionary_tools",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(what\s+does|que\s+veut\s+dire|que\s+signifie|qu?est[- ]?ce\s+que\s+(veut\s+dire|signifie))\s+\w+',
+            r'^(define|définir|définition\s+de|definition\s+of|meaning\s+of)\s+\w+',
+            r'^(synonyms?\s+of|synonymes?\s+de)\s+\w+',
+            r'^\w+\s+synonyms?\b',
+        ],
+        "handler": "dictionary_tools",
+        "requires_ai": False,
+    },
+    {
+        "name": "math_solver",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(calcule|combien\s+fait|combien\s+font)\s+',
+            r'^(solve|calculate|calculer|résous|résoudre)\s+(the\s+)?(equation\s+|expression\s+)?\d',
+            r'\d+\s*[+\-*/^]\s*\d',
+            r'\d+\s*[*x×]\s*\d+',
+        ],
+        "handler": "math_solver",
+        "requires_ai": False,
+    },
+    {
+        "name": "hash_tools",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(hash|hasher)\s+(this\s+|ce\s+|le\s+|the\s+)?(text|texte)\s*:\s*.+',
+            r'^(md5|sha\s*256|sha\s*1|sha512|checksum)\s+(of\s+|de\s+)?(the\s+|le\s+|ce\s+)?(file|fichier)\s*',
+            r'^(compute|calcul|génère|generate)\s+(the\s+|un\s+)?(md5|sha|checksum)\s+',
+        ],
+        "handler": "hash_tools",
+        "requires_ai": False,
+    },
+    {
+        "name": "random_tools",
+        "subsystem": "tools",
+        "patterns": [
+            r'^roll\s+(a\s+)?\d*d\d+',
+            r'^(lance|lancer)\s+(les?\s+)?dés',
+            r'^(pile\s+ou\s+face)',
+            r'^(heads?\s+or\s+tails?)',
+            r'^(pick|choose|choisis|choisir)\s+(between|entre)\s+',
+        ],
+        "handler": "random_tools",
+        "requires_ai": False,
+    },
+    {
+        "name": "use_tool",
+        "subsystem": "tools",
+        "patterns": [
+            r'^\b(nmap|ping|traceroute|tracert|netstat|dig|whois|nslookup|ifconfig|ipconfig|curl|wget|htop|top|ssh)\b',
+        ],
+        "handler": "use_tool",
+        "requires_ai": False,
+    },
+    {
+        "name": "notes_tools",
+        "subsystem": "tools",
+        "patterns": [
+            r'^note\s*:',
+            r'^(take|write|add|save|écris|ajoute|sauvegarde)\s+(a\s+)?note\s*',
+            r'^(list|show|affiche|montre|liste)\s+(my\s+|mes\s+)?notes?\b',
+            r'^(search|find|cherche|trouve|recherche)\s+(in\s+)?(my\s+|mes\s+)?notes?\s*',
+        ],
+        "handler": "notes_tools",
+        "requires_ai": False,
+    },
+    {
+        "name": "system_info_tools",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(battery\s+(level|status|pourcentage))',
+            r'^(quelle\s+batterie|niveau\s+de\s+batterie|batterie\s+restante)',
+            r'^(wifi\s+(ssid|nom)|quel\s+(réseau\s+)?wifi)',
+            r'^(disk\s+(info|space|remaining)|disque\s+(dur|info))',
+        ],
+        "handler": "system_info_tools",
+        "requires_ai": False,
+    },
+    {
+        "name": "screen_ocr",
+        "subsystem": "tools",
+        "patterns": [
+            r'^(is\s+the\s+word|est[- ]?ce\s+que\s+le\s+mot)\s+\w+\s+(visible|écrit|written|displayed|affiché)\s+(on\s+(my\s+)?screen|sur\s+(mon\s+|l?|le\s+)?écran)',
+            r'^(trouve|cherche|find)\s+(the\s+word|le\s+mot)\s+\w+\s+(sur\s+mon\s+écran|on\s+(my\s+)?screen)',
+        ],
+        "handler": "screen_ocr",
+        "requires_ai": False,
+    },
+    {
+        "name": "check_crypto",
+        "subsystem": "public_apis",
+        "patterns": [
+            r'^btc\s+price$',
+            r'^(bitcoin|ethereum|eth|solana|doge|dogecoin|crypto)\s+(price|prix|cours)',
+            r'^(prix|price)\s+(of\s+|du\s+)?(bitcoin|ethereum|btc|eth|crypto)',
+            r'^how\s+much\s+is\s+(bitcoin|ethereum|btc|eth)\b',
+        ],
+        "handler": "check_crypto",
+        "requires_ai": False,
+    },
+    {
+        "name": "currency_rate",
+        "subsystem": "public_apis",
+        "patterns": [
+            r'^convert\s+\d+\s+[a-z]{3}\s+(to|en|vers)\s+[a-z]{3}',
+            r'^[a-z]{3}[/\s-]?[a-z]{3}\s+(rate|taux)',
+            r'^(taux|rate|exchange\s+rate)\s+(of\s+|de\s+)?[a-z]{3}[a-z]{3}',
+        ],
+        "handler": "currency_rate",
+        "requires_ai": False,
+    },
+    {
+        "name": "check_time",
+        "subsystem": "public_apis",
+        "patterns": [
+            r'^what\s+time\s+is\s+it\s+in\s+',
+            r'^quelle\s+(est\s+)?(l?heure|heure)\s+(à|a|d[ae]|au)\s+',
+            r'^heure\s+(à|a)\s+[\w\s]+',
+            r'^time\s+in\s+[\w\s]+',
+        ],
+        "handler": "check_time",
+        "requires_ai": False,
+    },
+    {
+        "name": "random_quote",
+        "subsystem": "public_apis",
+        "patterns": [
+            r'^(give\s+me\s+|donne[- ]?moi\s+|je\s+veux\s+)?(a\s+|une\s+)?(quote|citation|motivation|quote du jour)',
+        ],
+        "handler": "random_quote",
+        "requires_ai": False,
+    },
+    {
+        "name": "opencode_run",
+        "subsystem": "opencode",
+        "patterns": [
+            r'^execute\s+new\s+dev\s+project',
+            r'^(build|create|make|start|lance|init)\s+(me\s+a\s+|a\s+)?(new\s+)?(dev|development\s+)?project',
+            r'^(build|create|make|start|lance|init|execute)\s+(me\s+)?(a\s+)?(new\s+)?(todo|web|mobile|desktop|app|application)\b',
+        ],
+        "handler": "opencode_run",
+        "requires_ai": True,
+    },
+    {
+        "name": "opencode_install",
+        "subsystem": "opencode",
+        "patterns": [
+            r'^install\s+opencode',
+        ],
+        "handler": "opencode_install",
+        "requires_ai": False,
+    },
+    {
+        "name": "opencode_status",
+        "subsystem": "opencode",
+        "patterns": [
+            r'^(is|est)\s+opencode\s+installed',
+        ],
+        "handler": "opencode_status",
+        "requires_ai": False,
+    },
+    {
+        "name": "tts_language",
+        "subsystem": "tts",
+        "patterns": [
+            r'^(speak|talk|parle|parler)\s+(in\s+|en\s+)?(a\s+)?(little\s+)?',
+            r'^(change|switch|basculer|changer)\s+(your\s+|ta\s+|la\s+)?(voice\s+|voix\s+)?(language\s+|langue\s+)?(to\s+|en\s+|vers\s+)?',
+            r'^(speak|talk|parle)\s+(me\s+|with\s+me\s+)?(in\s+|en\s+)?',
+        ],
+        "handler": "set_language",
+        "requires_ai": False,
+    },
+    {
+        "name": "create_document",
+        "subsystem": "documents",
+        "patterns": [
+            r'^(create|make|generate|write|build)\s+(a\s+)?(professional\s+)?(styled\s+)?(pdf|word|document|docx|report|file)\s+(that\s+|about\s+|on\s+|explaining\s+|of\s+)?',
+            r'^(pdf|word|document)\s+(please\s+)?(create|make|generate)\s+',
+            r'^(write|save|export)\s+(this\s+as\s+|it\s+as\s+)?(a\s+)?(pdf|word\s+document|docx)',
+        ],
+        "handler": "create_document",
+        "requires_ai": False,
+    },
+    {
+        "name": "read_pdf",
+        "subsystem": "documents",
+        "patterns": [
+            r"^(read|open|show|see|regarder|lire|qu?est[- ]?ce\s+qu?il\s+y\s+a|what\s*'?s?\s+in|tell\s+me\s+about)\s+(this\s+|that\s+|the\s+|le\s+|la\s+|ce\s+)?(pdf|document|fichier)\s*(in\s+my\s+files|dans\s+mes\s+fichiers)?",
+            r'^(c?est\s+quoi|qu?est\s+-?ce\s+que)\s+(contient|dit)\s+(ce\s+|ce\s+pdf|le\s+pdf)\s*',
+            r'(explain|explique|résume|resumé)\s+(this\s+|that\s+|le\s+|ce\s+)?(pdf|document)\s*',
+            r'^(open|show)\s+the\s+(content\s+of\s+)?my\s+(latest\s+|recent\s+)?pdf',
+        ],
+        "handler": "read_pdf",
+        "requires_ai": False,
+    },
+    {
+        "name": "install_tool",
+        "subsystem": "system",
+        "patterns": [
+            r'^(install|download|add|put|installer|télécharge)\s+(me\s+|for\s+me\s+)?(a\s+)?',
+            r'^(i\s+want|i\s+need|je\s+veux|j\s*ai\s+besoin\s+de)\s+(to\s+install\s+|installer\s+)?',
+        ],
+        "handler": "install_tool",
+        "requires_ai": False,
+    },
+    {
+        "name": "use_tool",
+        "subsystem": "system",
+        "patterns": [
+            r'^\b(nmap|ping|traceroute|tracert|netstat|dig|whois|nslookup|ifconfig|ipconfig|curl|wget|htop|top|ssh)\b',
+            r'^(use|scan|lance|utilise|utiliser)\s+(the\s+|la\s+|le\s+)?(tool\s+|outil\s+)?',
+            r'^(run|execute)\s+(the\s+)?(tool|nmap|ping|netstat|curl|ssh|docker|whois|dig|traceroute)\s+\S+(\s+\S+)?',
+        ],
+        "handler": "use_tool",
+        "requires_ai": False,
+    },
+
+    # ── Extra micro-tools / public APIs / opencode ─────────────
+
+
+    # ── Extra micro-tools / public APIs / opencode ─────────────
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     # ── Greetings (instant — no LLM) ──────────────────────────────────
     {
         "name": "greeting",
@@ -1844,6 +2135,466 @@ class IntentRouter:
                         params["body"] = after
             if not params.get("subject"):
                 params["subject"] = params.get("body", "")[:50] or "No subject"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        elif intent["name"] == "qr_tools":
+            low = text.lower()
+            if re.search(r"\b(scan|read|lire|scanner|decode)\b", low):
+                params["action"] = "scan"
+                m = re.search(r"(?:scan|read|lire|scanner|decode)\b.*?\b(from|dans|de)\s+(.+)$", low)
+                if m:
+                    params["path"] = m.group(2).strip().rstrip('.!?, \\\'"')
+            else:
+                params["action"] = "generate"
+                m = re.search(r"(?:qr\s*code|qr)\s+(?:for|pour)\s+(.+)$", low)
+                if m:
+                    params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "clipboard_mgr":
+            low = text.lower()
+            if re.search(r"\b(read|lis|voir|what|qu?est)\b", low):
+                params["action"] = "read"
+            else:
+                params["action"] = "write"
+                m = re.search(r"(?:copy|copie|copier|paste|colle|coller)\s+(.+?)(?:\s+to\s+(my\s+)?clipboard|\s+dans\s+(mon\s+)?presse[- ]?papiers|\s+\b(to|dans)\b)?$", low)
+                if m:
+                    params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "dictionary_tools":
+            low = text.lower()
+            if "synonym" in low:
+                params["action"] = "synonyms"
+                m = re.search(r"\b(?:of|de)\s+(\w+)$", low)
+                if m:
+                    params["word"] = m.group(1)
+                else:
+                    m = re.search(r"^(\w+)\s+synonyms?\b", low)
+                    if m:
+                        params["word"] = m.group(1)
+            else:
+                params["action"] = "definition"
+                m = re.search(r"(?:does\s+|veut\s+dire\s+|signifie\s+|\bof\s+|\bde\s+|\bmeaning\s+of\s+)(\w+)(?:\s|$)", low)
+                if m:
+                    params["word"] = m.group(1)
+                else:
+                    m = re.search(r"^(\w+)\s+(means?|meaning)\b", low)
+                    if m:
+                        params["word"] = m.group(1)
+
+        elif intent["name"] == "math_solver":
+            low = text.lower()
+            m = re.search(r"(?:calcule|combien\s+fait|solve|calculate|calculer|résous|résoudre|résultat\s+de|answer\s+to|is\s+)\s*(.+)$", low)
+            if m:
+                expr = m.group(1).strip().rstrip('.!?, \\\'"')
+                expr = re.sub(r"\b(the\s+)?(result\s+of|answer\s+to|expression|equation|of)\b\s*", " ", expr).strip()
+                if expr and re.search(r"\d", expr):
+                    params["expression"] = expr
+            elif "^" not in low:
+                m = re.search(r"\d[\d\s+\-*/^.()]*\d", low)
+                if m:
+                    params["expression"] = m.group(0)
+
+        elif intent["name"] == "hash_tools":
+            low = text.lower()
+            m_algo = re.search(r"\b(md5|sha\s*1|sha\s*256|sha512|checksum)\b", low)
+            params["algo"] = (m_algo.group(1).replace(" ", "") if m_algo else "sha256")
+            if re.search(r"\b(file|fichier)\b", low):
+                params["action"] = "file"
+                m = re.search(r"(?:file|fichier)\s+(.+)$", low)
+                if m:
+                    params["path"] = m.group(1).strip().rstrip('.!?, \\\'"')
+            else:
+                params["action"] = "text"
+                m = re.search(r"(?:text|texte)\s*:\s*(.+)$", low)
+                if m:
+                    params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+                else:
+                    m = re.search(r"(?:of|de)\s+(?:the\s+|le\s+|ce\s+)?(?:text|texte)?\s*(.+)$", low)
+                    if m:
+                        params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "random_tools":
+            low = text.lower()
+            m = re.search(r"\broll\s+(a\s+)?(\d+)?d(\d+)\b", low)
+            if m:
+                params["dice"] = (m.group(2) or "1") + "d" + m.group(3)
+            elif re.search(r"\bpile\s+ou\s+face\b|\bheads?\s+or\s+tails?\b|\bflip\s+a?\s*(coin|pièce)\b", low):
+                params["action"] = "coin"
+            elif re.search(r"\b(between|entre)\b", low):
+                m = re.search(r"\b(?:between|entre)\s+(.+?)\s+\b(?:and|et|ou)\s+(.+)$", low)
+                if m:
+                    params["options"] = m.group(1).strip() + ", " + m.group(2).strip()
+            else:
+                params["dice"] = "d6"
+
+        elif intent["name"] == "notes_tools":
+            low = text.lower()
+            if re.search(r"\b(list|show|affiche|montre|liste)\b", low):
+                params["action"] = "list"
+            elif re.search(r"\b(search|find|cherche|trouve|recherche)\b", low):
+                params["action"] = "find"
+                m = re.search(r"(?:search|find|cherche|trouve|recherche)\s+(?:in\s+)?(?:my\s+|mes\s+)?notes?\s+(?:for|dans)?\s*(.+)$", low)
+                if m:
+                    params["query"] = m.group(1).strip().rstrip('.!?, \\\'"')
+            else:
+                params["action"] = "save"
+                m = re.search(r"note\s*:\s*(.+)$", low)
+                if m:
+                    params["text"] = m.group(1).strip()
+                else:
+                    m = re.search(r"(?:take|write|add|save|écris|ajoute|sauvegarde)\s+(?:a\s+)?note\s+(?:that\s+|ceci\s+|ça\s+)?(.+)$", low)
+                    if m:
+                        params["text"] = m.group(1).strip()
+
+        elif intent["name"] == "system_info_tools":
+            low = text.lower()
+            if re.search(r"\bbatter", low):
+                params["action"] = "battery"
+            elif re.search(r"\bwifi\b|\bssid\b|\bréseau\b", low):
+                params["action"] = "wifi"
+            else:
+                params["action"] = "disk"
+
+        elif intent["name"] == "screen_ocr":
+            m = re.search(r"\b(?:the\s+word|le\s+mot)\s+(\w+)", text)
+            if m:
+                params["text"] = m.group(1)
+            else:
+                m = re.search(r"\b(?:trouve|cherche|find|see|read|voir|lire)\s+(?:the\s+)?(\w+)", text)
+                if m:
+                    params["text"] = m.group(1)
+
+        elif intent["name"] == "check_crypto":
+            low = text.lower()
+            m_coin = re.search(r"\b(bitcoin|ethereum|solana|dogecoin|ripple|cardano|bitcoin cash|litecoin|binancecoin|polkadot|tether|btc|eth|sol|xrp|doge|ada|usdt|bnb|ltc|dot)\b", low)
+            if m_coin:
+                params["crypto"] = m_coin.group(1)
+            m_cur = re.search(r"\b(eur|usd|gbp|tnd|dollar|euro)\b", low)
+            params["currency"] = (m_cur.group(1) if m_cur else "usd")
+
+        elif intent["name"] == "currency_rate":
+            low = text.upper()
+            m = re.search(r"([A-Z]{3})[\s/-]?([A-Z]{3})", low)
+            params["symbol"] = (m.group(1) + m.group(2)) if m else "EURUSD"
+
+        elif intent["name"] == "check_time":
+            m = re.search(r"(?:in|à|a|au|d[ae])\s+([a-zéèàùâç][a-zéèàùâç\s\-]+?)\s*$", text.lower())
+            params["place"] = m.group(1).strip() if m else "Tunis"
+
+        elif intent["name"] == "random_quote":
+            pass
+
+        elif intent["name"] == "opencode_run":
+            params["action"] = "run"
+            m = re.search(r"(?:execute|build|create|make|start|lance|init)\s+(?:me\s+a\s+|a\s+)?(?:new\s+)?(?:dev|development\s+)?(?:project)?\s*(.*?)\s*$", text)
+            if m and m.group(1).strip():
+                params["description"] = m.group(1).strip()
+            elif "project" not in params:
+                params["description"] = "a new development project"
+
+        elif intent["name"] == "opencode_install":
+            params["action"] = "install"
+
+        elif intent["name"] == "opencode_status":
+            params["action"] = "status"
+
+
+        elif intent["name"] == "create_document":
+            low = text.lower()
+            if "docx" in low or "word" in low:
+                params["format"] = "docx"
+            else:
+                params["format"] = "pdf"
+            m = re.search(r"(?:create|make|generate|write|build)\s+(?:(?:a|professional|styled|an?)\s+)*(?:pdf|word|document|docx|report|file)s?\s+(?:that\s+|about\s+|on\s+|explaining\s+|of\s+)?(.+)$", low)
+            if m:
+                c = m.group(1).strip().strip('.!?, \\\'"')
+                if c and c not in ("this", "it"):
+                    params["content"] = c
+
+        elif intent["name"] == "read_pdf":
+            low = text.lower()
+            m = re.search(r"(?:pdf|document|fichier)\s+(?:in\s+my\s+files|dans\s+mes\s+fichiers)?\s*(.+)?$", low)
+            if m and m.group(1) and m.group(1).strip():
+                params["path"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "install_tool":
+            m = re.search(r"(?:je\s+veux\s+|i\s+want\s+|i\s+need\s+|j\s*ai\s+besoin\s+de\s+)?(?:installer\s+|to\s+install\s+)?(.+)$", text.lower())
+            if m:
+                params["tool"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "use_tool":
+            low = text.lower()
+            m = re.match(r"\b(nmap|ping|traceroute|tracert|netstat|dig|whois|nslookup|ifconfig|ipconfig|curl|wget|htop|top|ssh)\b\s*(.*)$", low)
+            if m:
+                params["tool"] = m.group(1)
+                if m.group(2).strip():
+                    params["args"] = m.group(2).strip().rstrip(".!?,")
+            else:
+                m = re.search(r"(?:run|use|execute|scan|lance|utilise)\b(?:\s+(?:the|la|le))?\s+(?:tool\s+|outil\s+)?(\w+)\b(?:\s+(.*))?$", low)
+                if m:
+                    params["tool"] = m.group(1)
+                    if m.group(2):
+                        params["args"] = m.group(2).strip().rstrip(".!?,")
+
+        elif intent["name"] == "tts_language":
+            tail = text.lower()
+            m = re.search(r"(?:speak|talk|parle|parler|switch|change|basculer|changer)\b.*?(?:in\s+|en\s+|to\s+|vers\s+)?(.+)$", tail)
+            if m:
+                tail = m.group(1).strip().strip('.!?, \\\'"')
+                if len(tail) == 2 and tail in ("fr", "en", "ar"):
+                    params["language"] = tail
+                else:
+                    _aliases = {"french": "fr", "anglais": "en", "english": "en", "arabe": "ar", "français": "fr", "francais": "fr"}
+                    for _a, _c in _aliases.items():
+                        if _a in tail:
+                            params["language"] = _c
+                            break
+
+        elif intent["name"] == "qr_tools":
+            low = text.lower()
+            if re.search(r"\b(scan|read|lire|scanner|decode)\b", low):
+                params["action"] = "scan"
+                m = re.search(r"(?:scan|read|lire|scanner|decode)\b.*?\b(from|dans|de)\s+(.+)$", low)
+                if m:
+                    params["path"] = m.group(2).strip().rstrip('.!?, \\\'"')
+            else:
+                params["action"] = "generate"
+                m = re.search(r"(?:qr\s*code|qr)\s+(?:for|pour)\s+(.+)$", low)
+                if m:
+                    params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "clipboard_mgr":
+            low = text.lower()
+            if re.search(r"\b(read|lis|voir|what|qu?est)\b", low):
+                params["action"] = "read"
+            else:
+                params["action"] = "write"
+                m = re.search(r"(?:copy|copie|copier|paste|colle|coller)\s+(.+?)(?:\s+to\s+(my\s+)?clipboard|\s+dans\s+(mon\s+)?presse[- ]?papiers|\s+\b(to|dans)\b)?$", low)
+                if m:
+                    params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "dictionary_tools":
+            low = text.lower()
+            if "synonym" in low:
+                params["action"] = "synonyms"
+                m = re.search(r"\b(?:of|de)\s+(\w+)$", low)
+                if m:
+                    params["word"] = m.group(1)
+                else:
+                    m = re.search(r"^(\w+)\s+synonyms?\b", low)
+                    if m:
+                        params["word"] = m.group(1)
+            else:
+                params["action"] = "definition"
+                m = re.search(r"(?:does\s+|veut\s+dire\s+|signifie\s+|\bof\s+|\bde\s+|\bmeaning\s+of\s+)(\w+)(?:\s|$)", low)
+                if m:
+                    params["word"] = m.group(1)
+                else:
+                    m = re.search(r"^(\w+)\s+(means?|meaning)\b", low)
+                    if m:
+                        params["word"] = m.group(1)
+
+        elif intent["name"] == "math_solver":
+            low = text.lower()
+            m = re.search(r"(?:calcule|combien\s+fait|solve|calculate|calculer|résous|résoudre|résultat\s+de|answer\s+to|is\s+)\s*(.+)$", low)
+            if m:
+                expr = m.group(1).strip().rstrip('.!?, \\\'"')
+                expr = re.sub(r"\b(the\s+)?(result\s+of|answer\s+to|expression|equation|of)\b\s*", " ", expr).strip()
+                if expr and re.search(r"\d", expr):
+                    params["expression"] = expr
+            elif "^" not in low:
+                m = re.search(r"\d[\d\s+\-*/^.()]*\d", low)
+                if m:
+                    params["expression"] = m.group(0)
+
+        elif intent["name"] == "hash_tools":
+            low = text.lower()
+            m_algo = re.search(r"\b(md5|sha\s*1|sha\s*256|sha512|checksum)\b", low)
+            params["algo"] = (m_algo.group(1).replace(" ", "") if m_algo else "sha256")
+            if re.search(r"\b(file|fichier)\b", low):
+                params["action"] = "file"
+                m = re.search(r"(?:file|fichier)\s+(.+)$", low)
+                if m:
+                    params["path"] = m.group(1).strip().rstrip('.!?, \\\'"')
+            else:
+                params["action"] = "text"
+                m = re.search(r"(?:text|texte)\s*:\s*(.+)$", low)
+                if m:
+                    params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+                else:
+                    m = re.search(r"(?:of|de)\s+(?:the\s+|le\s+|ce\s+)?(?:text|texte)?\s*(.+)$", low)
+                    if m:
+                        params["text"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "random_tools":
+            low = text.lower()
+            m = re.search(r"\broll\s+(a\s+)?(\d+)?d(\d+)\b", low)
+            if m:
+                params["dice"] = (m.group(2) or "1") + "d" + m.group(3)
+            elif re.search(r"\bpile\s+ou\s+face\b|\bheads?\s+or\s+tails?\b|\bflip\s+a?\s*(coin|pièce)\b", low):
+                params["action"] = "coin"
+            elif re.search(r"\b(between|entre)\b", low):
+                m = re.search(r"\b(?:between|entre)\s+(.+?)\s+\b(?:and|et|ou)\s+(.+)$", low)
+                if m:
+                    params["options"] = m.group(1).strip() + ", " + m.group(2).strip()
+            else:
+                params["dice"] = "d6"
+
+        elif intent["name"] == "notes_tools":
+            low = text.lower()
+            if re.search(r"\b(list|show|affiche|montre|liste)\b", low):
+                params["action"] = "list"
+            elif re.search(r"\b(search|find|cherche|trouve|recherche)\b", low):
+                params["action"] = "find"
+                m = re.search(r"(?:search|find|cherche|trouve|recherche)\s+(?:in\s+)?(?:my\s+|mes\s+)?notes?\s+(?:for|dans)?\s*(.+)$", low)
+                if m:
+                    params["query"] = m.group(1).strip().rstrip('.!?, \\\'"')
+            else:
+                params["action"] = "save"
+                m = re.search(r"note\s*:\s*(.+)$", low)
+                if m:
+                    params["text"] = m.group(1).strip()
+                else:
+                    m = re.search(r"(?:take|write|add|save|écris|ajoute|sauvegarde)\s+(?:a\s+)?note\s+(?:that\s+|ceci\s+|ça\s+)?(.+)$", low)
+                    if m:
+                        params["text"] = m.group(1).strip()
+
+        elif intent["name"] == "system_info_tools":
+            low = text.lower()
+            if re.search(r"\bbatter", low):
+                params["action"] = "battery"
+            elif re.search(r"\bwifi\b|\bssid\b|\bréseau\b", low):
+                params["action"] = "wifi"
+            else:
+                params["action"] = "disk"
+
+        elif intent["name"] == "screen_ocr":
+            m = re.search(r"\b(?:the\s+word|le\s+mot)\s+(\w+)", text)
+            if m:
+                params["text"] = m.group(1)
+            else:
+                m = re.search(r"\b(?:trouve|cherche|find|see|read|voir|lire)\s+(?:the\s+)?(\w+)", text)
+                if m:
+                    params["text"] = m.group(1)
+
+        elif intent["name"] == "check_crypto":
+            low = text.lower()
+            m_coin = re.search(r"\b(bitcoin|ethereum|solana|dogecoin|ripple|cardano|bitcoin cash|litecoin|binancecoin|polkadot|tether|btc|eth|sol|xrp|doge|ada|usdt|bnb|ltc|dot)\b", low)
+            if m_coin:
+                params["crypto"] = m_coin.group(1)
+            m_cur = re.search(r"\b(eur|usd|gbp|tnd|dollar|euro)\b", low)
+            params["currency"] = (m_cur.group(1) if m_cur else "usd")
+
+        elif intent["name"] == "currency_rate":
+            low = text.upper()
+            m = re.search(r"([A-Z]{3})[\s/-]?([A-Z]{3})", low)
+            params["symbol"] = (m.group(1) + m.group(2)) if m else "EURUSD"
+
+        elif intent["name"] == "check_time":
+            m = re.search(r"(?:in|à|a|au|d[ae])\s+([a-zéèàùâç][a-zéèàùâç\s\-]+?)\s*$", text.lower())
+            params["place"] = m.group(1).strip() if m else "Tunis"
+
+        elif intent["name"] == "random_quote":
+            pass
+
+        elif intent["name"] == "opencode_run":
+            params["action"] = "run"
+            m = re.search(r"(?:execute|build|create|make|start|lance|init)\s+(?:me\s+a\s+|a\s+)?(?:new\s+)?(?:dev|development\s+)?(?:project)?\s*(.*?)\s*$", text)
+            if m and m.group(1).strip():
+                params["description"] = m.group(1).strip()
+            elif "project" not in params:
+                params["description"] = "a new development project"
+
+        elif intent["name"] == "opencode_install":
+            params["action"] = "install"
+
+        elif intent["name"] == "opencode_status":
+            params["action"] = "status"
+
+        elif intent["name"] == "devices_scan":
+            low = text.lower()
+            if re.search(r"\b(monitors|screens|écrans|displays|display)\b", low):
+                params["category"] = "monitors"
+            elif re.search(r"\b(bluetooth|bluetooth devices|périphérique\s+bluetooth)\b", low):
+                params["category"] = "bluetooth"
+            elif re.search(r"\badb\b", low):
+                params["category"] = "adb"
+            elif re.search(r"\b(usb|devices|appareils|périphériques|connectés|connected)\b", low):
+                params["category"] = "all"
+            else:
+                params["category"] = "all"
+
+        elif intent["name"] == "create_document":
+            low = text.lower()
+            if "docx" in low or "word" in low:
+                params["format"] = "docx"
+            else:
+                params["format"] = "pdf"
+            m = re.search(r"(?:create|make|generate|write|build)\s+(?:(?:a|professional|styled|an?)\s+)*(?:pdf|word|document|docx|report|file)s?\s+(?:that\s+|about\s+|on\s+|explaining\s+|of\s+)?(.+)$", low)
+            if m:
+                c = m.group(1).strip().strip('.!?, \\\'"')
+                if c and c not in ("this", "it"):
+                    params["content"] = c
+
+        elif intent["name"] == "read_pdf":
+            low = text.lower()
+            m = re.search(r"(?:pdf|document|fichier)\s+(?:in\s+my\s+files|dans\s+mes\s+fichiers)?\s*(.+)?$", low)
+            if m and m.group(1) and m.group(1).strip():
+                params["path"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "install_tool":
+            m = re.search(r"(?:je\s+veux\s+|i\s+want\s+|i\s+need\s+|j\s*ai\s+besoin\s+de\s+)?(?:installer\s+|to\s+install\s+)?(.+)$", text.lower())
+            if m:
+                params["tool"] = m.group(1).strip().rstrip('.!?, \\\'"')
+
+        elif intent["name"] == "use_tool":
+            low = text.lower()
+            m = re.match(r"\b(nmap|ping|traceroute|tracert|netstat|dig|whois|nslookup|ifconfig|ipconfig|curl|wget|htop|top|ssh)\b\s*(.*)$", low)
+            if m:
+                params["tool"] = m.group(1)
+                if m.group(2).strip():
+                    params["args"] = m.group(2).strip().rstrip(".!?,")
+            else:
+                m = re.search(r"(?:run|use|execute|scan|lance|utilise)\b(?:\s+(?:the|la|le))?\s+(?:tool\s+|outil\s+)?(\w+)\b(?:\s+(.*))?$", low)
+                if m:
+                    params["tool"] = m.group(1)
+                    if m.group(2):
+                        params["args"] = m.group(2).strip().rstrip(".!?,")
+
+        elif intent["name"] == "tts_language":
+            tail = text.lower()
+            m = re.search(r"(?:speak|talk|parle|parler|switch|change|basculer|changer)\b.*?(?:in\s+|en\s+|to\s+|vers\s+)?(.+)$", tail)
+            if m:
+                tail = m.group(1).strip().strip('.!?, \\\'"')
+                if len(tail) == 2 and tail in ("fr", "en", "ar"):
+                    params["language"] = tail
+                else:
+                    _aliases = {"french": "fr", "anglais": "en", "english": "en", "arabe": "ar", "français": "fr", "francais": "fr"}
+                    for _a, _c in _aliases.items():
+                        if _a in tail:
+                            params["language"] = _c
+                            break
 
         return params
 

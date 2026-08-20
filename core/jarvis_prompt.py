@@ -48,6 +48,12 @@ def _build_system_prompt(self, user_text: str = "") -> str:
     #
     # Rule: static content first → semi-static memory middle → dynamic time LAST.
     sys_p   = _load_system_prompt()               # cached in-process after first call
+    # ── User profile: static enough to sit right after the protocol ─────
+    try:
+        from core.jarvis_profile import profile_for_prompt  # noqa: E402
+        _user_profile_ctx = profile_for_prompt()
+    except Exception:
+        _user_profile_ctx = ""
     memory  = load_memory()
     mem_str = format_memory_for_prompt(memory)    # semi-static
     now     = datetime.now()
@@ -64,6 +70,7 @@ def _build_system_prompt(self, user_text: str = "") -> str:
         pass
 
     # ── Time context: cached per-minute (avoids regenerating tokens) ───
+    global _time_ctx_cache, _time_ctx_cache_min
     cur_min = now.hour * 60 + now.minute
     if cur_min != _time_ctx_cache_min:
         _time_ctx_cache = (
@@ -99,6 +106,8 @@ def _build_system_prompt(self, user_text: str = "") -> str:
     agent_info = f"[BACKGROUND AGENTS: {running} running]" if running > 0 else ""
 
     parts = [sys_p]
+    if _user_profile_ctx:
+        parts.append(_user_profile_ctx)
     if mem_str:
         parts.append(mem_str)
     if _episodic_ctx:

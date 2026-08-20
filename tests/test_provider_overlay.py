@@ -48,7 +48,7 @@ def test_discovery_and_submit(qapp):
     time.sleep(1)
     assert ov._discovery, "discovery should return statuses for all providers"
     assert all(pid in ov._discovery for pid in
-               ["ollama", "groq", "nvidia_nim", "openrouter", "openai"])
+               ["ollama", "groq", "gemini", "nvidia_nim", "openrouter", "openai"])
     ov._select_provider("groq")
     assert ov._selected_pid == "groq"
     ov._submit()

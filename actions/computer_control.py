@@ -145,15 +145,31 @@ def _random_data(data_type: str) -> str:
     return f"random_{data_type}_{random.randint(1000, 9999)}"
 
 def _user_profile() -> dict:
-    """Read identity fields from long-term memory."""
+    """Read identity fields from long-term memory + static user profile."""
+    prof: dict = {}
     try:
         if _MEMORY_PATH.exists():
             data     = json.loads(_MEMORY_PATH.read_text(encoding="utf-8"))
             identity = data.get("identity", {})
-            return {k: v.get("value", "") for k, v in identity.items()}
+            prof.update({k: v.get("value", "") for k, v in identity.items()})
     except Exception:
         pass
-    return {}
+    # Static profile (config/user_profile.json) fills anything not in memory
+    try:
+        _upath = Path(__file__).resolve().parent.parent / "config" / "user_profile.json"
+        if _upath.exists():
+            _data = json.loads(_upath.read_text(encoding="utf-8"))
+            if not prof.get("name") and _data.get("name"):
+                prof["name"] = _data["name"]
+            if not prof.get("email") and _data.get("email"):
+                prof["email"] = _data["email"]
+            if not prof.get("city") and (_data.get("city") or _data.get("location")):
+                prof["city"] = _data.get("city") or _data.get("location")
+            if not prof.get("phone") and _data.get("phone"):
+                prof["phone"] = _data["phone"]
+    except Exception:
+        pass
+    return prof
 
 def _type(text: str, interval: float = 0.03) -> str:
     _require_pyautogui()
@@ -275,24 +291,101 @@ def _screenshot(save_path: str | None = None) -> str:
     return f"Screenshot saved: {path}"
 
 
+_DANGEROUS_PATTERNS = [
+    # OS-agnostic destructive commands
+    r"^rm\s+-rf?\s+/",                 # rm -rf on absolute paths
+    r"^format\s+[cd]:",                # format C: / D:
+    r"^(del|deltree)\b.*\*",           # del/deltree with any wildcard
+    r"^(del|deltree)\b.*[cd]:\\?",     # del/deltree targeting a drive root
+    r"^dd\s+.*\bof=/dev/(sda|sd[b-z]|nvme|disk0|disk1)\b",
+    r"^mkfs\.",                        # format any partition
+    r"^shutdown\s+(-[sS]|/[sS]|/p)",   # immediate shutdown (Win+Unix)
+    r"^powercfg",                      # power config abuse
+]
+
+def _is_safe_command(command: str, os_name: str) -> str | None:
+    """Return a rejection reason if the command is destructive, else None."""
+    flat = command.strip().lower()
+    if flat.startswith("history"):
+        return "Command rejected: 'history' is a shell builtin — use my memory instead."
+    for pat in _DANGEROUS_PATTERNS:
+        if re.search(pat, flat):
+            return f"Command rejected for your safety (destructive): '{command.strip()}'"
+    return None
+
+def _adapt_command(command: str, os_name: str) -> str:
+    """Translate common shell commands to the native OS equivalent."""
+    if os_name == "windows":
+        t = command.strip().lower()
+        if t.startswith("ls ") or t == "ls":
+            return "dir " + command[3:].strip()
+        if t.startswith("cat "):
+            return "type " + command[4:].strip()
+        if t.startswith("rm "):
+            return "del " + command[3:].strip()
+        if t.startswith("mkdir "):
+            return "mkdir " + command[6:].strip()
+        if t.startswith("cp "):
+            return "copy " + command[3:].replace(" ", " ")
+        if t.startswith("mv "):
+            return "move " + command[3:].strip()
+        if t.startswith("grep "):
+            # grep word file -> findstr /i "word" file
+            m = re.match(r"grep\s+(?:(?:-[a-zA-Z]+)\s+)*\"?([^\s\"])\"?\s+(.+)", command.strip())
+            if m:
+                return f'findstr /i "{m.group(1)}" {m.group(2)}'
+        if t.startswith("ps ") or t == "ps":
+            return "tasklist"
+        if t.startswith("kill "):
+            return "taskkill /PID " + command[5:].strip()
+        if t == "pwd":
+            return "cd"
+        if t == "clear":
+            return "cls"
+        if t == "whoami":
+            return "whoami"
+        if t == "ifconfig" or t == "ip addr":
+            return "ipconfig"
+    elif os_name == "mac":
+        if command.strip().lower() == "ls":
+            return command  # already native
+    return command
+
 def _run_command(command: str, timeout: int = 60, workdir: str | None = None) -> str:
-    """Run an arbitrary shell command."""
-    if command.strip().startswith("history"):
-        return "Command rejected: 'history' is a shell builtin and cannot run as a subprocess. Use your own memory or conversation history instead."
+    """Run an arbitrary shell command, adapted to the detected OS."""
+    command = command.strip()
+    if not command:
+        return "No command given."
+    os_name = _get_os()
+    reject = _is_safe_command(command, os_name)
+    if reject:
+        return reject
+    command = _adapt_command(command, os_name)
     try:
         cwd = Path(workdir).expanduser().resolve() if workdir else None
-        cmd_list = shlex.split(command)
-        result = subprocess.run(
-            cmd_list,
-            capture_output=True,
-            timeout=timeout,
-            cwd=cwd,
-            text=True,
-        )
+        if os_name == "windows":
+            # Windows: some commands are shell builtins (dir, cls, tasklist)
+            # Use cmd.exe /c so builtins work exactly like the real terminal.
+            result = subprocess.run(
+                ["cmd.exe", "/c", command],
+                capture_output=True,
+                timeout=timeout,
+                cwd=cwd,
+                text=True,
+            )
+        else:
+            # bash -c supports pipes, redirections, &&, variables and builtins
+            result = subprocess.run(
+                ["bash", "-c", command],
+                capture_output=True,
+                timeout=timeout,
+                cwd=cwd,
+                text=True,
+            )
         out = result.stdout.strip()
         err = result.stderr.strip()
         rc = result.returncode
-        parts = [f"Exit code: {rc}"]
+        parts = [f"[{os_name}] Exit code: {rc}"]
         if out:
             parts.append(f"STDOUT:\n{out[:2000]}")
         if err:

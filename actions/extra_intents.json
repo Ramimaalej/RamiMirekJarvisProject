@@ -1,0 +1,263 @@
+[
+  {
+    "name": "devices_scan",
+    "subsystem": "tools",
+    "patterns": [
+      "^(list|show|affiche|montre)\\s+(connected|plugged|branch)\\s+(devices|devices on|appareils|periphériques|périphériques|dispositifs)",
+      "^q\\s*u?\\s*['’-]?\\s*est[- ]?ce\\s+qui\\s+est\\s+.*?(connect|branch|plug|allum)",
+      "^q\\s*u?\\s*['’-]?\\s*est[- ]?ce\\s+(qui\\s+|que\\s+)?(je\\s+dois\\s+avoir|tu\\s+as)\\s+.*?(connect|branch|plug|allum)",
+      "^que\\s*(qu)?\\s*est[- ]?ce\\s+qui\\s+est\\s+.*?(connect|branch|plug|allum)",
+      "^(connect|branch|plug|allum)é?\\s+(sur\\s+mon\\s+pc|sur\\s+ma\\s+machine|à\\s+mon\\s+pc)",
+      "^what\\s+(is\\s+)?(connected|plugged|plugged in|allume|branche)\\s+(on\\s+(my\\s+)?pc|sur\\s+mon\\s+pc|in\\s+my\\s+pc|my\\s+pc|my\\s+machine)",
+      "^whats\\s+(connected|plugged|allume|branche)\\s+(on\\s+(my\\s+)?pc|sur\\s+mon\\s+pc|in\\s+my\\s+pc|my\\s+pc|my\\s+machine)",
+      "^(monitors|screens|écrans|displays)\\s+(connected|connected to my pc|displayed|sur mon pc)",
+      "^(show|liste|affiche)\\s+(me\\s+|mes\\s+)?(monitors|screens|écrans|displays)",
+      "^devices\\s+(connected|connectés|sur mon pc|sur ma machine)",
+      "^(bluetooth|usb|adb)\\s+(devices|périphériques|connectés|sur mon pc)"
+    ],
+    "handler": "devices_scan",
+    "requires_ai": false
+  },
+  {
+    "name": "qr_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^(generate|create|make|fais|génère)\\s+(a\\s+)?(qr\\s*code|qr)\\s+(for|pour)\\s+",
+      "^(read|scan|lire|scanner|décoder|decode)\\s+(a\\s+|this\\s+|le\\s+|ce\\s+)?(qr\\s*code|qr)\\s*",
+      "\\b(qr\\s*code|qr)\\s+(for|pour)\\s+"
+    ],
+    "handler": "qr_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "clipboard_mgr",
+    "subsystem": "tools",
+    "patterns": [
+      "^(what|whats|qu?est)\\s*(-?ce\\s+que\\s+(-?il\\s+y\\s+a)?\\s*)?(is\\s+|il\\s+y\\s+a)?\\s*(in\\s+)?(my\\s+)?clipboard",
+      "^(lis|montrer|voir|read|show)\\s+(mon\\s+|my\\s+)?(presse[- ]?papiers|clipboard)",
+      "^(copy|copie|copier|colle|coller)\\s+.*\\b(clipboard|presse[- ]?papiers)\\b",
+      "\\bclipboard\\b"
+    ],
+    "handler": "clipboard_mgr",
+    "requires_ai": false
+  },
+  {
+    "name": "dictionary_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^(what\\s+does|que\\s+veut\\s+dire|que\\s+signifie|qu?est[- ]?ce\\s+que\\s+(veut\\s+dire|signifie))\\s+\\w+",
+      "^(define|définir|définition\\s+de|definition\\s+of|meaning\\s+of)\\s+\\w+",
+      "^(synonyms?\\s+of|synonymes?\\s+de)\\s+\\w+",
+      "^\\w+\\s+synonyms?\\b"
+    ],
+    "handler": "dictionary_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "math_solver",
+    "subsystem": "tools",
+    "patterns": [
+      "^(calcule|combien\\s+fait|combien\\s+font)\\s+",
+      "^(solve|calculate|calculer|résous|résoudre)\\s+(the\\s+)?(equation\\s+|expression\\s+)?\\d",
+      "\\d+\\s*[+\\-*/^]\\s*\\d",
+      "\\d+\\s*[*x×]\\s*\\d+"
+    ],
+    "handler": "math_solver",
+    "requires_ai": false
+  },
+  {
+    "name": "hash_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^(hash|hasher)\\s+(this\\s+|ce\\s+|le\\s+|the\\s+)?(text|texte)\\s*:\\s*.+",
+      "^(md5|sha\\s*256|sha\\s*1|sha512|checksum)\\s+(of\\s+|de\\s+)?(the\\s+|le\\s+|ce\\s+)?(file|fichier)\\s*",
+      "^(compute|calcul|génère|generate)\\s+(the\\s+|un\\s+)?(md5|sha|checksum)\\s+"
+    ],
+    "handler": "hash_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "random_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^roll\\s+(a\\s+)?\\d*d\\d+",
+      "^(lance|lancer)\\s+(les?\\s+)?dés",
+      "^(pile\\s+ou\\s+face)",
+      "^(heads?\\s+or\\s+tails?)",
+      "^(pick|choose|choisis|choisir)\\s+(between|entre)\\s+"
+    ],
+    "handler": "random_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "use_tool",
+    "subsystem": "tools",
+    "patterns": [
+      "^\\b(nmap|ping|traceroute|tracert|netstat|dig|whois|nslookup|ifconfig|ipconfig|curl|wget|htop|top|ssh)\\b"
+    ],
+    "handler": "use_tool",
+    "requires_ai": false
+  },
+  {
+    "name": "notes_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^note\\s*:",
+      "^(take|write|add|save|écris|ajoute|sauvegarde)\\s+(a\\s+)?note\\s*",
+      "^(list|show|affiche|montre|liste)\\s+(my\\s+|mes\\s+)?notes?\\b",
+      "^(search|find|cherche|trouve|recherche)\\s+(in\\s+)?(my\\s+|mes\\s+)?notes?\\s*"
+    ],
+    "handler": "notes_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "system_info_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^(battery\\s+(level|status|pourcentage))",
+      "^(quelle\\s+batterie|niveau\\s+de\\s+batterie|batterie\\s+restante)",
+      "^(wifi\\s+(ssid|nom)|quel\\s+(réseau\\s+)?wifi)",
+      "^(disk\\s+(info|space|remaining)|disque\\s+(dur|info))"
+    ],
+    "handler": "system_info_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "screen_ocr",
+    "subsystem": "tools",
+    "patterns": [
+      "^(is\\s+the\\s+word|est[- ]?ce\\s+que\\s+le\\s+mot)\\s+\\w+\\s+(visible|écrit|written|displayed|affiché)\\s+(on\\s+(my\\s+)?screen|sur\\s+(mon\\s+|l?|le\\s+)?écran)",
+      "^(trouve|cherche|find)\\s+(the\\s+word|le\\s+mot)\\s+\\w+\\s+(sur\\s+mon\\s+écran|on\\s+(my\\s+)?screen)"
+    ],
+    "handler": "screen_ocr",
+    "requires_ai": false
+  },
+  {
+    "name": "check_crypto",
+    "subsystem": "public_apis",
+    "patterns": [
+      "^btc\\s+price$",
+      "^(bitcoin|ethereum|eth|solana|doge|dogecoin|crypto)\\s+(price|prix|cours)",
+      "^(prix|price)\\s+(of\\s+|du\\s+)?(bitcoin|ethereum|btc|eth|crypto)",
+      "^how\\s+much\\s+is\\s+(bitcoin|ethereum|btc|eth)\\b"
+    ],
+    "handler": "check_crypto",
+    "requires_ai": false
+  },
+  {
+    "name": "currency_rate",
+    "subsystem": "public_apis",
+    "patterns": [
+      "^convert\\s+\\d+\\s+[a-z]{3}\\s+(to|en|vers)\\s+[a-z]{3}",
+      "^[a-z]{3}[/\\s-]?[a-z]{3}\\s+(rate|taux)",
+      "^(taux|rate|exchange\\s+rate)\\s+(of\\s+|de\\s+)?[a-z]{3}[a-z]{3}"
+    ],
+    "handler": "currency_rate",
+    "requires_ai": false
+  },
+  {
+    "name": "check_time",
+    "subsystem": "public_apis",
+    "patterns": [
+      "^what\\s+time\\s+is\\s+it\\s+in\\s+",
+      "^quelle\\s+(est\\s+)?(l?heure|heure)\\s+(à|a|d[ae]|au)\\s+",
+      "^heure\\s+(à|a)\\s+[\\w\\s]+",
+      "^time\\s+in\\s+[\\w\\s]+"
+    ],
+    "handler": "check_time",
+    "requires_ai": false
+  },
+  {
+    "name": "random_quote",
+    "subsystem": "public_apis",
+    "patterns": [
+      "^(give\\s+me\\s+|donne[- ]?moi\\s+|je\\s+veux\\s+)?(a\\s+|une\\s+)?(quote|citation|motivation|quote du jour)"
+    ],
+    "handler": "random_quote",
+    "requires_ai": false
+  },
+  {
+    "name": "opencode_run",
+    "subsystem": "opencode",
+    "patterns": [
+      "^execute\\s+new\\s+dev\\s+project",
+      "^(build|create|make|start|lance|init)\\s+(me\\s+a\\s+|a\\s+)?(new\\s+)?(dev|development\\s+)?project",
+      "^(build|create|make|start|lance|init|execute)\\s+(me\\s+)?(a\\s+)?(new\\s+)?(todo|web|mobile|desktop|app|application)\\b"
+    ],
+    "handler": "opencode_run",
+    "requires_ai": true
+  },
+  {
+    "name": "opencode_install",
+    "subsystem": "opencode",
+    "patterns": [
+      "^install\\s+opencode"
+    ],
+    "handler": "opencode_install",
+    "requires_ai": false
+  },
+  {
+    "name": "opencode_status",
+    "subsystem": "opencode",
+    "patterns": [
+      "^(is|est)\\s+opencode\\s+installed"
+    ],
+    "handler": "opencode_status",
+    "requires_ai": false
+  },
+  {
+    "name": "tts_language",
+    "subsystem": "tts",
+    "patterns": [
+      "^(speak|talk|parle|parler)\\s+(in\\s+|en\\s+)?(a\\s+)?(little\\s+)?",
+      "^(change|switch|basculer|changer)\\s+(your\\s+|ta\\s+|la\\s+)?(voice\\s+|voix\\s+)?(language\\s+|langue\\s+)?(to\\s+|en\\s+|vers\\s+)?",
+      "^(speak|talk|parle)\\s+(me\\s+|with\\s+me\\s+)?(in\\s+|en\\s+)?"
+    ],
+    "handler": "set_language",
+    "requires_ai": false
+  },
+  {
+    "name": "create_document",
+    "subsystem": "documents",
+    "patterns": [
+      "^(create|make|generate|write|build)\\s+(a\\s+)?(professional\\s+)?(styled\\s+)?(pdf|word|document|docx|report|file)\\s+(that\\s+|about\\s+|on\\s+|explaining\\s+|of\\s+)?",
+      "^(pdf|word|document)\\s+(please\\s+)?(create|make|generate)\\s+",
+      "^(write|save|export)\\s+(this\\s+as\\s+|it\\s+as\\s+)?(a\\s+)?(pdf|word\\s+document|docx)"
+    ],
+    "handler": "create_document",
+    "requires_ai": false
+  },
+  {
+    "name": "read_pdf",
+    "subsystem": "documents",
+    "patterns": [
+      "^(read|open|show|see|regarder|lire|qu?est[- ]?ce\\s+qu?il\\s+y\\s+a|what\\s*'?s?\\s+in|tell\\s+me\\s+about)\\s+(this\\s+|that\\s+|the\\s+|le\\s+|la\\s+|ce\\s+)?(pdf|document|fichier)\\s*(in\\s+my\\s+files|dans\\s+mes\\s+fichiers)?",
+      "^(c?est\\s+quoi|qu?est\\s+-?ce\\s+que)\\s+(contient|dit)\\s+(ce\\s+|ce\\s+pdf|le\\s+pdf)\\s*",
+      "(explain|explique|résume|resumé)\\s+(this\\s+|that\\s+|le\\s+|ce\\s+)?(pdf|document)\\s*",
+      "^(open|show)\\s+the\\s+(content\\s+of\\s+)?my\\s+(latest\\s+|recent\\s+)?pdf"
+    ],
+    "handler": "read_pdf",
+    "requires_ai": false
+  },
+  {
+    "name": "install_tool",
+    "subsystem": "system",
+    "patterns": [
+      "^(install|download|add|put|installer|télécharge)\\s+(me\\s+|for\\s+me\\s+)?(a\\s+)?",
+      "^(i\\s+want|i\\s+need|je\\s+veux|j\\s*ai\\s+besoin\\s+de)\\s+(to\\s+install\\s+|installer\\s+)?"
+    ],
+    "handler": "install_tool",
+    "requires_ai": false
+  },
+  {
+    "name": "use_tool",
+    "subsystem": "system",
+    "patterns": [
+      "^\\b(nmap|ping|traceroute|tracert|netstat|dig|whois|nslookup|ifconfig|ipconfig|curl|wget|htop|top|ssh)\\b",
+      "^(use|scan|lance|utilise|utiliser)\\s+(the\\s+|la\\s+|le\\s+)?(tool\\s+|outil\\s+)?",
+      "^(run|execute)\\s+(the\\s+)?(tool|nmap|ping|netstat|curl|ssh|docker|whois|dig|traceroute)\\s+\\S+(\\s+\\S+)?"
+    ],
+    "handler": "use_tool",
+    "requires_ai": false
+  }
+]

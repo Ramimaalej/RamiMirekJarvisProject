@@ -20,6 +20,8 @@ from actions.weather_report import weather_action
 from actions.maps import maps_action
 from actions.stock_prices import stock_price_action
 from actions.news_reader import news_action
+from actions.public_apis import check_crypto, check_currency, check_time, check_quote, check_rate
+from actions.opencode_launcher import opencode_action
 from actions.get_datetime import get_datetime
 from actions.send_message import send_message
 from actions.reminder import reminder
@@ -54,6 +56,17 @@ from actions.goal_engine import create_goal, list_goals, get_goal, update_goal_p
 from actions.task_manager import task_manager, budget_manager, add_task, complete_task, delete_task, list_tasks, add_transaction, list_transactions, budget_summary
 from actions.screen_explain import screen_explain
 from actions.screen_vision import screen_vision as screen_vision_action
+import actions.device_scanner as _devices
+import actions.device_scanner as _devices
+from actions.qr_tools import qr_generate as _qr_gen, qr_scan as _qr_scan
+from actions.clipboard_mgr import clipboard_read as _clip_read, clipboard_write as _clip_write
+from actions.dictionary_tools import word_definition as _word_def, word_synonyms as _word_syn, word_example as _word_ex
+from actions.math_solver import solve_math as _solve_math
+from actions.hash_tools import hash_string as _hash_str, hash_file as _hash_file
+from actions.random_tools import dice_roll as _dice_roll, coin_flip as _coin_flip, random_pick as _rand_pick
+from actions.notes_tools import quick_note_save as _note_save, quick_note_list as _note_list, quick_note_find as _note_find
+from actions.system_info_tools import battery_status as _battery, disk_info as _disk_info, wifi_status as _wifi
+from actions.screenshot_ocr import screen_find_text as _screen_find
 from actions.comfyui import generate_image
 from actions.file_converter import convert_file
 from actions.random_number import random_number
@@ -340,6 +353,59 @@ def execute_tool(ui, name: str, args: dict,
         elif name == "news":
             r = news_action(parameters=args, player=ui)
             result = r or "Done."
+
+        elif name == "check_crypto":
+            _explicit = (args.get("coin") or "").lower()
+            if _explicit:
+                coin = _explicit
+                cur = (args.get("currency") or "usd").lower()
+            else:
+                _q = (args.get("query") or "").lower()
+                coin = next((c for c in
+                         ("bitcoin", "ethereum", "solana", "ripple", "dogecoin",
+                          "cardano", "tether", "binancecoin", "litecoin",
+                          "polkadot", "btc", "eth", "sol", "xrp", "doge",
+                          "ada", "usdt", "bnb", "ltc", "dot")
+                         if c in _q), "bitcoin")
+                cur = next((cu for cu in ("eur", "usd", "gbp", "tnd") if cu in _q), "usd")
+            result = check_crypto(coin, cur)
+            if ui:
+                ui.write_log(f"[public_apis] crypto {coin}")
+
+        elif name == "currency_rate":
+            _sym = args.get("symbol") or args.get("pair") or ""
+            if _sym:
+                pair = _sym.upper()
+            else:
+                _q = (args.get("query") or "").upper()
+                import re as _re
+                _m = _re.search(r"([A-Z]{3})[\s/-]?([A-Z]{3})", _q)
+                pair = (_m.group(1) + _m.group(2)) if _m else "EURUSD"
+            result = check_rate(pair)
+            if ui:
+                ui.write_log(f"[public_apis] rate {pair}")
+
+        elif name == "check_time":
+            place = (args.get("place") or args.get("query") or "Tunis").strip()
+            if not place or place.lower() in ("now", "current", "actuelle", "il", "it", "est"):
+                place = "Tunis"
+            result = check_time(place)
+
+        elif name == "random_quote":
+            result = check_quote()
+
+        elif name == "opencode_run":
+            desc = args.get("description") or args.get("project") or args.get("query", "")
+            if not desc:
+                desc = "a new development project"
+            result = opencode_action(parameters={"action": "run", "description": desc,
+                                               "dir": args.get("dir")}, player=ui)
+
+        elif name == "opencode_install":
+            result = opencode_action(parameters={"action": "install"}, player=ui)
+
+        elif name == "opencode_status":
+            result = opencode_action(parameters={"action": "status"}, player=ui)
 
         elif name == "get_datetime":
             result = get_datetime(parameters=args)
@@ -1255,6 +1321,52 @@ def execute_tool(ui, name: str, args: dict,
             else:
                 result = get_largest_files(path=path, count=count)
 
+        elif name == "solve_math":
+            result = _solve_math(parameters=args, player=ui)
+        elif name == "dice_roll":
+            result = _dice_roll(parameters=args, player=ui)
+        elif name == "coin_flip":
+            result = _coin_flip(parameters=args, player=ui)
+        elif name == "random_pick":
+            result = _rand_pick(parameters=args, player=ui)
+        elif name == "quick_note":
+            result = _note_save(parameters=args, player=ui)
+        elif name == "note_list":
+            result = _note_list(parameters=args, player=ui)
+        elif name == "note_find":
+            result = _note_find(parameters=args, player=ui)
+        elif name == "clipboard_read":
+            result = _clip_read(parameters=args, player=ui)
+        elif name == "clipboard_write":
+            result = _clip_write(parameters=args, player=ui)
+        elif name == "word_definition":
+            result = _word_def(parameters=args, player=ui)
+        elif name == "word_synonyms":
+            result = _word_syn(parameters=args, player=ui)
+        elif name == "word_example":
+            result = _word_ex(parameters=args, player=ui)
+        elif name == "hash_string":
+            result = _hash_str(parameters=args, player=ui)
+        elif name == "hash_file":
+            result = _hash_file(parameters=args, player=ui)
+        elif name == "qr_generate":
+            result = _qr_gen(parameters=args, player=ui)
+        elif name == "qr_scan":
+            result = _qr_scan(parameters=args, player=ui)
+        elif name == "screen_find_text":
+            result = _screen_find(parameters=args, player=ui)
+        elif name == "battery_status":
+            result = _battery(parameters=args, player=ui)
+        elif name == "disk_info":
+            result = _disk_info(parameters=args, player=ui)
+        elif name == "wifi_status":
+            result = _wifi(parameters=args, player=ui)
+        elif name == "devices_scan":
+            category = (args or {}).get("category", "all")
+            if category == "all":
+                result = _devices.list_devices(parameters=args, player=ui)
+            else:
+                result = _devices.device_detail(parameters=args, player=ui)
         else:
             result = "I cannot do that."
             ui.show_error_state(f"Unknown tool — {name}")

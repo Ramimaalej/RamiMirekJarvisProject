@@ -82,3 +82,4 @@ edge-tts              # EdgeTTS  (default, free, requires internet)
 # ── Local LLM ─────────────────────────────────────────────────────────────
 # Ollama must be installed separately: https://ollama.com
 # Then pull a model:  ollama pull qwen2.5:7b
+pdfplumber

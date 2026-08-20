@@ -1465,6 +1465,73 @@ def _to_ollama_tools(decls: list) -> list:
     return tools
 
 
+# ---------------------------------------------------------------------------
+# Public APIs & OpenCode (real-time data + dev automation)
+# ---------------------------------------------------------------------------
+TOOL_DECLARATIONS += [
+    {
+        "name": "check_crypto",
+        "description": "Live cryptocurrency price (bitcoin, ethereum, solana, xrp, dogecoin, cardano, tether, binancecoin, litecoin, polkadot...) with 24h change, any currency (usd, eur, gbp, tnd). Free, no key.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "coin": {"type": "STRING", "description": "Coin id, e.g. 'bitcoin', 'ethereum', 'solana', 'dogecoin'"},
+                "currency": {"type": "STRING", "description": "Display currency, default 'usd'"},
+            },
+            "required": ["coin"]
+        }
+    },
+    {
+        "name": "check_rate",
+        "description": "Live foreign-exchange rate for any pair from ECB data (EURUSD, USDGBP, EUR-TND...). Free, no key.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "symbol": {"type": "STRING", "description": "Pair like 'EURUSD', 'USDGBP', 'EUR-TND'"},
+            },
+            "required": ["symbol"]
+        }
+    },
+    {
+        "name": "check_time",
+        "description": "Current local time in a city or timezone. Aliases: tunis, sfax, london, paris, berlin, dubai, tokyo, new york, los angeles, moscow, beijing.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "place": {"type": "STRING", "description": "City name or timezone, e.g. 'tunis', 'london', 'Asia/Dubai'"},
+            },
+            "required": ["place"]
+        }
+    },
+    {
+        "name": "check_quote",
+        "description": "Random inspirational quote.",
+        "parameters": {"type": "OBJECT", "properties": {}},
+    },
+    {
+        "name": "opencode_run",
+        "description": "Run the OpenCode AI coding agent headlessly with a DETAILED prompt. Builds a new project or implements a feature step by step (analyze, scaffold, implement, test, document). Use for 'build me an app', 'create a new project', 'execute new dev project'.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "description": {"type": "STRING", "description": "Detailed project/feature description: goal, main features, tech stack, UI style, data, constraints"},
+                "dir": {"type": "STRING", "description": "Working directory (optional)"},
+            },
+            "required": ["description"]
+        }
+    },
+    {
+        "name": "opencode_install",
+        "description": "Install OpenCode (AI coding agent) if missing. Linux/macOS via official installer, message on Windows.",
+        "parameters": {"type": "OBJECT", "properties": {}},
+    },
+    {
+        "name": "opencode_status",
+        "description": "Check if OpenCode is installed and available.",
+        "parameters": {"type": "OBJECT", "properties": {}},
+    },
+]
+
 OLLAMA_TOOLS = _to_ollama_tools(TOOL_DECLARATIONS)
 
 
