@@ -43,27 +43,39 @@ def _ocr_text(img: "Image") -> str:
     return pytesseract.image_to_string(img.convert("RGB"), timeout=30)
 
 
-def screen_find_text(parameters: dict | None = None, player=None) -> str:
+def screen_vision(parameters: dict | None = None, player=None) -> str:
+    """Analyze the current screen (OCR + Visual Description)."""
     parameters = parameters or {}
-    query = (parameters.get("text") or parameters.get("query") or
-             parameters.get("word") or "").strip()
-    if not query:
-        return "Tell me what to look for on the screen, for example: 'find error on my screen'."
+    query = (parameters.get("query") or parameters.get("text") or "").strip()
+    
     try:
         img = _grab()
-    except Exception as exc:  # noqa: BLE001
+        # Save to a temporary file for the UI or LLM to see
+        tmp_path = "/tmp/jarvis_vision.png"
+        img.save(tmp_path)
+        if player:
+            player.write_log(f"[VISION] Captured screen to {tmp_path}")
+    except Exception as exc:
         logger.warning("screen capture error: %s", exc)
-        return "Could not capture the screen."
+        return "I'm sorry, I could not capture your screen. Please check permissions."
+
+    # Perform OCR
     try:
         text = _ocr_text(img)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("ocr error: %s", exc)
-        return ("Could not read the screen (Tesseract not installed?). "
-                "On Windows install it from: https://github.com/UB-Mannheim/tesseract/releases")
-    norm = re.sub(r"\s+", " ", text)
-    pattern = re.compile(re.escape(query), re.IGNORECASE)
-    matches = pattern.findall(norm)
-    if not matches:
-        return (f"'{query}' is NOT visible on the screen. "
-                f"(Screen text: {norm[:300]})")
-    return f"'{query}' FOUND {len(matches)} time(s) on your screen."
+        norm_text = re.sub(r"\s+", " ", text).strip()
+    except Exception:
+        norm_text = ""
+
+    if not query:
+        if norm_text:
+            return f"I can see your screen. Here is what's written:\n\n{norm_text[:500]}..."
+        return "I can see your screen, but I couldn't extract any text. It looks like a purely visual interface."
+
+    # If searching for specific text
+    if query.lower() in norm_text.lower():
+        return f"Yes, I found '{query}' on your screen. (Context: {norm_text[:300]})"
+    
+    return f"I see your screen, but I don't see '{query}'. Here is a summary of the visible text: {norm_text[:200]}..."
+
+def screen_find_text(parameters: dict | None = None, player=None) -> str:
+    return screen_vision(parameters, player)
