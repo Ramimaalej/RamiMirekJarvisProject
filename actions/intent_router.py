@@ -242,6 +242,9 @@ _INTENTS: list[dict[str, Any]] = [
         "subsystem": "tools",
         "patterns": [
             r'battery\s+level',
+            r'what\s+my\s+battery',
+            r'check\s+battery',
+            r'niveau\s+de\s+batterie',
             r'quelle\s+batterie',
             r'wifi\s+ssid',
             r'disk\s+info',

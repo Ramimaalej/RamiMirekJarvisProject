@@ -74,9 +74,10 @@ def _build_system_prompt(self, user_text: str = "") -> str:
     cur_min = now.hour * 60 + now.minute
     if cur_min != _time_ctx_cache_min:
         _time_ctx_cache = (
-            f"[CURRENT DATE & TIME]\n"
-            f"Right now it is: {now.strftime('%A, %B %d, %Y — %I:%M %p')}\n"
-            f"Use this to calculate exact times for reminders."
+            f"[CRITICAL: CURRENT DATE & TIME]\n"
+            f"The current year is {now.year}. Today is: {now.strftime('%A, %B %d, %Y')}\n"
+            f"Current time: {now.strftime('%I:%M %p')}\n"
+            f"IMPORTANT: Ignore any internal training data suggesting a previous year. It is {now.year}."
         )
         _time_ctx_cache_min = cur_min
     time_ctx = _time_ctx_cache

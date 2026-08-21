@@ -946,10 +946,10 @@ class ChatWidget(QWidget):
     def _bubble_style(side: str) -> str:
         if side == "you":
             # User bubble: No border, dark panel background — right aligned
-            return (f"QWidget {{ background: #1A1A1A; border: none; border-radius: 0px; }}"
+            return (f"QWidget {{ background: #1A1A1A; border: none; border-radius: 0px; margin-left: 80px; padding: 2px; }}"
                     f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
         # Jarvis bubble: Subtle accent border on left — left aligned
-        return (f"QWidget {{ background: #000000; border-left: 3px solid {C.ACC}; border-radius: 0px; }}"
+        return (f"QWidget {{ background: #000000; border-left: 3px solid {C.ACC}; border-radius: 0px; margin-right: 80px; padding: 2px; }}"
                 f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
 
     @staticmethod
@@ -971,7 +971,8 @@ class ChatWidget(QWidget):
         lbl.setFont(QFont(_FONT, _FONT_SZ_SM))
         lbl.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         lbl.setStyleSheet(f"color: {'#ffffff' if side == 'you' else C.TEXT}; background: transparent; border: none;")
-        lbl.setMaximumWidth(340)
+        # Remove hard limit and set alignment for better wrapping
+        lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         b_lay.addWidget(lbl)
 
         ts = QLabel(self._timestamp())
