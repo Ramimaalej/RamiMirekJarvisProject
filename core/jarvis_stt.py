@@ -74,8 +74,8 @@ def _listen_whisper(self) -> None:
                                 daemon=True,
                             )
                             self._prefetch_thread.start()
-                            self._process_message(text)
-                except queue.Empty:
+	                            self.process_message(text)
+	                except queue.Empty:
                     pass
     except Exception as e:
         print(f"[STT-Whisper] Mic error: {e}")
@@ -108,8 +108,8 @@ def _listen_vosk(self) -> None:
                     chunk = q.get(timeout=0.1)
                     text, is_final = self._stt.process_chunk(chunk.tobytes())
                     if is_final and text.strip():
-                        self._process_message(text)
-                except queue.Empty:
+	                        self.process_message(text)
+	                except queue.Empty:
                     pass
     except Exception as e:
         print(f"[STT-Vosk] Mic error: {e}")
@@ -124,9 +124,9 @@ def _text_command_loop(self) -> None:
         try:
             text = self._text_queue.get(timeout=0.5)
             if text.strip():
-                with self._processing_lock:
-                    self._process_message(text)
-        except queue.Empty:
+	                with self._processing_lock:
+	                    self.process_message(text)
+	        except queue.Empty:
             pass
         except Exception as e:
             short = str(e)[:120]

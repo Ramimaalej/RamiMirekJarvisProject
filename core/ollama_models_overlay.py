@@ -52,7 +52,7 @@ class OllamaModelsOverlay(QWidget):
         self.setStyleSheet(f"""
             OllamaModelsOverlay {{
                 background: #000000;
-                border: 2px solid #ffffff;
+                border: 2px solid {C.ACC};
                 border-radius: 0px;
             }}
         """)
@@ -92,14 +92,14 @@ class OllamaModelsOverlay(QWidget):
         self._tbl.setStyleSheet(f"""
             QTableWidget {{
                 background: {C.PANEL}; color: {C.TEXT};
-                border: 1px solid {C.BORDER}; border-radius: 0px;
-                gridline-color: {C.BORDER}; font-family: '{_font()}';
+                border: 1px solid #333333; border-radius: 0px;
+                gridline-color: #222222; font-family: '{_font()}';
                 font-size: 9pt;
             }}
             QTableWidget::item {{ padding: 4px 8px; }}
             QHeaderView::section {{
                 background: {C.PANEL2}; color: {C.TEXT_MED};
-                border: none; border-bottom: 1px solid {C.BORDER};
+                border: none; border-bottom: 1px solid #333333;
                 padding: 4px 8px; font-weight: bold; font-family: 'Courier New';
             }}
         """)
@@ -141,8 +141,8 @@ class OllamaModelsOverlay(QWidget):
         self._any_input.setFixedHeight(28)
         self._any_input.setStyleSheet(f"""
             QLineEdit {{
-                background: {C.PANEL2}; color: {C.TEXT};
-                border: 1px solid {C.BORDER}; border-radius: 0px; padding: 4px 8px;
+                background: #1A1A1A; color: {C.TEXT};
+                border: 1px solid #333333; border-radius: 0px; padding: 4px 8px;
                 font-family: '{_font()}'; font-size: 9pt;
             }}
             QLineEdit:focus {{ border: 1px solid {C.ACC}; }}

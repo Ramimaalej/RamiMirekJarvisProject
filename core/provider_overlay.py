@@ -82,7 +82,7 @@ class ProviderOverlay(QWidget):
         self.setStyleSheet(f"""
             ProviderOverlay {{
                 background: {bg_color};
-                border: 1px solid {C.BORDER};
+                border: 2px solid {C.ACC};
             }}
         """)
 
@@ -115,7 +115,7 @@ class ProviderOverlay(QWidget):
         refresh_all_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER};
+                border: 1px solid #333333;
                 padding: 0px 8px;
             }}
             QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.ACC}; background: {C.PRI_GHO}; }}
@@ -165,7 +165,7 @@ class ProviderOverlay(QWidget):
         cancel_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER};
+                border: 1px solid #333333;
                 padding: 4px 16px;
             }}
             QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.TEXT_MED}; }}
@@ -207,7 +207,7 @@ class ProviderOverlay(QWidget):
         card.setStyleSheet(f"""
             QWidget {{
                 background: {C.ACC_GHO if is_active else C.PANEL2};
-                border: 2px solid {C.ACC if is_active else C.BORDER};
+                border: 1px solid {"#333333" if not is_active else C.ACC};
             }}
         """)
         lay = QVBoxLayout(card)
@@ -249,8 +249,8 @@ class ProviderOverlay(QWidget):
             key_input.setText(self._init.get(key_field, ""))
             key_input.setStyleSheet(f"""
                 QLineEdit {{
-                    background: {C.PANEL}; color: {C.TEXT};
-                    border: 1px solid {C.BORDER}; padding: 2px 8px;
+                    background: #1A1A1A; color: {C.TEXT};
+                    border: 1px solid #333333; padding: 2px 8px;
                     font-family: '{_font()}'; font-size: 9pt;
                 }}
                 QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
@@ -275,8 +275,8 @@ class ProviderOverlay(QWidget):
             url_input.setText(p["url"])
             url_input.setStyleSheet(f"""
                 QLineEdit {{
-                    background: {C.PANEL}; color: {C.TEXT};
-                    border: 1px solid {C.BORDER}; padding: 2px 8px;
+                    background: #1A1A1A; color: {C.TEXT};
+                    border: 1px solid #333333; padding: 2px 8px;
                     font-family: '{_font()}'; font-size: 9pt;
                 }}
                 QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
@@ -296,15 +296,15 @@ class ProviderOverlay(QWidget):
         combo.setFixedHeight(26)
         combo.setStyleSheet(f"""
             QComboBox {{
-                background: {C.PANEL}; color: {C.TEXT};
-                border: 1px solid {C.BORDER}; padding: 2px 6px;
+                background: #1A1A1A; color: {C.TEXT};
+                border: 1px solid #333333; padding: 2px 6px;
                 font-family: '{_font()}'; font-size: 9pt;
             }}
             QComboBox:focus {{ border: 1px solid {C.ACC}; }}
             QComboBox::drop-down {{ border: none; width: 16px; }}
             QComboBox QAbstractItemView {{
-                background: {C.PANEL}; color: {C.TEXT};
-                border: 1px solid {C.BORDER};
+                background: #1A1A1A; color: {C.TEXT};
+                border: 1px solid #333333;
                 selection-background-color: {C.ACC_GHO};
             }}
         """)
@@ -338,7 +338,7 @@ class ProviderOverlay(QWidget):
         refresh_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent; color: {C.TEXT_MED};
-                border: 1px solid {C.BORDER}; padding: 0px 6px;
+                border: 1px solid #333333; padding: 0px 6px;
             }}
             QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.ACC}; background: {C.PRI_GHO}; }}
             QPushButton:disabled {{ color: {C.TEXT_DIM}; }}

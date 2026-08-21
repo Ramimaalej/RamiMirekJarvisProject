@@ -945,11 +945,11 @@ class ChatWidget(QWidget):
     @staticmethod
     def _bubble_style(side: str) -> str:
         if side == "you":
-            # User bubble: WHITE border on BLACK, white text — right aligned
-            return (f"QWidget {{ background: #000000; border: 2px solid #ffffff; border-radius: 0px; }}"
+            # User bubble: No border, dark panel background — right aligned
+            return (f"QWidget {{ background: #1A1A1A; border: none; border-radius: 0px; }}"
                     f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
-        # Jarvis bubble: BLUE border on BLACK, white text — left aligned
-        return (f"QWidget {{ background: #000000; border: 2px solid {C.ACC}; border-radius: 0px; }}"
+        # Jarvis bubble: Subtle accent border on left — left aligned
+        return (f"QWidget {{ background: #000000; border-left: 3px solid {C.ACC}; border-radius: 0px; }}"
                 f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
 
     @staticmethod
@@ -1276,7 +1276,7 @@ class SetupOverlay(QWidget):
         self.setStyleSheet(f"""
             SetupOverlay {{
                 background: #000000;
-                border: 2px solid #ffffff;
+                border: 2px solid {C.ACC};
                 border-radius: 0px;
             }}
         """)
@@ -1295,10 +1295,10 @@ class SetupOverlay(QWidget):
         self._sel_llm_provider = _init.get("llm_provider",  "ollama")
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(22, 16, 22, 16)
-        layout.setSpacing(6)
+        layout.setContentsMargins(30, 24, 30, 24)
+        layout.setSpacing(16)
 
-        def _lbl(txt, sz=9, bold=False, col=None, align=Qt.AlignmentFlag.AlignCenter):
+        def _lbl(txt, sz=10, bold=False, col=None, align=Qt.AlignmentFlag.AlignCenter):
             if col is None: col = C.TEXT
             w = QLabel(txt); w.setAlignment(align)
             w.setFont(QFont("Cantarell", sz,
@@ -1361,11 +1361,11 @@ class SetupOverlay(QWidget):
         header_layout = QHBoxLayout()
         text_layout = QVBoxLayout()
         if mode == "config":
-            text_layout.addWidget(_lbl("CONFIGURATION", 12, True, align=Qt.AlignmentFlag.AlignLeft))
-            text_layout.addWidget(_lbl("Update J.A.R.V.I.S. settings and click Apply.", 8, col=C.PRI_DIM, align=Qt.AlignmentFlag.AlignLeft))
+            text_layout.addWidget(_lbl("CONFIGURATION", 16, True, align=Qt.AlignmentFlag.AlignLeft))
+            text_layout.addWidget(_lbl("Update J.A.R.V.I.S. settings and click Apply.", 10, col=C.PRI_DIM, align=Qt.AlignmentFlag.AlignLeft))
         else:
-            text_layout.addWidget(_lbl("INITIALISATION REQUIRED", 12, True, align=Qt.AlignmentFlag.AlignLeft))
-            text_layout.addWidget(_lbl("Configure J.A.R.V.I.S. before first boot.", 8, col=C.PRI_DIM, align=Qt.AlignmentFlag.AlignLeft))
+            text_layout.addWidget(_lbl("INITIALISATION REQUIRED", 16, True, align=Qt.AlignmentFlag.AlignLeft))
+            text_layout.addWidget(_lbl("Configure J.A.R.V.I.S. before first boot.", 10, col=C.PRI_DIM, align=Qt.AlignmentFlag.AlignLeft))
         header_layout.addLayout(text_layout)
         
         self._theme_combo = QComboBox()
@@ -1388,7 +1388,7 @@ class SetupOverlay(QWidget):
         layout.addWidget(_sep())
 
         # ── STT ──────────────────────────────────────────────────────── #
-        layout.addWidget(_lbl("SPEECH-TO-TEXT ENGINE", 7, col=C.TEXT_DIM,
+        layout.addWidget(_lbl("SPEECH-TO-TEXT ENGINE", 9, col=C.TEXT_DIM,
                                align=Qt.AlignmentFlag.AlignLeft))
         stt_row, self._stt_btns = _toggle_row(
             [("whisper","Whisper"), ("vosk","Vosk")],
@@ -1695,7 +1695,7 @@ class ConnectionsOverlay(QWidget):
         self.setStyleSheet(f"""
             ConnectionsOverlay {{
                 background: #000000;
-                border: 2px solid #ffffff;
+                border: 2px solid {C.ACC};
                 border-radius: 0px;
             }}
         """)
@@ -3106,7 +3106,7 @@ class MainWindow(QMainWindow):
         w.setStyleSheet(f"""
             #header_widget {{
                 background: {C.PANEL};
-                border-bottom: 1px solid {C.BORDER};
+                border-bottom: 1px solid #222222;
             }}
         """)
         lay = QHBoxLayout(w)
@@ -3163,7 +3163,7 @@ class MainWindow(QMainWindow):
         w.setStyleSheet(f"""
             #left_panel {{
                 background: {C.PANEL};
-                border-right: 1px solid {C.BORDER};
+                border-right: 1px solid #222222;
             }}
         """)
         lay = QVBoxLayout(w)
@@ -3202,7 +3202,7 @@ class MainWindow(QMainWindow):
         info_panel.setStyleSheet(f"""
             #info_panel {{
                 background: {C.PANEL2};
-                border: 1px solid {C.BORDER};
+                border-left: 2px solid {C.ACC};
                
             }}
         """)
@@ -3274,7 +3274,7 @@ class MainWindow(QMainWindow):
         add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         add_btn.setStyleSheet(
             f"QPushButton {{ background: transparent; color: {C.TEXT_DIM}; "
-            f"border: 1px solid {C.BORDER}; }}"
+            f"border: 1px solid #333333; }}"
             f"QPushButton:hover {{ color: {C.GREEN}; border: 1px solid {C.GREEN}; "
             f"background: {C.PANEL2}; }}"
         )
@@ -3323,7 +3323,7 @@ class MainWindow(QMainWindow):
         w.setStyleSheet(f"""
             #right_panel {{
                 background: {C.BG};
-                border-left: 1px solid {C.BORDER};
+                border-left: 1px solid #222222;
             }}
         """)
         lay = QVBoxLayout(w)
@@ -3342,8 +3342,8 @@ class MainWindow(QMainWindow):
         self._input.setFixedHeight(40)
         self._input.setStyleSheet(f"""
             QLineEdit {{
-                background: {C.PANEL2}; color: {C.WHITE};
-                border: 1px solid {C.BORDER};
+                background: #1A1A1A; color: {C.WHITE};
+                border: 1px solid #333333;
                 padding: 4px 14px;
                 font-size: 13px;
             }}
@@ -3400,7 +3400,7 @@ class MainWindow(QMainWindow):
             btn.setStyleSheet(f"""
                 QPushButton {{
                     background: transparent; color: {C.TEXT_DIM};
-                    border: 1px solid {C.BORDER};
+                    border: 1px solid #333333;
                     padding: 0px 4px;
                 }}
                 QPushButton:hover {{ color: {C.TEXT}; border: 1px solid {C.ACC}; background: {C.PRI_GHO}; }}
@@ -3435,7 +3435,7 @@ class MainWindow(QMainWindow):
             b.setStyleSheet(f"""
                 QPushButton {{
                     background: {C.PANEL2}; color: {C.TEXT_MED};
-                    border: 1px solid {C.BORDER};
+                    border: 1px solid #333333;
                     padding: 0 10px;
                 }}
                 QPushButton:hover {{
@@ -3459,7 +3459,7 @@ class MainWindow(QMainWindow):
         w.setStyleSheet(f"""
             #footer_widget {{
                 background: {C.PANEL};
-                border-top: 1px solid {C.BORDER};
+                border-top: 1px solid #222222;
             }}
         """)
         lay = QHBoxLayout(w); lay.setContentsMargins(16, 0, 16, 0)
