@@ -116,6 +116,9 @@ class JarvisLocal:
     def _run_async(self, coro):
         return _ra(coro)
 
+    def _build_system_prompt(self, user_text: str = "") -> str:
+        return _build_system_prompt(self, user_text)
+
     # ------------------------------------------------------------------
     # Text command entry
     # ------------------------------------------------------------------
