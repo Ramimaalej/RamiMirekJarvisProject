@@ -57,7 +57,29 @@ from actions.task_manager import task_manager, budget_manager, add_task, complet
 from actions.screen_explain import screen_explain
 from actions.screen_vision import screen_vision as screen_vision_action
 import actions.device_scanner as _devices
+import actions.stock_market as _stocks
+import actions.translator as _trans
+import actions.media_downloader as _dl
+import actions.network_tools as _net
+import actions.process_mgr as _proc
+import actions.archive_tools as _arch
+import actions.image_edit as _img
+import actions.wiki_tools as _wiki
+import actions.system_health as _health
+import actions.news_pro as _news_pro
+
 import actions.device_scanner as _devices
+import actions.stock_market as _stocks
+import actions.translator as _trans
+import actions.media_downloader as _dl
+import actions.network_tools as _net
+import actions.process_mgr as _proc
+import actions.archive_tools as _arch
+import actions.image_edit as _img
+import actions.wiki_tools as _wiki
+import actions.system_health as _health
+import actions.news_pro as _news_pro
+
 from actions.qr_tools import qr_generate as _qr_gen, qr_scan as _qr_scan
 from actions.clipboard_mgr import clipboard_read as _clip_read, clipboard_write as _clip_write
 from actions.dictionary_tools import word_definition as _word_def, word_synonyms as _word_syn, word_example as _word_ex

@@ -1,0 +1,13 @@
+{
+  "usb": [
+    "vda"
+  ],
+  "bluetooth": [],
+  "adb": [],
+  "monitors": [
+    "DUMMY0 (1280x1029)"
+  ],
+  "storage": [
+    "vda  39.7G disk"
+  ]
+}

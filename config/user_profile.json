@@ -1,0 +1,33 @@
+{
+  "name": "Rami Maalej",
+  "location": "Sfax, Tunisia",
+  "email": "rami.maalej.2002@gmail.com",
+  "phone": "+216 54 903 705",
+  "linkedin": "https://linkedin.com/in/rami-maalej-70203425b",
+  "languages": ["Arabic (native)", "French (B2)", "English (B2)"],
+  "education": {
+    "degree": "B.Sc. in Computer Science",
+    "school": "ISIMS Sfax",
+    "year": "2026"
+  },
+  "work": [
+    "Full-Stack Developer Intern (PFE) at Syberno, Sfax — Jan-Jun 2026: School Management System with Kafka/RabbitMQ microservices, RBAC+JWT, 500+ records",
+    "Full-Stack Developer Intern at Syberno, Sfax — Jul-Sep 2025: Retail Management & POS system with real-time inventory and sales analytics"
+  ],
+  "skills": ["React", "Node.js", "Express", "JavaScript", "TypeScript", "Python", "Flutter", "Dart", "MySQL", "Firebase", "Supabase", "Sequelize", "Kafka", "RabbitMQ", "Tailwind CSS", "Docker", "Git", "Ruby", "Odoo"],
+  "projects": {
+    "Jarvis": "Desktop AI assistant — Python, PyQt6, Ollama/Groq/Gemini, Whisper STT, TTS, screen OCR, browser automation (this project)",
+    "Linguvo": "AI language-learning platform — React, Node.js, Gemini AI, Supabase",
+    "Invo": "Inventory management Flutter app — barcode scanning, Firebase sync, Google OAuth",
+    "Gamafa": "15-game offline mobile app — Flutter/Dart",
+    "SUPERVIB": "AI-powered developer IDE — Ollama, code generation",
+    "pkgmap": "Linux package manager listing tool — RPM/DPKG/Flatpak/Snap/npm",
+    "MyPortfolio": "Personal portfolio — Next.js"
+  },
+  "timezone": "Africa/Tunis",
+  "notes": [
+    "Full-Stack developer, open to web/frontend/mobile opportunities",
+    "Interest: AI integration, clean architecture, system design"
+  ],
+  "_auto_populated": true
+}

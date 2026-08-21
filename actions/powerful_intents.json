@@ -1,0 +1,113 @@
+[
+  {
+    "name": "stock_market",
+    "subsystem": "tools",
+    "patterns": [
+      "^(stock|price|market|bourse|action)\\s+(of|de|du|for)?\\s*([A-Z0-9.]+)",
+      "^(how\\s+is|prix\\s+de)\\s+([A-Z0-9.]+)\\s+(doing|trading|market)",
+      "([A-Z0-9.]+)\\s+(stock\\s+price|cours\\s+de\\s+l\\s*action)"
+    ],
+    "handler": "stock_market",
+    "requires_ai": false
+  },
+  {
+    "name": "translator",
+    "subsystem": "tools",
+    "patterns": [
+      "^(translate|traduire|traduis)\\s+(.+?)\\s+(to|in|into|en|vers)\\s+(\\w+)",
+      "^(how\\s+do\\s+you\\s+say|comment\\s+dit\\s+on)\\s+(.+?)\\s+(in|en)\\s+(\\w+)",
+      "^traduction\\s+(de\\s+)?(.+?)\\s+(en|vers)\\s+(\\w+)"
+    ],
+    "handler": "translator",
+    "requires_ai": false
+  },
+  {
+    "name": "media_downloader",
+    "subsystem": "tools",
+    "patterns": [
+      "^(download|télécharger|télécharge)\\s+(the\\s+)?(video|image|file|media|photo)\\s+(from|de)?\\s+(https?://\\S+)",
+      "^(save|sauvegarder)\\s+(this\\s+)?(video|image|file)\\s+(https?://\\S+)",
+      "^youtube\\s+download\\s+(https?://\\S+)"
+    ],
+    "handler": "media_downloader",
+    "requires_ai": false
+  },
+  {
+    "name": "speedtest",
+    "subsystem": "tools",
+    "patterns": [
+      "^(run\\s+)?speedtest",
+      "^(test|check)\\s+(my\\s+)?(internet\\s+)?speed",
+      "^(vitesse\\s+d?e?\\s*internet|test\\s+de\\s+débit)"
+    ],
+    "handler": "speedtest",
+    "requires_ai": false
+  },
+  {
+    "name": "process_mgr",
+    "subsystem": "tools",
+    "patterns": [
+      "^(list|show|affiche|liste)\\s+(all\\s+)?processes",
+      "^(what\\s+is\\s+running|qu\\s*est\\s+ce\\s+qui\\s+tourne)",
+      "^(kill|stop|terminer|tuer)\\s+(process|l\\s*application|l\\s*app)\\s+(.+)",
+      "^kill\\s+pid\\s+(\\d+)"
+    ],
+    "handler": "process_mgr",
+    "requires_ai": false
+  },
+  {
+    "name": "archive_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^(archive|zip|compress|compresser)\\s+(.+?)\\s+(to|as|en|dans)\\s+(.+)",
+      "^(extract|unzip|décompresser|extraire)\\s+(.+?)\\s+(to|in|dans)\\s+(.+)",
+      "^create\\s+zip\\s+of\\s+(.+)"
+    ],
+    "handler": "archive_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "image_edit",
+    "subsystem": "tools",
+    "patterns": [
+      "^(resize|redimensionner)\\s+(image\\s+)?(.+?)\\s+(to|à)\\s+(\\d+)x(\\d+)",
+      "^(grayscale|flip|mirror|noir\\s+et\\s+blanc)\\s+(image\\s+)?(.+)",
+      "^(edit|modifier)\\s+image\\s+(.+)"
+    ],
+    "handler": "image_edit",
+    "requires_ai": false
+  },
+  {
+    "name": "wiki_tools",
+    "subsystem": "tools",
+    "patterns": [
+      "^(wikipedia|wiki|search\\s+wiki)\\s+(for|de)?\\s*(.+)",
+      "^(who\\s+is|what\\s+is|qui\\s+est|qu\\s*est\\s+ce\\s+que)\\s+(.+?)\\s+(on\\s+wikipedia|sur\\s+wikipedia)",
+      "^wiki\\s+(.+)"
+    ],
+    "handler": "wiki_tools",
+    "requires_ai": false
+  },
+  {
+    "name": "system_health",
+    "subsystem": "tools",
+    "patterns": [
+      "^(check\\s+)?system\\s+health",
+      "^(santé\\s+du\\s+système|état\\s+du\\s+pc)",
+      "^(how\\s+is\\s+my\\s+pc|comment\\s+va\\s+mon\\s+ordinateur)"
+    ],
+    "handler": "system_health",
+    "requires_ai": false
+  },
+  {
+    "name": "news_pro",
+    "subsystem": "tools",
+    "patterns": [
+      "^(get|show|read|affiche|donne)\\s+(latest|recent|news|actualités)\\s+(about|on|de)?\\s*(.+)",
+      "^(tech|business|science|health|sports|entertainment)\\s+news",
+      "^news\\s+(for|about|sur)\\s+(.+)"
+    ],
+    "handler": "news_pro",
+    "requires_ai": false
+  }
+]
