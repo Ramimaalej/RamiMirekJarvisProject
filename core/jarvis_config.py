@@ -12,7 +12,7 @@ from core.llm_client import invalidate_config_cache
 def reconfigure(self, new_config: dict) -> None:
     """Non-blocking: spawns a background thread to install + reload."""
     threading.Thread(
-        target=self._do_reconfigure, args=(new_config,), daemon=True
+        target=_do_reconfigure, args=(self, new_config), daemon=True
     ).start()
 
 def _do_reconfigure(self, new_config: dict) -> None:

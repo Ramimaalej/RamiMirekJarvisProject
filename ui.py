@@ -1280,11 +1280,13 @@ class SetupOverlay(QWidget):
         self._init = initial or {}
         _init = self._init
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        # Harmonize overlay background with global theme
+        bg_color = "rgba(255, 255, 255, 248)" if C.BG.lower() in ("#ffffff", "#f8f9fa") else "rgba(0, 0, 0, 248)"
         self.setStyleSheet(f"""
             SetupOverlay {{
-                background: rgba(0, 0, 0, 248);
+                background: {bg_color};
                 border: 1px solid {C.BORDER};
-               
+                border-radius: 0px;
             }}
         """)
 
@@ -1305,11 +1307,12 @@ class SetupOverlay(QWidget):
         layout.setContentsMargins(22, 16, 22, 16)
         layout.setSpacing(6)
 
-        def _lbl(txt, sz=9, bold=False, col=C.PRI, align=Qt.AlignmentFlag.AlignCenter):
+        def _lbl(txt, sz=9, bold=False, col=None, align=Qt.AlignmentFlag.AlignCenter):
+            if col is None: col = C.TEXT
             w = QLabel(txt); w.setAlignment(align)
-            w.setFont(QFont("Courier New", sz,
+            w.setFont(QFont("Cantarell", sz,
                             QFont.Weight.Bold if bold else QFont.Weight.Normal))
-            w.setStyleSheet(f"color: {col}; background: transparent;")
+            w.setStyleSheet(f"color: {col}; background: transparent; border: none;")
             return w
 
         def _sep():

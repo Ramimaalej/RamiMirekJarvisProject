@@ -49,11 +49,12 @@ class OllamaModelsOverlay(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         C = _C()
+        bg_color = "rgba(255, 255, 255, 248)" if C.BG.lower() in ("#ffffff", "#f8f9fa") else "rgba(0, 0, 0, 248)"
         self.setStyleSheet(f"""
             OllamaModelsOverlay {{
-                background: rgba(0, 0, 0, 248);
+                background: {bg_color};
                 border: 1px solid {C.BORDER};
-                border-radius: 8px;
+                border-radius: 0px;
             }}
         """)
 
@@ -92,7 +93,7 @@ class OllamaModelsOverlay(QWidget):
         self._tbl.setStyleSheet(f"""
             QTableWidget {{
                 background: {C.PANEL}; color: {C.TEXT};
-                border: 1px solid {C.BORDER}; border-radius: 6px;
+                border: 1px solid {C.BORDER}; border-radius: 0px;
                 gridline-color: {C.BORDER}; font-family: '{_font()}';
                 font-size: 9pt;
             }}
@@ -142,7 +143,7 @@ class OllamaModelsOverlay(QWidget):
         self._any_input.setStyleSheet(f"""
             QLineEdit {{
                 background: {C.PANEL2}; color: {C.TEXT};
-                border: 1px solid {C.BORDER}; border-radius: 4px; padding: 2px 8px;
+                border: 1px solid {C.BORDER}; border-radius: 0px; padding: 4px 8px;
                 font-family: '{_font()}'; font-size: 9pt;
             }}
             QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
@@ -314,7 +315,7 @@ def _btn_style(color: str, hover: str | None = None):
     return f"""
         QPushButton {{
             background: {color}; color: {C.WHITE};
-            border: none; border-radius: 4px;
+            border: none; border-radius: 0px;
         }}
         QPushButton:hover {{ background: {hover}; }}
         QPushButton:disabled {{ background: {C.BORDER}; color: {C.TEXT_MED}; }}
