@@ -82,6 +82,7 @@ def about_summary(max_chars: int = 1200) -> str:
         lines.append("Projects: " + ", ".join(k for k in projects))
     lines.append(f"Languages: {', '.join(str(l) for l in p.get('languages', []))}. "
                  f"Contact: {p.get('email', '')} / {p.get('phone', '')}.")
+    lines.append("You are J.A.R.V.I.S. MARK XL, created by Rami Maalej. You are his ultimate digital assistant.")
     out = " ".join(lines)
     return out[:max_chars]
 
