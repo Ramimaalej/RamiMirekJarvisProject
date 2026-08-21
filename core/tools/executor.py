@@ -488,6 +488,20 @@ def execute_tool(ui, name: str, args: dict,
             else:
                 result = f"Unknown action: {action}"
 
+        elif name == "clone_and_run":
+            repo_url = args.get("repo_url") or args.get("url") or args.get("query", "")
+            if not repo_url or "github.com" not in repo_url:
+                # Try to extract URL from query if it's there
+                import re as _re
+                _m = _re.search(r'(https?://github\.com/[^\s]+)', repo_url)
+                if _m:
+                    repo_url = _m.group(1)
+            
+            if not repo_url or "github.com" not in repo_url:
+                result = "Please provide a valid GitHub repository URL."
+            else:
+                result = clone_and_run(repo_url=repo_url, player=ui)
+
         elif name == "manage_scheduler":
             action = args.get("action", "").lower()
             sched = get_scheduler()
