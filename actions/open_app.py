@@ -18,29 +18,28 @@ _SYSTEM = platform.system()
 def _detect_terminal() -> str:
     if _SYSTEM != "Linux":
         return "gnome-terminal"
-    # GNOME: read the default terminal from gsettings
-    try:
-        import subprocess
-        gs = subprocess.run(
-            ["gsettings", "get", "org.gnome.desktop.default-applications.terminal", "exec"],
-            capture_output=True, text=True, timeout=5
-        )
-        if gs.returncode == 0:
-            term = gs.stdout.strip().strip("'")
-            if term:
-                return term
-    except Exception:
-        pass
-    # xdg-terminal: queries the system default
-    xdg = shutil.which("xdg-terminal")
-    if xdg:
-        return xdg
-    # Fedora/GNOME defaults first
+    
+    # Try common Fedora/GNOME terminals first
     for term in ["gnome-terminal", "kgx", "konsole", "xfce4-terminal", "lxterminal",
                   "terminator", "alacritty", "kitty", "xterm", "mate-terminal",
                   "tilix", "sakura", "deepin-terminal"]:
         if shutil.which(term):
             return term
+            
+    # GNOME: read the default terminal from gsettings as fallback
+    try:
+        import subprocess
+        gs = subprocess.run(
+            ["gsettings", "get", "org.gnome.desktop.default-applications.terminal", "exec"],
+            capture_output=True, text=True, timeout=2
+        )
+        if gs.returncode == 0:
+            term = gs.stdout.strip().strip("'")
+            if term and shutil.which(term.split()[0]):
+                return term
+    except Exception:
+        pass
+        
     return "xterm"
 
 _APP_ALIASES: dict[str, dict[str, str]] = {

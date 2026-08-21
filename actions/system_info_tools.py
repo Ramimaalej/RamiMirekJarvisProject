@@ -14,12 +14,23 @@ def battery_status(parameters: dict | None = None, player=None) -> str:
     try:
         import psutil  # noqa: E402
         bat = psutil.sensors_battery()
-        if bat is None:
-            return "No battery detected on this machine (desktop?)."
-        state = "charging" if bat.power_plugged else "on battery"
-        return (f"Battery: {bat.percent}% ({state}, "
-                f"~{bat.secsleft // 60} min remaining)" if bat.secsleft > 0
-                else f"Battery: {bat.percent}% ({state})")
+        if bat is not None:
+            state = "charging" if bat.power_plugged else "on battery"
+            return (f"Battery: {bat.percent}% ({state}, "
+                    f"~{bat.secsleft // 60} min remaining)" if bat.secsleft > 0
+                    else f"Battery: {bat.percent}% ({state})")
+        
+        # Fallback for Linux if psutil fails to detect battery
+        if platform.system() == "Linux":
+            for path in ["/sys/class/power_supply/BAT0/capacity", "/sys/class/power_supply/BAT1/capacity"]:
+                try:
+                    with open(path, "r") as f:
+                        cap = f.read().strip()
+                        return f"Battery: {cap}% (Linux sysfs)"
+                except:
+                    continue
+        
+        return "No battery detected on this machine (desktop?)."
     except Exception as exc:  # noqa: BLE001
         logger.warning("battery error: %s", exc)
         return "Could not read battery information."
