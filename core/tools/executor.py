@@ -1383,6 +1383,17 @@ def execute_tool(ui, name: str, args: dict,
             result = _disk_info(parameters=args, player=ui)
         elif name == "wifi_status":
             result = _wifi(parameters=args, player=ui)
+        elif name == "system_info_tools":
+            q = (args or {}).get("query", "").lower()
+            if any(w in q for w in ["battery", "batterie", "percentage", "pourcentage", "charge"]):
+                result = _battery(parameters=args, player=ui)
+            elif any(w in q for w in ["disk", "disque", "space", "espace", "storage", "stockage"]):
+                result = _disk_info(parameters=args, player=ui)
+            elif any(w in q for w in ["wifi", "reseau", "network", "ssid", "internet"]):
+                result = _wifi(parameters=args, player=ui)
+            else:
+                result = _battery(parameters=args, player=ui)
+
         elif name == "devices_scan":
             category = (args or {}).get("category", "all")
             if category == "all":
