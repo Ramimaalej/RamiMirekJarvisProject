@@ -94,6 +94,7 @@ _APP_ALIASES: dict[str, dict[str, str]] = {
     "steam":              {"Windows": "steam",                   "Darwin": "Steam",                "Linux": "steam"},
     "epic":               {"Windows": "EpicGamesLauncher",       "Darwin": "Epic Games Launcher",  "Linux": "legendary"},
     "epic games":         {"Windows": "EpicGamesLauncher",       "Darwin": "Epic Games Launcher",  "Linux": "legendary"},
+    "appflowy":           {"Windows": "AppFlowy",                "Darwin": "AppFlowy",             "Linux": "appflowy"},
 }
 
 # Web-only apps — opened in the default browser via xdg-open / start / open
@@ -196,6 +197,8 @@ def _find_desktop_app(name: str) -> str:
     search_dirs = [
         Path.home() / ".local" / "share" / "applications",
         Path("/usr") / "share" / "applications",
+        Path("/var/lib/flatpak/exports/share/applications"),
+        Path.home() / ".local/share/flatpak/exports/share/applications",
     ]
     seen: set[str] = set()
     for d in search_dirs:
@@ -606,6 +609,7 @@ def open_app(
             "terminal", "cmd", "powershell", "bash", "shell", "console",
             "explorer", "file explorer", "task manager", "settings",
             "calculator", "notepad", "control center", "finder", "activity monitor",
+            "appflowy", "appflowy.desktop",
         }
         if normalized.lower().strip() in _SYSTEM_APP_KEYS or app_name.lower().strip() in _SYSTEM_APP_KEYS:
             return (
