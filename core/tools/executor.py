@@ -184,6 +184,9 @@ def execute_tool(ui, name: str, args: dict,
         if name == "open_app":
             r = open_app(parameters=args, response=None, player=ui)
             result = r or f"Opened {args.get('app_name')}."
+        elif name == "list_apps":
+            from actions.open_app import list_apps
+            result = list_apps(args, ui)
             # Feed the dashboard: successful app launches teach Jarvis
             # which software is used daily.
             if r and not any(w in r for w in ("Could not", "Failed", "Unsupported")):

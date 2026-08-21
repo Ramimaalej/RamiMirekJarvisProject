@@ -249,6 +249,26 @@ def _find_desktop_app(name: str) -> str:
     return name
 
 
+def list_apps(parameters: dict | None = None, player=None) -> str:
+    """List all installed applications found in the cache."""
+    if _SYSTEM != "Linux":
+        return "Software listing is currently optimized for Linux systems."
+    
+    if not _APP_CACHE:
+        _refresh_app_cache()
+    
+    if not _APP_CACHE:
+        return "I couldn't find any installed applications on this system."
+    
+    apps = sorted(list(_APP_CACHE.keys()))
+    # Group apps for better readability
+    formatted_list = "\n".join([f"• {app.capitalize()}" for app in apps[:50]])
+    if len(apps) > 50:
+        formatted_list += f"\n... and {len(apps) - 50} more."
+    
+    return f"INSTALLED APPLICATIONS ({len(apps)} found):\n\n{formatted_list}"
+
+
 def _normalize(raw: str) -> str:
     """Resolve an app name to a command or URL."""
     key = raw.lower().strip()
