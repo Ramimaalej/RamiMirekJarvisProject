@@ -56,6 +56,10 @@ class JarvisLocal:
         self._conv_lock = threading.Lock()
         self._generation = 0
         self._processing_lock = threading.Lock()
+        self._prefetch_thread = None
+        self._prefetched_vec = ""
+        self._prefetched_skill = ""
+        self._last_intent = None
         self.ui.on_text_command = self._on_text_command
         self._current_language = "en"
         # ── GWS logging ───────────────────────────────────────────────────
