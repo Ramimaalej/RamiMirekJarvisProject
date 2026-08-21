@@ -97,65 +97,57 @@ _API_SERVICES = [
 
 
 class C:
-    BG        = "#0a0a0a"
-    PANEL     = "#111111"
-    PANEL2    = "#181818"
-    BORDER    = "#1e1e1e"
-    BORDER_B  = "#2a2a2a"
-    BORDER_A  = "#252525"
-    PRI       = "#eeeeee"
-    PRI_DIM   = "#555555"
-    PRI_GHO   = "#141414"
-    ACC       = "#6c7bef"
-    ACC_DIM   = "#353b6a"
-    ACC_GHO   = "#1a1d3a"
+    # Strict Black & White theme constants
+    BG        = "#000000"
+    PANEL     = "#000000"
+    PANEL2    = "#000000"
+    BORDER    = "#ffffff"
+    BORDER_B  = "#ffffff"
+    BORDER_A  = "#ffffff"
+    PRI       = "#ffffff"
+    PRI_DIM   = "#ffffff"
+    PRI_GHO   = "#000000"
+    ACC       = "#007AFF"
+    ACC_DIM   = "#004A99"
+    ACC_GHO   = "#001A33"
     _theme_hooks: list = []
 
     @classmethod
     def on_theme_change(cls, hook):
         cls._theme_hooks.append(hook)
 
-    GREEN     = "#7ae07a"
-    GREEN_D   = "#3a8a3a"
-    RED       = "#e04444"
-    MUTED_C   = "#555555"
-    TEXT      = "#eeeeee"
-    TEXT_DIM  = "#4a4a4a"
-    TEXT_MED  = "#7a7a7a"
-    WHITE     = "#eeeeee"
-    DARK      = "#0a0a0a"
-    BAR_BG    = "#151515"
+    GREEN     = "#00FF00"
+    GREEN_D   = "#008800"
+    RED       = "#FF0000"
+    MUTED_C   = "#FFFFFF"
+    TEXT      = "#FFFFFF"
+    TEXT_DIM  = "#FFFFFF"
+    TEXT_MED  = "#FFFFFF"
+    WHITE     = "#FFFFFF"
+    DARK      = "#000000"
+    BAR_BG    = "#000000"
 
     @classmethod
     def apply_theme(cls, light_mode: bool):
-        if light_mode:
-            cls.BG        = "#f8f9fa"
-            cls.PANEL     = "#ffffff"
-            cls.PANEL2    = "#f0f2f5"
-            cls.BORDER    = "#e0e0e0"
-            cls.BORDER_B  = "#d0d0d0"
-            cls.BORDER_A  = "#cccccc"
-            cls.PRI       = "#000000"
-            cls.PRI_DIM   = "#888888"
-            cls.PRI_GHO   = "#e0e0e0"
-            cls.TEXT      = "#111111"
-            cls.TEXT_DIM  = "#666666"
-            cls.TEXT_MED  = "#444444"
-            cls.BAR_BG    = "#e0e0e0"
-        else:
-            cls.BG        = "#000000"
-            cls.PANEL     = "#0d0d0d"
-            cls.PANEL2    = "#141414"
-            cls.BORDER    = "#222222"
-            cls.BORDER_B  = "#333333"
-            cls.BORDER_A  = "#2a2a2a"
-            cls.PRI       = "#ffffff"
-            cls.PRI_DIM   = "#666666"
-            cls.PRI_GHO   = "#111111"
-            cls.TEXT      = "#ffffff"
-            cls.TEXT_DIM  = "#555555"
-            cls.TEXT_MED  = "#888888"
-            cls.BAR_BG    = "#1a1a1a"
+        # Force Dark Mode (Black & White) even if light_mode is requested
+        cls.BG        = "#000000"
+        cls.PANEL     = "#000000"
+        cls.PANEL2    = "#000000"
+        cls.BORDER    = "#ffffff"
+        cls.BORDER_B  = "#ffffff"
+        cls.BORDER_A  = "#ffffff"
+        cls.PRI       = "#ffffff"
+        cls.PRI_DIM   = "#ffffff"
+        cls.PRI_GHO   = "#000000"
+        cls.TEXT      = "#ffffff"
+        cls.TEXT_DIM  = "#ffffff"
+        cls.TEXT_MED  = "#ffffff"
+        cls.BAR_BG    = "#000000"
+        for _hook in cls._theme_hooks:
+            try:
+                _hook()
+            except Exception:
+                pass
         for _hook in cls._theme_hooks:
             try:
                 _hook()
@@ -953,12 +945,12 @@ class ChatWidget(QWidget):
     @staticmethod
     def _bubble_style(side: str) -> str:
         if side == "you":
-            # User bubble: BLUE accent (kept), white text — right aligned
-            return (f"QWidget {{ background: {C.ACC}; border-radius: 0px; border: none; }}"
+            # User bubble: WHITE border on BLACK, white text — right aligned
+            return (f"QWidget {{ background: #000000; border: 2px solid #ffffff; border-radius: 0px; }}"
                     f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
-        # Jarvis bubble: white/grey on black — left aligned
-        return (f"QWidget {{ background: {C.PANEL2}; border: 1px solid {C.BORDER}; border-radius: 0px; }}"
-                f"QLabel {{ color: {C.TEXT}; background: transparent; border: none; }}")
+        # Jarvis bubble: BLUE border on BLACK, white text — left aligned
+        return (f"QWidget {{ background: #000000; border: 2px solid {C.ACC}; border-radius: 0px; }}"
+                f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
 
     @staticmethod
     def _tag_style(tag: str) -> str:
@@ -1280,12 +1272,11 @@ class SetupOverlay(QWidget):
         self._init = initial or {}
         _init = self._init
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        # Harmonize overlay background with global theme
-        bg_color = "rgba(255, 255, 255, 248)" if C.BG.lower() in ("#ffffff", "#f8f9fa") else "rgba(0, 0, 0, 248)"
+        # Force Opaque Black for B&W theme
         self.setStyleSheet(f"""
             SetupOverlay {{
-                background: {bg_color};
-                border: 1px solid {C.BORDER};
+                background: #000000;
+                border: 2px solid #ffffff;
                 border-radius: 0px;
             }}
         """)
@@ -1701,12 +1692,11 @@ class ConnectionsOverlay(QWidget):
         self._init = initial or {}
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         
-        bg_color = "rgba(240, 242, 245, 245)" if C.BG.lower() in ("#ffffff", "#f8f9fa") else "rgba(10, 10, 10, 245)"
         self.setStyleSheet(f"""
             ConnectionsOverlay {{
-                background: {bg_color};
-                border: 1px solid {C.BORDER};
-               
+                background: #000000;
+                border: 2px solid #ffffff;
+                border-radius: 0px;
             }}
         """)
 

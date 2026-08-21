@@ -49,11 +49,10 @@ class OllamaModelsOverlay(QWidget):
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         C = _C()
-        bg_color = "rgba(255, 255, 255, 248)" if C.BG.lower() in ("#ffffff", "#f8f9fa") else "rgba(0, 0, 0, 248)"
         self.setStyleSheet(f"""
             OllamaModelsOverlay {{
-                background: {bg_color};
-                border: 1px solid {C.BORDER};
+                background: #000000;
+                border: 2px solid #ffffff;
                 border-radius: 0px;
             }}
         """)
