@@ -14,6 +14,7 @@ except ImportError:
     _PSUTIL = False
 
 _SYSTEM = platform.system()
+_APP_CACHE: dict[str, str] = {}
 
 def _detect_terminal() -> str:
     if _SYSTEM != "Linux":
@@ -188,18 +189,19 @@ def _extract_wikipedia_topic(raw: str) -> str:
     return ""
 
 
-def _find_desktop_app(name: str) -> str:
-    """Search .desktop files for an installed app matching the name."""
+def _refresh_app_cache():
+    """Build a global cache of all installed .desktop applications."""
     if _SYSTEM != "Linux":
-        return name
-    key = name.lower().strip()
+        return
+    
     search_dirs = [
         Path.home() / ".local" / "share" / "applications",
         Path("/usr") / "share" / "applications",
         Path("/var/lib/flatpak/exports/share/applications"),
         Path.home() / ".local/share/flatpak/exports/share/applications",
     ]
-    seen: set[str] = set()
+    
+    _APP_CACHE.clear()
     for d in search_dirs:
         if not d.is_dir():
             continue
@@ -208,39 +210,42 @@ def _find_desktop_app(name: str) -> str:
                 continue
             try:
                 content = f.read_text(encoding="utf-8", errors="replace")
+                app_name = ""
+                exec_cmd = ""
+                no_display = False
+                for line in content.splitlines():
+                    if line.startswith("Name=") and not app_name and "[" not in line:
+                        app_name = line[5:].strip().lower()
+                    elif line.startswith("Exec=") and not exec_cmd:
+                        exec_cmd = line[5:].strip().split("%")[0].strip()
+                    elif line == "NoDisplay=true":
+                        no_display = True
+                
+                if not no_display and app_name and exec_cmd:
+                    binary = exec_cmd.split()[0]
+                    if shutil.which(binary):
+                        _APP_CACHE[app_name] = exec_cmd
             except Exception:
                 continue
-            app_name = ""
-            generic_name = ""
-            exec_cmd = ""
-            keywords = ""
-            no_display = False
-            for line in content.splitlines():
-                line_s = line.strip()
-                if line_s.startswith("Name=") and not app_name and "[" not in line_s:
-                    app_name = line_s[5:].strip()
-                elif line_s.startswith("GenericName=") and not generic_name and "[" not in line_s:
-                    generic_name = line_s[12:].strip()
-                elif line_s.startswith("Keywords=") and not keywords and "[" not in line_s:
-                    keywords = line_s[9:].strip().lower()
-                elif line_s.startswith("Exec=") and not exec_cmd:
-                    exec_cmd = line_s[5:].strip()
-                    exec_cmd = exec_cmd.split("%")[0].strip()
-                elif line_s == "NoDisplay=true":
-                    no_display = True
-            if no_display or (not app_name and not exec_cmd):
-                continue
-            # Match: name, generic name, or keywords contain the search key
-            haystack = (app_name.lower() + " " + generic_name.lower() + " " + keywords)
-            if key in haystack:
-                canon = app_name.lower()
-                if canon not in seen:
-                    seen.add(canon)
-                    if exec_cmd:
-                        binary = exec_cmd.split()[0] if exec_cmd else ""
-                        if binary and shutil.which(binary):
-                            return exec_cmd
-                    return app_name
+
+def _find_desktop_app(name: str) -> str:
+    """Search cache for an installed app matching the name."""
+    if _SYSTEM != "Linux":
+        return name
+    
+    if not _APP_CACHE:
+        _refresh_app_cache()
+        
+    key = name.lower().strip()
+    # Direct match
+    if key in _APP_CACHE:
+        return _APP_CACHE[key]
+    
+    # Partial match
+    for app_name, cmd in _APP_CACHE.items():
+        if key in app_name or app_name in key:
+            return cmd
+            
     return name
 
 

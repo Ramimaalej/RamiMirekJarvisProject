@@ -27,10 +27,22 @@ def mega_route(text):
     if best_match and best_score > 0.1:
         name, m = best_match
         params = {}
-        # Extraction intelligente : tout ce qui suit le match
-        match_end = m.end()
-        remaining = norm_text[match_end:].strip()
-        if remaining:
+        
+        # Extraction intelligente
+        full_match = m.group(0)
+        remaining = norm_text[m.end():].strip()
+        
+        if name == "open_app":
+            # For "open terminal", m.group(0) is "open terminal"
+            # We need to extract "terminal"
+            import re as _re
+            app_match = _re.search(r'(?:open|lance|ouvre)\s+(.+)', full_match, _re.IGNORECASE)
+            if app_match:
+                params["app_name"] = app_match.group(1).strip()
+            elif remaining:
+                params["app_name"] = remaining
+        elif remaining:
             params["query"] = remaining
+            
         return {"intent": name, "params": params, "confidence": best_score}
     return None
