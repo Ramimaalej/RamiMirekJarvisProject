@@ -35,7 +35,8 @@ def _detect_terminal() -> str:
     xdg = shutil.which("xdg-terminal")
     if xdg:
         return xdg
-    for term in ["gnome-terminal", "konsole", "xfce4-terminal", "lxterminal",
+    # Fedora/GNOME defaults first
+    for term in ["gnome-terminal", "kgx", "konsole", "xfce4-terminal", "lxterminal",
                   "terminator", "alacritty", "kitty", "xterm", "mate-terminal",
                   "tilix", "sakura", "deepin-terminal"]:
         if shutil.which(term):

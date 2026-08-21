@@ -1017,8 +1017,12 @@ class ChatWidget(QWidget):
         tl = text.strip()
         low = tl.lower()
         
-        # Explicitly ignore common log prefixes
-        if low.startswith(("[system]", "[error]", "[file]", "[intent]", "[sched]", "sys:", "err:")):
+        # Explicitly ignore common log prefixes and debug noise
+        if low.startswith(("[system]", "[error]", "[file]", "[intent]", "[sched]", "sys:", "err:", "o ")):
+            return
+        
+        # Filter out debug strings like "dispatch test", "crud test", "urgent [HIGH]"
+        if any(w in low for w in ["dispatch test", "crud test", "urgent [high]", "due 2026"]):
             return
 
         if low.startswith(("you:", "you :")):
