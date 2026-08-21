@@ -954,10 +954,10 @@ class ChatWidget(QWidget):
     def _bubble_style(side: str) -> str:
         if side == "you":
             # User bubble: BLUE accent (kept), white text — right aligned
-            return (f"QWidget {{ background: {C.ACC}; }}"
+            return (f"QWidget {{ background: {C.ACC}; border-radius: 0px; border: none; }}"
                     f"QLabel {{ color: #ffffff; background: transparent; border: none; }}")
         # Jarvis bubble: white/grey on black — left aligned
-        return (f"QWidget {{ background: {C.PANEL2}; border: 1px solid {C.BORDER}; }}"
+        return (f"QWidget {{ background: {C.PANEL2}; border: 1px solid {C.BORDER}; border-radius: 0px; }}"
                 f"QLabel {{ color: {C.TEXT}; background: transparent; border: none; }}")
 
     @staticmethod
@@ -1023,11 +1023,16 @@ class ChatWidget(QWidget):
         — no logs, only the conversation."""
         tl = text.strip()
         low = tl.lower()
+        
+        # Explicitly ignore common log prefixes
+        if low.startswith(("[system]", "[error]", "[file]", "[intent]", "[sched]", "sys:", "err:")):
+            return
+
         if low.startswith(("you:", "you :")):
             self._add_bubble(tl.split(":", 1)[1].strip(), "you")
         elif low.startswith(("jarvis:", "jarvis :")):
             self._add_bubble(tl.split(":", 1)[1].strip(), "ai")
-        # everything else (SYS/ERR/FILE/INTENT/SCHED/…) is silently ignored
+        # everything else is silently ignored
 
     def add_instant(self, text: str, tag: str = "ai") -> None:
         """Same as add_message — kept for signal compatibility."""
@@ -1737,33 +1742,34 @@ class ConnectionsOverlay(QWidget):
         self.inputs = {}
 
         def _card(title: str, fields: list[tuple[str, str, bool, str]], check_keys: list[str]) -> QWidget:
-            card = QWidget()
+            card = QFrame()
+            card.setFrameShape(QFrame.Shape.StyledPanel)
             card.setStyleSheet(f"""
-                QWidget {{
+                QFrame {{
                     background: {C.PANEL2};
                     border: 1px solid {C.BORDER};
-                   
+                    border-radius: 0px;
                 }}
             """)
             card_lay = QVBoxLayout(card)
-            card_lay.setContentsMargins(12, 10, 12, 10)
-            card_lay.setSpacing(6)
+            card_lay.setContentsMargins(16, 12, 16, 12)
+            card_lay.setSpacing(8)
 
             header = QWidget()
             header.setStyleSheet("background: transparent; border: none;")
             h_lay = QHBoxLayout(header)
             h_lay.setContentsMargins(0, 0, 0, 0)
-            h_lay.setSpacing(6)
+            h_lay.setSpacing(8)
 
             dot = QLabel("●")
-            dot.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+            dot.setFont(QFont("Cantarell", 10, QFont.Weight.Bold))
             
             lbl = QLabel(title)
-            lbl.setFont(QFont(_FONT, 9, QFont.Weight.Bold))
+            lbl.setFont(QFont("Cantarell", 10, QFont.Weight.Bold))
             lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent; border: none;")
 
             status_lbl = QLabel("Disconnected")
-            status_lbl.setFont(QFont("Courier New", 7))
+            status_lbl.setFont(QFont("Cantarell", 8))
             
             h_lay.addWidget(dot)
             h_lay.addWidget(lbl)
@@ -1791,8 +1797,9 @@ class ConnectionsOverlay(QWidget):
                 inp.setStyleSheet(f"""
                     QLineEdit {{
                         background: {C.PANEL}; color: {C.TEXT};
-                        border: 1px solid {C.BORDER}; padding: 4px 8px;
+                        border: 1px solid {C.BORDER}; padding: 6px 10px;
                         font-family: '{_FONT}'; font-size: 9pt;
+                        border-radius: 0px;
                     }}
                     QLineEdit:focus {{ border: 1px solid {C.ACC}; }}
                 """)
@@ -2801,7 +2808,13 @@ class MainWindow(QMainWindow):
         self._footer_widget   = None
 
         central = QWidget()
-        central.setStyleSheet(f"background: {C.BG};")
+        central.setStyleSheet(f"""
+            QWidget {{ background: {C.BG}; border-radius: 0px; }}
+            * {{ border-radius: 0px !important; }}
+            QPushButton {{ border-radius: 0px; }}
+            QLineEdit {{ border-radius: 0px; }}
+            QFrame {{ border-radius: 0px; }}
+        """)
         self.setCentralWidget(central)
 
         root = QVBoxLayout(central)
