@@ -93,17 +93,17 @@ class ProviderOverlay(QWidget):
         self._locks: dict = {}          # pid -> bool (refresh in progress)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(8)
+        layout.setContentsMargins(30, 24, 30, 24)
+        layout.setSpacing(16)
 
         # ── Header ────────────────────────────────────────────────────────
         header_lay = QHBoxLayout()
-        header_lay.setSpacing(10)
+        header_lay.setSpacing(15)
         title_lbl = QLabel("AI PROVIDERS")
-        title_lbl.setFont(QFont(_font(), 12, QFont.Weight.Bold))
+        title_lbl.setFont(QFont(_font(), 16, QFont.Weight.Bold))
         title_lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent; border: none;")
         desc_lbl = QLabel("Manage providers & API keys — models load automatically")
-        desc_lbl.setFont(QFont(_font(), 8))
+        desc_lbl.setFont(QFont(_font(), 10))
         desc_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
         header_lay.addWidget(title_lbl)
         header_lay.addWidget(desc_lbl)
@@ -133,9 +133,9 @@ class ProviderOverlay(QWidget):
         inner.setStyleSheet("background: transparent;")
         grid = QGridLayout(inner)
         grid.setContentsMargins(0, 0, 0, 0)
-        grid.setSpacing(8)
+        grid.setSpacing(16)
         row = col = 0
-        per_row = 3
+        per_row = 2
         for p in PROVIDERS:
             card = self._build_card(p)
             self._cards[p["id"]] = card
@@ -211,15 +211,15 @@ class ProviderOverlay(QWidget):
             }}
         """)
         lay = QVBoxLayout(card)
-        lay.setContentsMargins(10, 8, 10, 8)
-        lay.setSpacing(6)
+        lay.setContentsMargins(15, 12, 15, 12)
+        lay.setSpacing(10)
 
         # Top row: label + badge
         top_row = QHBoxLayout()
-        top_row.setSpacing(6)
+        top_row.setSpacing(10)
         top_row.setContentsMargins(0, 0, 0, 0)
         lbl = QLabel(p["label"].upper())
-        lbl.setFont(QFont("Courier New", 9, QFont.Weight.Bold))
+        lbl.setFont(QFont("Courier New", 11, QFont.Weight.Bold))
         lbl.setStyleSheet(f"color: {C.PRI}; background: transparent; border: none;")
         top_row.addWidget(lbl)
         top_row.addStretch()

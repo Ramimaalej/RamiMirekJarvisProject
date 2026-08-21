@@ -77,10 +77,10 @@ def _run_async(coro):
 CONFIG_DIR = BASE_DIR / "config"
 API_FILE   = CONFIG_DIR / "api_keys.json"
 
-_DEFAULT_W, _DEFAULT_H = 1200, 780
-_MIN_W,     _MIN_H     = 960, 620
-_LEFT_W  = 185
-_RIGHT_W = 440
+_DEFAULT_W, _DEFAULT_H = 1400, 900
+_MIN_W,     _MIN_H     = 1200, 800
+_LEFT_W  = 220
+_RIGHT_W = 500
 
 _OS = platform.system()  # "Windows" | "Darwin" | "Linux"
 
@@ -155,9 +155,9 @@ class C:
                 pass
 
 _FONT = "Cantarell"
-_FONT_SZ = 12
-_FONT_SZ_SM = 10
-_FONT_SZ_XS = 9
+_FONT_SZ = 14
+_FONT_SZ_SM = 12
+_FONT_SZ_XS = 11
 
 
 def qcol(h: str, a: int = 255) -> QColor:
@@ -1701,16 +1701,16 @@ class ConnectionsOverlay(QWidget):
         """)
 
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(18, 14, 18, 14)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(30, 24, 30, 24)
+        main_layout.setSpacing(20)
 
         # Header Row
         header_lay = QHBoxLayout()
         title_lbl = QLabel("CONNECTION CENTER")
-        title_lbl.setFont(QFont(_FONT, 12, QFont.Weight.Bold))
+        title_lbl.setFont(QFont(_FONT, 16, QFont.Weight.Bold))
         title_lbl.setStyleSheet(f"color: {C.TEXT}; background: transparent; border: none;")
         desc_lbl = QLabel("Manage AI credentials, databases, local APIs, and workspace tokens")
-        desc_lbl.setFont(QFont(_FONT, 8))
+        desc_lbl.setFont(QFont(_FONT, 10))
         desc_lbl.setStyleSheet(f"color: {C.TEXT_MED}; background: transparent; border: none;")
         
         header_lay.addWidget(title_lbl)
@@ -1725,11 +1725,11 @@ class ConnectionsOverlay(QWidget):
         
         # Sidebar widget
         sidebar = QWidget()
-        sidebar.setFixedWidth(190)
+        sidebar.setFixedWidth(240)
         sidebar.setStyleSheet("background: transparent; border: none;")
         sidebar_lay = QVBoxLayout(sidebar)
         sidebar_lay.setContentsMargins(0, 0, 0, 0)
-        sidebar_lay.setSpacing(6)
+        sidebar_lay.setSpacing(10)
 
         self.stack = QStackedWidget()
         self.inputs = {}
