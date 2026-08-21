@@ -44,6 +44,11 @@ def load_api_keys() -> dict:
         return {}
 
 
+def load_config() -> dict:
+    """Alias for load_api_keys for compatibility."""
+    return load_api_keys()
+
+
 def is_configured() -> bool:
     cfg = load_api_keys()
     return (
