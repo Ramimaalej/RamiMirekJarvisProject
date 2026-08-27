@@ -72,6 +72,49 @@ def _fast_general_answer(self, user_text: str) -> None:
         logger.warning("Fast path failed: %s", e)
     return False
 
+
+def _offline_identity_scope_reply(user_text: str) -> str:
+    """Answer a small, safe identity-and-capability baseline without an LLM.
+
+    This protects essential setup and diagnostic prompts from a temporarily
+    unavailable model provider.  It deliberately has a narrow trigger and
+    never attempts to impersonate a tool result or answer arbitrary requests.
+    """
+    normalized = " ".join(user_text.casefold().split())
+    asks_about_identity = "jarvis mark xl" in normalized and any(
+        phrase in normalized
+        for phrase in (
+            "state your role",
+            "your role",
+            "real capability",
+            "must not claim",
+            "capability you must not claim",
+        )
+    )
+    if not asks_about_identity:
+        return ""
+
+    return (
+        "I am JARVIS MARK XL, Rami Maalej’s desktop AI assistant. "
+        "One real capability is routing supported local tools or configured "
+        "AI providers and reporting their verified results. I must not claim "
+        "that I opened an application, read your screen, accessed private data, "
+        "or fetched live information without a confirmed tool result."
+    )
+
+
+def _llm_unavailable_reply(short: str) -> str:
+    """Describe a model-provider failure without confusing it with refusal."""
+    hint = _llm_error_hint(short)
+    if hint:
+        return f"I could not reach the configured AI provider. {hint}"
+    return (
+        "I could not reach the configured AI provider, so I cannot answer "
+        "this request yet. Open Settings → PROVIDER, verify the selected "
+        "provider and model, then try again."
+    )
+
+
 def _process_message(self, user_text: str) -> None:
     """
     Full turn: user_text → LLM stream → TTS (overlapped) → tool execution
@@ -113,6 +156,29 @@ def _process_message(self, user_text: str) -> None:
 
     with self._conv_lock:
         self._conversation.append({"role": "user", "content": user_text})
+
+    # Identity/scope diagnostics should remain answerable even while a cloud
+    # provider, a local model server, or the network is being repaired.
+    offline_reply = _offline_identity_scope_reply(user_text)
+    if offline_reply:
+        self.ui.write_log_instant(f"Jarvis: {offline_reply}")
+        self.speak(offline_reply)
+        assistant_msg = {"role": "assistant", "content": offline_reply}
+        with self._conv_lock:
+            self._conversation.append(assistant_msg)
+        threading.Thread(
+            target=store_conversation,
+            args=(user_text, offline_reply),
+            daemon=True,
+        ).start()
+        try:
+            from core.jarvis_memory import update_last_episode  # noqa: E402
+            update_last_episode(offline_reply)
+        except Exception:
+            pass
+        if not self.ui.muted:
+            self.ui.set_state("LISTENING")
+        return
 
     MAX_HISTORY = 10
     if len(self._conversation) > MAX_HISTORY:
@@ -222,12 +288,11 @@ def _process_message(self, user_text: str) -> None:
                     final_tool_calls = event["tool_calls"]
         except RuntimeError as e:
             short = str(e)[:120]
-            hint = _llm_error_hint(short)
             self.ui.write_log(f"ERR: LLM — {short}")
-            if hint:
-                self.ui.write_log(hint)
-            self.speak(hint_short(hint) if hint else "I cannot do that.")
-            fallback = {"role": "assistant", "content": f"I'm sorry, I encountered an error: {short}"}
+            reply = _llm_unavailable_reply(short)
+            self.ui.write_log_instant(f"Jarvis: {reply}")
+            self.speak(reply)
+            fallback = {"role": "assistant", "content": reply}
             with self._conv_lock:
                 self._conversation.append(fallback)
             return
@@ -390,4 +455,3 @@ def hint_short(hint: str) -> str:
 # ------------------------------------------------------------------
 # STT listening loops
 # ------------------------------------------------------------------
-
