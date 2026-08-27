@@ -817,6 +817,18 @@ _INTENTS: list[dict[str, Any]] = [
         "priority": "high",
     },
     {
+        "name": "youtube_video",
+        "subsystem": "media",
+        "patterns": [
+            r"^(open|play|search|find)\s+.*\s+(on|in)\s+(youtube|yt)$",
+            r"^(open|play|search|find)\s+(youtube|yt)\s+.*$",
+        ],
+        "handler": "youtube_video",
+        "params": {},
+        "requires_ai": False,
+        "priority": "high",
+    },
+    {
         "name": "open_app",
         "subsystem": "browser",
         "patterns": [
@@ -1995,6 +2007,12 @@ class IntentRouter:
                 params["query"] = query
             else:
                 params["query"] = text
+
+        elif intent["name"] == "youtube_video":
+            query = re.sub(r"^(?:open|play|search|find)\s+(?:a|an|the)?\s*", "", text, flags=re.IGNORECASE)
+            query = re.sub(r"\s+(?:on|in|from|at)\s+(?:youtube|yt)\s*$", "", query, flags=re.IGNORECASE)
+            params["action"] = "open_search"
+            params["query"] = query.strip() or "YouTube"
 
         elif intent["name"] == "generate_image":
             prompt = text[match.end():].strip().rstrip("!?., ")

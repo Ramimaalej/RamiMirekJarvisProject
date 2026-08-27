@@ -68,18 +68,6 @@ import actions.wiki_tools as _wiki
 import actions.system_health as _health
 import actions.news_pro as _news_pro
 
-import actions.device_scanner as _devices
-import actions.stock_market as _stocks
-import actions.translator as _trans
-import actions.media_downloader as _dl
-import actions.network_tools as _net
-import actions.process_mgr as _proc
-import actions.archive_tools as _arch
-import actions.image_edit as _img
-import actions.wiki_tools as _wiki
-import actions.system_health as _health
-import actions.news_pro as _news_pro
-
 from actions.qr_tools import qr_generate as _qr_gen, qr_scan as _qr_scan
 from actions.clipboard_mgr import clipboard_read as _clip_read, clipboard_write as _clip_write
 from actions.dictionary_tools import word_definition as _word_def, word_synonyms as _word_syn, word_example as _word_ex
@@ -184,16 +172,15 @@ def execute_tool(ui, name: str, args: dict,
         if name == "open_app":
             r = open_app(parameters=args, response=None, player=ui)
             result = r or f"Opened {args.get('app_name')}."
-        elif name == "list_apps":
-            from actions.open_app import list_apps
-            result = list_apps(args, ui)
-            # Feed the dashboard: successful app launches teach Jarvis
-            # which software is used daily.
-            if r and not any(w in r for w in ("Could not", "Failed", "Unsupported")):
+            # Feed the dashboard only after an actual successful launch.
+            if r and not any(word in r for word in ("Could not", "Failed", "Unsupported")):
                 try:
                     dashboard_log_usage(args.get("app_name", ""))
                 except Exception:
                     pass
+        elif name == "list_apps":
+            from actions.open_app import list_apps
+            result = list_apps(args, ui)
 
         elif name == "run_fcc":
             r = run_fcc_in_folder(parameters=args, response=None, player=ui)
@@ -374,6 +361,10 @@ def execute_tool(ui, name: str, args: dict,
         elif name == "stock_price":
             r = stock_price_action(parameters=args, player=ui)
             result = r or "Done."
+
+        elif name == "stock_market":
+            r = _stocks.get_stock_price(parameters=args, player=ui)
+            result = r or "Market data is currently unavailable."
 
         elif name == "news":
             r = news_action(parameters=args, player=ui)
@@ -1429,4 +1420,3 @@ def execute_tool(ui, name: str, args: dict,
 
     print(f"[JARVIS] 📤 {name} → {str(result)[:80]}")
     return result
-

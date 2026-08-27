@@ -283,6 +283,17 @@ def _handle_play(parameters: dict, player) -> str:
     return f"Opened YouTube search for: {query} (manual selection required)"
 
 
+def _handle_open_search(parameters: dict, player, speak) -> str:
+    """Open a YouTube results page immediately for explicit playlist/video searches."""
+    query = parameters.get("query", "").strip()
+    if not query:
+        return "Please provide a YouTube search query."
+    if player:
+        player.write_log(f"[YouTube] Opening search: {query}")
+    _open_url(f"https://www.youtube.com/results?search_query={quote_plus(query)}")
+    return f"Opened YouTube search for '{query}' in your browser."
+
+
 def _handle_summarize(parameters: dict, player, speak) -> str:
     if not _TRANSCRIPT_OK:
         return "youtube-transcript-api is not installed. Run: pip install youtube-transcript-api"
@@ -531,6 +542,7 @@ def _handle_download(parameters: dict, player, speak) -> str:
 
 _ACTION_MAP = {
     "play":          _handle_play,
+    "open_search":   _handle_open_search,
     "summarize":     _handle_summarize,
     "get_info":      _handle_get_info,
     "trending":      _handle_trending,
